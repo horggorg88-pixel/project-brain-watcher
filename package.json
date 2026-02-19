@@ -1,6 +1,6 @@
 {
   "name": "project-brain-watcher",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "description": "Smart Local Watcher for Project Brain MCP Server — indexes your codebase and pushes compressed summaries",
   "license": "MIT",
   "type": "module",
