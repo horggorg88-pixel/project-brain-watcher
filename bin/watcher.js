@@ -1,30 +1,1921 @@
 #!/usr/bin/env node
-import{createRequire}from'module';const require=createRequire(import.meta.url);
-import{createHash as Cs}from"node:crypto";import{readFileSync as Ds,statSync as wt,readdirSync as Ls,existsSync as Fs}from"node:fs";import{join as ks,relative as Nt,extname as Bt}from"node:path";import{stat as rs}from"fs";import{stat as is,readdir as os}from"fs/promises";import{EventEmitter as as}from"events";import*as w from"path";import{stat as ve,lstat as zt,readdir as Ce,realpath as De}from"node:fs/promises";import{Readable as Le}from"node:stream";import{resolve as Ht,relative as Fe,join as ke,sep as Me}from"node:path";var T={FILE_TYPE:"files",DIR_TYPE:"directories",FILE_DIR_TYPE:"files_directories",EVERYTHING_TYPE:"all"},_t={root:".",fileFilter:r=>!0,directoryFilter:r=>!0,type:T.FILE_TYPE,lstat:!1,depth:2147483648,alwaysStat:!1,highWaterMark:4096};Object.freeze(_t);var Gt="READDIRP_RECURSIVE_ERROR",Ae=new Set(["ENOENT","EPERM","EACCES","ELOOP",Gt]),Yt=[T.DIR_TYPE,T.EVERYTHING_TYPE,T.FILE_DIR_TYPE,T.FILE_TYPE],je=new Set([T.DIR_TYPE,T.EVERYTHING_TYPE,T.FILE_DIR_TYPE]),Ne=new Set([T.EVERYTHING_TYPE,T.FILE_DIR_TYPE,T.FILE_TYPE]),Be=r=>Ae.has(r.code),Oe=process.platform==="win32",Ut=r=>!0,Kt=r=>{if(r===void 0)return Ut;if(typeof r=="function")return r;if(typeof r=="string"){let t=r.trim();return e=>e.basename===t}if(Array.isArray(r)){let t=r.map(e=>e.trim());return e=>t.some(n=>e.basename===n)}return Ut},bt=class extends Le{constructor(t={}){super({objectMode:!0,autoDestroy:!0,highWaterMark:t.highWaterMark});let e={..._t,...t},{root:n,type:s}=e;this._fileFilter=Kt(e.fileFilter),this._directoryFilter=Kt(e.directoryFilter);let i=e.lstat?zt:ve;Oe?this._stat=o=>i(o,{bigint:!0}):this._stat=i,this._maxDepth=e.depth??_t.depth,this._wantsDir=s?je.has(s):!1,this._wantsFile=s?Ne.has(s):!1,this._wantsEverything=s===T.EVERYTHING_TYPE,this._root=Ht(n),this._isDirent=!e.alwaysStat,this._statsProp=this._isDirent?"dirent":"stats",this._rdOptions={encoding:"utf8",withFileTypes:this._isDirent},this.parents=[this._exploreDir(n,1)],this.reading=!1,this.parent=void 0}async _read(t){if(!this.reading){this.reading=!0;try{for(;!this.destroyed&&t>0;){let e=this.parent,n=e&&e.files;if(n&&n.length>0){let{path:s,depth:i}=e,o=n.splice(0,t).map(c=>this._formatEntry(c,s)),a=await Promise.all(o);for(let c of a){if(!c)continue;if(this.destroyed)return;let h=await this._getEntryType(c);h==="directory"&&this._directoryFilter(c)?(i<=this._maxDepth&&this.parents.push(this._exploreDir(c.fullPath,i+1)),this._wantsDir&&(this.push(c),t--)):(h==="file"||this._includeAsFile(c))&&this._fileFilter(c)&&this._wantsFile&&(this.push(c),t--)}}else{let s=this.parents.pop();if(!s){this.push(null);break}if(this.parent=await s,this.destroyed)return}}}catch(e){this.destroy(e)}finally{this.reading=!1}}}async _exploreDir(t,e){let n;try{n=await Ce(t,this._rdOptions)}catch(s){this._onError(s)}return{files:n,depth:e,path:t}}async _formatEntry(t,e){let n,s=this._isDirent?t.name:t;try{let i=Ht(ke(e,s));n={path:Fe(this._root,i),fullPath:i,basename:s},n[this._statsProp]=this._isDirent?t:await this._stat(i)}catch(i){this._onError(i);return}return n}_onError(t){Be(t)&&!this.destroyed?this.emit("warn",t):this.destroy(t)}async _getEntryType(t){if(!t&&this._statsProp in t)return"";let e=t[this._statsProp];if(e.isFile())return"file";if(e.isDirectory())return"directory";if(e&&e.isSymbolicLink()){let n=t.fullPath;try{let s=await De(n),i=await zt(s);if(i.isFile())return"file";if(i.isDirectory()){let o=s.length;if(n.startsWith(s)&&n.substr(o,1)===Me){let a=new Error(`Circular symlink detected: "${n}" points to "${s}"`);return a.code=Gt,this._onError(a)}return"directory"}}catch(s){return this._onError(s),""}}}_includeAsFile(t){let e=t&&t[this._statsProp];return e&&this._wantsEverything&&!e.isDirectory()}};function Vt(r,t={}){let e=t.entryType||t.type;if(e==="both"&&(e=T.FILE_DIR_TYPE),e&&(t.type=e),r){if(typeof r!="string")throw new TypeError("readdirp: root argument must be a string. Usage: readdirp(root, options)");if(e&&!Yt.includes(e))throw new Error(`readdirp: Invalid type passed. Use one of ${Yt.join(", ")}`)}else throw new Error("readdirp: root argument is required. Usage: readdirp(root, options)");return t.root=r,new bt(t)}import{watchFile as We,unwatchFile as Jt,watch as ze}from"fs";import{open as He,stat as Xt,lstat as Ye,realpath as Et}from"fs/promises";import*as E from"path";import{type as Ue}from"os";var Ke="data",St="end",Qt="close",X=()=>{};var Q=process.platform,Pt=Q==="win32",Ge=Q==="darwin",Ve=Q==="linux",Je=Q==="freebsd",Zt=Ue()==="OS400",$={ALL:"all",READY:"ready",ADD:"add",CHANGE:"change",ADD_DIR:"addDir",UNLINK:"unlink",UNLINK_DIR:"unlinkDir",RAW:"raw",ERROR:"error"},D=$,qe="watch",Xe={lstat:Ye,stat:Xt},j="listeners",G="errHandlers",W="rawEmitters",Qe=[j,G,W],Ze=new Set(["3dm","3ds","3g2","3gp","7z","a","aac","adp","afdesign","afphoto","afpub","ai","aif","aiff","alz","ape","apk","appimage","ar","arj","asf","au","avi","bak","baml","bh","bin","bk","bmp","btif","bz2","bzip2","cab","caf","cgm","class","cmx","cpio","cr2","cur","dat","dcm","deb","dex","djvu","dll","dmg","dng","doc","docm","docx","dot","dotm","dra","DS_Store","dsk","dts","dtshd","dvb","dwg","dxf","ecelp4800","ecelp7470","ecelp9600","egg","eol","eot","epub","exe","f4v","fbs","fh","fla","flac","flatpak","fli","flv","fpx","fst","fvt","g3","gh","gif","graffle","gz","gzip","h261","h263","h264","icns","ico","ief","img","ipa","iso","jar","jpeg","jpg","jpgv","jpm","jxr","key","ktx","lha","lib","lvp","lz","lzh","lzma","lzo","m3u","m4a","m4v","mar","mdi","mht","mid","midi","mj2","mka","mkv","mmr","mng","mobi","mov","movie","mp3","mp4","mp4a","mpeg","mpg","mpga","mxu","nef","npx","numbers","nupkg","o","odp","ods","odt","oga","ogg","ogv","otf","ott","pages","pbm","pcx","pdb","pdf","pea","pgm","pic","png","pnm","pot","potm","potx","ppa","ppam","ppm","pps","ppsm","ppsx","ppt","pptm","pptx","psd","pya","pyc","pyo","pyv","qt","rar","ras","raw","resources","rgb","rip","rlc","rmf","rmvb","rpm","rtf","rz","s3m","s7z","scpt","sgi","shar","snap","sil","sketch","slk","smv","snk","so","stl","suo","sub","swf","tar","tbz","tbz2","tga","tgz","thmx","tif","tiff","tlz","ttc","ttf","txz","udf","uvh","uvi","uvm","uvp","uvs","uvu","viv","vob","war","wav","wax","wbmp","wdp","weba","webm","webp","whl","wim","wm","wma","wmv","wmx","woff","woff2","wrm","wvx","xbm","xif","xla","xlam","xls","xlsb","xlsm","xlsx","xlt","xltm","xltx","xm","xmind","xpi","xpm","xwd","xz","z","zip","zipx"]),ts=r=>Ze.has(E.extname(r).slice(1).toLowerCase()),Rt=(r,t)=>{r instanceof Set?r.forEach(t):t(r)},z=(r,t,e)=>{let n=r[t];n instanceof Set||(r[t]=n=new Set([n])),n.add(e)},es=r=>t=>{let e=r[t];e instanceof Set?e.clear():delete r[t]},H=(r,t,e)=>{let n=r[t];n instanceof Set?n.delete(e):n===e&&delete r[t]},te=r=>r instanceof Set?r.size===0:!r,V=new Map;function qt(r,t,e,n,s){let i=(o,a)=>{e(r),s(o,a,{watchedPath:r}),a&&r!==a&&J(E.resolve(r,a),j,E.join(r,a))};try{return ze(r,{persistent:t.persistent},i)}catch(o){n(o);return}}var J=(r,t,e,n,s)=>{let i=V.get(r);i&&Rt(i[t],o=>{o(e,n,s)})},ss=(r,t,e,n)=>{let{listener:s,errHandler:i,rawEmitter:o}=n,a=V.get(t),c;if(!e.persistent)return c=qt(r,e,s,i,o),c?c.close.bind(c):void 0;if(a)z(a,j,s),z(a,G,i),z(a,W,o);else{if(c=qt(r,e,J.bind(null,t,j),i,J.bind(null,t,W)),!c)return;c.on(D.ERROR,async h=>{let l=J.bind(null,t,G);if(a&&(a.watcherUnusable=!0),Pt&&h.code==="EPERM")try{await(await He(r,"r")).close(),l(h)}catch{}else l(h)}),a={listeners:s,errHandlers:i,rawEmitters:o,watcher:c},V.set(t,a)}return()=>{H(a,j,s),H(a,G,i),H(a,W,o),te(a.listeners)&&(a.watcher.close(),V.delete(t),Qe.forEach(es(a)),a.watcher=void 0,Object.freeze(a))}},$t=new Map,ns=(r,t,e,n)=>{let{listener:s,rawEmitter:i}=n,o=$t.get(t),a=o&&o.options;return a&&(a.persistent<e.persistent||a.interval>e.interval)&&(Jt(t),o=void 0),o?(z(o,j,s),z(o,W,i)):(o={listeners:s,rawEmitters:i,options:e,watcher:We(t,e,(c,h)=>{Rt(o.rawEmitters,p=>{p(D.CHANGE,t,{curr:c,prev:h})});let l=c.mtimeMs;(c.size!==h.size||l>h.mtimeMs||l===0)&&Rt(o.listeners,p=>p(r,c))})},$t.set(t,o)),()=>{H(o,j,s),H(o,W,i),te(o.listeners)&&($t.delete(t),Jt(t),o.options=o.watcher=void 0,Object.freeze(o))}},q=class{constructor(t){this.fsw=t,this._boundHandleError=e=>t._handleError(e)}_watchWithNodeFs(t,e){let n=this.fsw.options,s=E.dirname(t),i=E.basename(t);this.fsw._getWatchedDir(s).add(i);let a=E.resolve(t),c={persistent:n.persistent};e||(e=X);let h;if(n.usePolling){let l=n.interval!==n.binaryInterval;c.interval=l&&ts(i)?n.binaryInterval:n.interval,h=ns(t,a,c,{listener:e,rawEmitter:this.fsw._emitRaw})}else h=ss(t,a,c,{listener:e,errHandler:this._boundHandleError,rawEmitter:this.fsw._emitRaw});return h}_handleFile(t,e,n){if(this.fsw.closed)return;let s=E.dirname(t),i=E.basename(t),o=this.fsw._getWatchedDir(s),a=e;if(o.has(i))return;let c=async(l,p)=>{if(this.fsw._throttle(qe,t,5)){if(!p||p.mtimeMs===0)try{let d=await Xt(t);if(this.fsw.closed)return;let g=d.atimeMs,f=d.mtimeMs;if((!g||g<=f||f!==a.mtimeMs)&&this.fsw._emit(D.CHANGE,t,d),(Ge||Ve||Je)&&a.ino!==d.ino){this.fsw._closeFile(l),a=d;let x=this._watchWithNodeFs(t,c);x&&this.fsw._addPathCloser(l,x)}else a=d}catch{this.fsw._remove(s,i)}else if(o.has(i)){let d=p.atimeMs,g=p.mtimeMs;(!d||d<=g||g!==a.mtimeMs)&&this.fsw._emit(D.CHANGE,t,p),a=p}}},h=this._watchWithNodeFs(t,c);if(!(n&&this.fsw.options.ignoreInitial)&&this.fsw._isntIgnored(t)){if(!this.fsw._throttle(D.ADD,t,0))return;this.fsw._emit(D.ADD,t,e)}return h}async _handleSymlink(t,e,n,s){if(this.fsw.closed)return;let i=t.fullPath,o=this.fsw._getWatchedDir(e);if(!this.fsw.options.followSymlinks){this.fsw._incrReadyCount();let a;try{a=await Et(n)}catch{return this.fsw._emitReady(),!0}return this.fsw.closed?void 0:(o.has(s)?this.fsw._symlinkPaths.get(i)!==a&&(this.fsw._symlinkPaths.set(i,a),this.fsw._emit(D.CHANGE,n,t.stats)):(o.add(s),this.fsw._symlinkPaths.set(i,a),this.fsw._emit(D.ADD,n,t.stats)),this.fsw._emitReady(),!0)}if(this.fsw._symlinkPaths.has(i))return!0;this.fsw._symlinkPaths.set(i,!0)}_handleRead(t,e,n,s,i,o,a){if(t=E.join(t,""),a=this.fsw._throttle("readdir",t,1e3),!a)return;let c=this.fsw._getWatchedDir(n.path),h=new Set,l=this.fsw._readdirp(t,{fileFilter:p=>n.filterPath(p),directoryFilter:p=>n.filterDir(p)});if(l)return l.on(Ke,async p=>{if(this.fsw.closed){l=void 0;return}let d=p.path,g=E.join(t,d);if(h.add(d),!(p.stats.isSymbolicLink()&&await this._handleSymlink(p,t,g,d))){if(this.fsw.closed){l=void 0;return}(d===s||!s&&!c.has(d))&&(this.fsw._incrReadyCount(),g=E.join(i,E.relative(i,g)),this._addToNodeFs(g,e,n,o+1))}}).on(D.ERROR,this._boundHandleError),new Promise((p,d)=>{if(!l)return d();l.once(St,()=>{if(this.fsw.closed){l=void 0;return}let g=a?a.clear():!1;p(void 0),c.getChildren().filter(f=>f!==t&&!h.has(f)).forEach(f=>{this.fsw._remove(t,f)}),l=void 0,g&&this._handleRead(t,!1,n,s,i,o,a)})})}async _handleDir(t,e,n,s,i,o,a){let c=this.fsw._getWatchedDir(E.dirname(t)),h=c.has(E.basename(t));!(n&&this.fsw.options.ignoreInitial)&&!i&&!h&&this.fsw._emit(D.ADD_DIR,t,e),c.add(E.basename(t)),this.fsw._getWatchedDir(t);let l,p,d=this.fsw.options.depth;if((d==null||s<=d)&&!this.fsw._symlinkPaths.has(a)){if(!i&&(await this._handleRead(t,n,o,i,t,s,l),this.fsw.closed))return;p=this._watchWithNodeFs(t,(g,f)=>{f&&f.mtimeMs===0||this._handleRead(g,!1,o,i,t,s,l)})}return p}async _addToNodeFs(t,e,n,s,i){let o=this.fsw._emitReady;if(this.fsw._isIgnored(t)||this.fsw.closed)return o(),!1;let a=this.fsw._getWatchHelpers(t);n&&(a.filterPath=c=>n.filterPath(c),a.filterDir=c=>n.filterDir(c));try{let c=await Xe[a.statMethod](a.watchPath);if(this.fsw.closed)return;if(this.fsw._isIgnored(a.watchPath,c))return o(),!1;let h=this.fsw.options.followSymlinks,l;if(c.isDirectory()){let p=E.resolve(t),d=h?await Et(t):t;if(this.fsw.closed||(l=await this._handleDir(a.watchPath,c,e,s,i,a,d),this.fsw.closed))return;p!==d&&d!==void 0&&this.fsw._symlinkPaths.set(p,d)}else if(c.isSymbolicLink()){let p=h?await Et(t):t;if(this.fsw.closed)return;let d=E.dirname(a.watchPath);if(this.fsw._getWatchedDir(d).add(a.watchPath),this.fsw._emit(D.ADD,a.watchPath,c),l=await this._handleDir(d,c,e,s,t,a,p),this.fsw.closed)return;p!==void 0&&this.fsw._symlinkPaths.set(E.resolve(t),p)}else l=this._handleFile(a.watchPath,c,e);return o(),l&&this.fsw._addPathCloser(t,l),!1}catch(c){if(this.fsw._handleError(c))return o(),t}}};var It="/",cs="//",oe=".",ls="..",hs="string",us=/\\/g,ee=/\/\//,ps=/\..*\.(sw[px])$|~$|\.subl.*\.tmp/,ds=/^\.[/\\]/;function Z(r){return Array.isArray(r)?r:[r]}var Tt=r=>typeof r=="object"&&r!==null&&!(r instanceof RegExp);function ms(r){return typeof r=="function"?r:typeof r=="string"?t=>r===t:r instanceof RegExp?t=>r.test(t):typeof r=="object"&&r!==null?t=>{if(r.path===t)return!0;if(r.recursive){let e=w.relative(r.path,t);return e?!e.startsWith("..")&&!w.isAbsolute(e):!1}return!1}:()=>!1}function fs(r){if(typeof r!="string")throw new Error("string expected");r=w.normalize(r),r=r.replace(/\\/g,"/");let t=!1;r.startsWith("//")&&(t=!0);let e=/\/\//;for(;r.match(e);)r=r.replace(e,"/");return t&&(r="/"+r),r}function se(r,t,e){let n=fs(t);for(let s=0;s<r.length;s++){let i=r[s];if(i(n,e))return!0}return!1}function gs(r,t){if(r==null)throw new TypeError("anymatch: specify first argument");let n=Z(r).map(s=>ms(s));return t==null?(s,i)=>se(n,s,i):se(n,t)}var ne=r=>{let t=Z(r).flat();if(!t.every(e=>typeof e===hs))throw new TypeError(`Non-string provided as watch path: ${t}`);return t.map(ae)},re=r=>{let t=r.replace(us,It),e=!1;for(t.startsWith(cs)&&(e=!0);t.match(ee);)t=t.replace(ee,It);return e&&(t=It+t),t},ae=r=>re(w.normalize(re(r))),ie=(r="")=>t=>typeof t=="string"?ae(w.isAbsolute(t)?t:w.join(r,t)):t,ys=(r,t)=>w.isAbsolute(r)?r:w.join(t,r),ws=Object.freeze(new Set),vt=class{constructor(t,e){this.path=t,this._removeWatcher=e,this.items=new Set}add(t){let{items:e}=this;e&&t!==oe&&t!==ls&&e.add(t)}async remove(t){let{items:e}=this;if(!e||(e.delete(t),e.size>0))return;let n=this.path;try{await os(n)}catch{this._removeWatcher&&this._removeWatcher(w.dirname(n),w.basename(n))}}has(t){let{items:e}=this;if(e)return e.has(t)}getChildren(){let{items:t}=this;return t?[...t.values()]:[]}dispose(){this.items.clear(),this.path="",this._removeWatcher=X,this.items=ws,Object.freeze(this)}},xs="stat",_s="lstat",Ct=class{constructor(t,e,n){this.fsw=n;let s=t;this.path=t=t.replace(ds,""),this.watchPath=s,this.fullWatchPath=w.resolve(s),this.dirParts=[],this.dirParts.forEach(i=>{i.length>1&&i.pop()}),this.followSymlinks=e,this.statMethod=e?xs:_s}entryPath(t){return w.join(this.watchPath,w.relative(this.watchPath,t.fullPath))}filterPath(t){let{stats:e}=t;if(e&&e.isSymbolicLink())return this.filterDir(t);let n=this.entryPath(t);return this.fsw._isntIgnored(n,e)&&this.fsw._hasReadPermissions(e)}filterDir(t){return this.fsw._isntIgnored(this.entryPath(t),t.stats)}},tt=class extends as{constructor(t={}){super(),this.closed=!1,this._closers=new Map,this._ignoredPaths=new Set,this._throttled=new Map,this._streams=new Set,this._symlinkPaths=new Map,this._watched=new Map,this._pendingWrites=new Map,this._pendingUnlinks=new Map,this._readyCount=0,this._readyEmitted=!1;let e=t.awaitWriteFinish,n={stabilityThreshold:2e3,pollInterval:100},s={persistent:!0,ignoreInitial:!1,ignorePermissionErrors:!1,interval:100,binaryInterval:300,followSymlinks:!0,usePolling:!1,atomic:!0,...t,ignored:t.ignored?Z(t.ignored):Z([]),awaitWriteFinish:e===!0?n:typeof e=="object"?{...n,...e}:!1};Zt&&(s.usePolling=!0),s.atomic===void 0&&(s.atomic=!s.usePolling);let i=process.env.CHOKIDAR_USEPOLLING;if(i!==void 0){let c=i.toLowerCase();c==="false"||c==="0"?s.usePolling=!1:c==="true"||c==="1"?s.usePolling=!0:s.usePolling=!!c}let o=process.env.CHOKIDAR_INTERVAL;o&&(s.interval=Number.parseInt(o,10));let a=0;this._emitReady=()=>{a++,a>=this._readyCount&&(this._emitReady=X,this._readyEmitted=!0,process.nextTick(()=>this.emit($.READY)))},this._emitRaw=(...c)=>this.emit($.RAW,...c),this._boundRemove=this._remove.bind(this),this.options=s,this._nodeFsHandler=new q(this),Object.freeze(s)}_addIgnoredPath(t){if(Tt(t)){for(let e of this._ignoredPaths)if(Tt(e)&&e.path===t.path&&e.recursive===t.recursive)return}this._ignoredPaths.add(t)}_removeIgnoredPath(t){if(this._ignoredPaths.delete(t),typeof t=="string")for(let e of this._ignoredPaths)Tt(e)&&e.path===t&&this._ignoredPaths.delete(e)}add(t,e,n){let{cwd:s}=this.options;this.closed=!1,this._closePromise=void 0;let i=ne(t);return s&&(i=i.map(o=>ys(o,s))),i.forEach(o=>{this._removeIgnoredPath(o)}),this._userIgnored=void 0,this._readyCount||(this._readyCount=0),this._readyCount+=i.length,Promise.all(i.map(async o=>{let a=await this._nodeFsHandler._addToNodeFs(o,!n,void 0,0,e);return a&&this._emitReady(),a})).then(o=>{this.closed||o.forEach(a=>{a&&this.add(w.dirname(a),w.basename(e||a))})}),this}unwatch(t){if(this.closed)return this;let e=ne(t),{cwd:n}=this.options;return e.forEach(s=>{!w.isAbsolute(s)&&!this._closers.has(s)&&(n&&(s=w.join(n,s)),s=w.resolve(s)),this._closePath(s),this._addIgnoredPath(s),this._watched.has(s)&&this._addIgnoredPath({path:s,recursive:!0}),this._userIgnored=void 0}),this}close(){if(this._closePromise)return this._closePromise;this.closed=!0,this.removeAllListeners();let t=[];return this._closers.forEach(e=>e.forEach(n=>{let s=n();s instanceof Promise&&t.push(s)})),this._streams.forEach(e=>e.destroy()),this._userIgnored=void 0,this._readyCount=0,this._readyEmitted=!1,this._watched.forEach(e=>e.dispose()),this._closers.clear(),this._watched.clear(),this._streams.clear(),this._symlinkPaths.clear(),this._throttled.clear(),this._closePromise=t.length?Promise.all(t).then(()=>{}):Promise.resolve(),this._closePromise}getWatched(){let t={};return this._watched.forEach((e,n)=>{let i=(this.options.cwd?w.relative(this.options.cwd,n):n)||oe;t[i]=e.getChildren().sort()}),t}emitWithAll(t,e){this.emit(t,...e),t!==$.ERROR&&this.emit($.ALL,t,...e)}async _emit(t,e,n){if(this.closed)return;let s=this.options;Pt&&(e=w.normalize(e)),s.cwd&&(e=w.relative(s.cwd,e));let i=[e];n!=null&&i.push(n);let o=s.awaitWriteFinish,a;if(o&&(a=this._pendingWrites.get(e)))return a.lastChange=new Date,this;if(s.atomic){if(t===$.UNLINK)return this._pendingUnlinks.set(e,[t,...i]),setTimeout(()=>{this._pendingUnlinks.forEach((c,h)=>{this.emit(...c),this.emit($.ALL,...c),this._pendingUnlinks.delete(h)})},typeof s.atomic=="number"?s.atomic:100),this;t===$.ADD&&this._pendingUnlinks.has(e)&&(t=$.CHANGE,this._pendingUnlinks.delete(e))}if(o&&(t===$.ADD||t===$.CHANGE)&&this._readyEmitted){let c=(h,l)=>{h?(t=$.ERROR,i[0]=h,this.emitWithAll(t,i)):l&&(i.length>1?i[1]=l:i.push(l),this.emitWithAll(t,i))};return this._awaitWriteFinish(e,o.stabilityThreshold,t,c),this}if(t===$.CHANGE&&!this._throttle($.CHANGE,e,50))return this;if(s.alwaysStat&&n===void 0&&(t===$.ADD||t===$.ADD_DIR||t===$.CHANGE)){let c=s.cwd?w.join(s.cwd,e):e,h;try{h=await is(c)}catch{}if(!h||this.closed)return;i.push(h)}return this.emitWithAll(t,i),this}_handleError(t){let e=t&&t.code;return t&&e!=="ENOENT"&&e!=="ENOTDIR"&&(!this.options.ignorePermissionErrors||e!=="EPERM"&&e!=="EACCES")&&this.emit($.ERROR,t),t||this.closed}_throttle(t,e,n){this._throttled.has(t)||this._throttled.set(t,new Map);let s=this._throttled.get(t);if(!s)throw new Error("invalid throttle");let i=s.get(e);if(i)return i.count++,!1;let o,a=()=>{let h=s.get(e),l=h?h.count:0;return s.delete(e),clearTimeout(o),h&&clearTimeout(h.timeoutObject),l};o=setTimeout(a,n);let c={timeoutObject:o,clear:a,count:0};return s.set(e,c),c}_incrReadyCount(){return this._readyCount++}_awaitWriteFinish(t,e,n,s){let i=this.options.awaitWriteFinish;if(typeof i!="object")return;let o=i.pollInterval,a,c=t;this.options.cwd&&!w.isAbsolute(t)&&(c=w.join(this.options.cwd,t));let h=new Date,l=this._pendingWrites;function p(d){rs(c,(g,f)=>{if(g||!l.has(t)){g&&g.code!=="ENOENT"&&s(g);return}let x=Number(new Date);d&&f.size!==d.size&&(l.get(t).lastChange=x);let _=l.get(t);x-_.lastChange>=e?(l.delete(t),s(void 0,f)):a=setTimeout(p,o,f)})}l.has(t)||(l.set(t,{lastChange:h,cancelWait:()=>(l.delete(t),clearTimeout(a),n)}),a=setTimeout(p,o))}_isIgnored(t,e){if(this.options.atomic&&ps.test(t))return!0;if(!this._userIgnored){let{cwd:n}=this.options,i=(this.options.ignored||[]).map(ie(n)),a=[...[...this._ignoredPaths].map(ie(n)),...i];this._userIgnored=gs(a,void 0)}return this._userIgnored(t,e)}_isntIgnored(t,e){return!this._isIgnored(t,e)}_getWatchHelpers(t){return new Ct(t,this.options.followSymlinks,this)}_getWatchedDir(t){let e=w.resolve(t);return this._watched.has(e)||this._watched.set(e,new vt(e,this._boundRemove)),this._watched.get(e)}_hasReadPermissions(t){return this.options.ignorePermissionErrors?!0:!!(Number(t.mode)&256)}_remove(t,e,n){let s=w.join(t,e),i=w.resolve(s);if(n=n??(this._watched.has(s)||this._watched.has(i)),!this._throttle("remove",s,100))return;!n&&this._watched.size===1&&this.add(t,e,!0),this._getWatchedDir(s).getChildren().forEach(d=>this._remove(s,d));let c=this._getWatchedDir(t),h=c.has(e);c.remove(e),this._symlinkPaths.has(i)&&this._symlinkPaths.delete(i);let l=s;if(this.options.cwd&&(l=w.relative(this.options.cwd,s)),this.options.awaitWriteFinish&&this._pendingWrites.has(l)&&this._pendingWrites.get(l).cancelWait()===$.ADD)return;this._watched.delete(s),this._watched.delete(i);let p=n?$.UNLINK_DIR:$.UNLINK;h&&!this._isIgnored(s)&&this._emit(p,s),this._closePath(s)}_closePath(t){this._closeFile(t);let e=w.dirname(t);this._getWatchedDir(e).remove(w.basename(t))}_closeFile(t){let e=this._closers.get(t);e&&(e.forEach(n=>n()),this._closers.delete(t))}_addPathCloser(t,e){if(!e)return;let n=this._closers.get(t);n||(n=[],this._closers.set(t,n)),n.push(e)}_readdirp(t,e){if(this.closed)return;let n={type:$.ALL,alwaysStat:!0,lstat:!0,...e,depth:0},s=Vt(t,n);return this._streams.add(s),s.once(Qt,()=>{s=void 0}),s.once(St,()=>{s&&(this._streams.delete(s),s=void 0)}),s}};function bs(r,t={}){let e=new tt(t);return e.add(r),e}var ce={watch:bs,FSWatcher:tt};import{readFileSync as le}from"node:fs";var et=class{parsersByExtension=new Map;parsersByLanguage=new Map;register(t){this.parsersByLanguage.set(t.language,t);for(let e of t.extensions)this.parsersByExtension.set(e.toLowerCase(),t)}getByExtension(t){return this.parsersByExtension.get(t.toLowerCase())??null}getByLanguage(t){return this.parsersByLanguage.get(t)??null}getByFilePath(t){let e=t.lastIndexOf(".");if(e===-1)return null;let n=t.slice(e).toLowerCase();return this.getByExtension(n)}getSupportedExtensions(){return[...this.parsersByExtension.keys()]}isSupported(t){return this.getByFilePath(t)!==null}};import{createHash as Es}from"node:crypto";var st=class{logger;constructor(t){this.logger=t}parse(t,e){let n=(s,i)=>({path:e,language:this.language,hash:Es("md5").update(s).digest("hex"),sizeBytes:Buffer.byteLength(s,"utf-8"),lineCount:s.split(`
-`).length,symbolCount:i.length,lastModified:Date.now(),isIndexed:!1});try{let s=this.extractSymbols(t,e);return{metadata:n(t,s),symbols:s,imports:this.extractImports(t),exports:s.filter(i=>i.isExported).map(i=>i.name),errors:[]}}catch(s){return this.logger.warn(`Parse error in ${e}: ${s}`),{metadata:n(t,[]),symbols:[],imports:[],exports:[],errors:[{message:String(s)}]}}}extractImports(t){let e=[],n=/^[ \t]*import\s+(?:type\s+)?(?:\{[^}]*\}|[\w*]+(?:\s*,\s*\{[^}]*\})?)\s+from\s+['"]([^'"]+)['"]/gm,s;for(;(s=n.exec(t))!==null;)e.push(s[1]);return e}extractDocComments(t){let e=new Map,n=/\/\*\*\s*([\s\S]*?)\s*\*\//g,s;for(;(s=n.exec(t))!==null;){let i=t.substring(0,s.index).split(`
-`).length;e.set(i,s[1].replace(/^\s*\*\s?/gm,"").trim())}return e}findDocComment(t,e){for(let n=e-1;n>=e-3&&n>=1;n--)if(t.has(n))return t.get(n)}};var L={FUNCTION:/^[ \t]*(export\s+)?(default\s+)?(async\s+)?function\s+(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)(?:\s*:\s*([^\s{]+(?:\s*\|\s*[^\s{]+)*))?\s*\{/gm,ARROW_FUNCTION:/^[ \t]*(export\s+)?(const|let)\s+(\w+)\s*(?::\s*[^=]+)?\s*=\s*(async\s+)?(?:\(([^)]*)\)|(\w+))(?:\s*:\s*([^\s=]+(?:\s*\|\s*[^\s=]+)*))?\s*=>/gm,CLASS:/^[ \t]*(export\s+)?(default\s+)?(abstract\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([\w\s,]+))?\s*\{/gm,INTERFACE:/^[ \t]*(export\s+)?interface\s+(\w+)(?:\s+extends\s+([\w\s,]+))?\s*\{/gm,TYPE_ALIAS:/^[ \t]*(export\s+)?type\s+(\w+)(?:<[^>]*>)?\s*=\s*(.+)/gm,VARIABLE:/^[ \t]*(export\s+)?(const|let|var)\s+(\w+)(?:\s*:\s*([^=]+))?\s*=/gm,METHOD:/^[ \t]*(public|private|protected|static|abstract|async|readonly|\s)*(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)(?:\s*:\s*([^\s{]+(?:\s*\|\s*[^\s{]+)*))?\s*\{/gm,IMPORT:/^[ \t]*import\s+(?:type\s+)?(?:\{[^}]*\}|[\w*]+(?:\s*,\s*\{[^}]*\})?)\s+from\s+['"]([^'"]+)['"]/gm,JSDOC:/\/\*\*\s*([\s\S]*?)\s*\*\//g},nt=class extends st{language="typescript";extensions=[".ts",".tsx",".js",".jsx"];constructor(t){super(t)}extractSymbols(t,e){let n=[],s=t.split(`
-`),i=this.extractDocComments(t);return n.push(...this.extractFunctions(t,e,s,i)),n.push(...this.extractArrowFunctions(t,e,s,i)),n.push(...this.extractClasses(t,e,s)),n.push(...this.extractInterfaces(t,e,s)),n.push(...this.extractTypeAliases(t,e,s)),n.push(...this.extractVariables(t,e,s)),n}extractImports(t){let e=[],n=new RegExp(L.IMPORT.source,"gm"),s;for(;(s=n.exec(t))!==null;)s[1]&&e.push(s[1]);return e}extractExports(t,e){return e.filter(n=>n.isExported).map(n=>n.name)}extractFunctions(t,e,n,s){let i=[],o=new RegExp(L.FUNCTION.source,"gm"),a;for(;(a=o.exec(t))!==null;){let c=this.getLineNumber(t,a.index),h=a[4]??"anonymous",l=!!a[1],p=!!a[3],d=a[5]??"",g=a[6]??null,f=this.parseParameters(d),x=this.findDocComment(s,c),_=this.findClosingBrace(n,c),S=this.buildFunctionSignature(l,p,h,f,g);i.push({id:`${e}:${h}:${c}`,name:h,type:"function",filePath:e,range:this.buildRange(c,_),signature:S,isExported:l,parameters:f,returnType:g,isAsync:p,isStatic:!1,docComment:x})}return i}extractArrowFunctions(t,e,n,s){let i=[],o=new RegExp(L.ARROW_FUNCTION.source,"gm"),a;for(;(a=o.exec(t))!==null;){let c=this.getLineNumber(t,a.index),h=a[3]??"anonymous",l=!!a[1],p=!!a[4],d=a[5]??a[6]??"",g=a[7]??null,f=this.parseParameters(d),x=this.findDocComment(s,c),_=this.buildFunctionSignature(l,p,h,f,g);i.push({id:`${e}:${h}:${c}`,name:h,type:"function",filePath:e,range:this.buildRange(c,c),signature:_,isExported:l,parameters:f,returnType:g,isAsync:p,isStatic:!1,docComment:x})}return i}extractClasses(t,e,n){let s=[],i=new RegExp(L.CLASS.source,"gm"),o;for(;(o=i.exec(t))!==null;){let a=this.getLineNumber(t,o.index),c=o[4]??"AnonymousClass",h=!!o[1],l=!!o[3],p=o[5]??null,d=o[6]?o[6].split(",").map(S=>S.trim()).filter(Boolean):[],g=this.findClosingBrace(n,a),f=n.slice(a,g+1).join(`
-`),x=this.extractClassMethods(f,e,a),_=this.buildClassSignature(h,l,c,p,d);s.push({id:`${e}:${c}:${a}`,name:c,type:"class",filePath:e,range:this.buildRange(a,g),signature:_,isExported:h,extends:p,implements:d,members:x,isAbstract:l})}return s}extractInterfaces(t,e,n){let s=[],i=new RegExp(L.INTERFACE.source,"gm"),o;for(;(o=i.exec(t))!==null;){let a=this.getLineNumber(t,o.index),c=o[2]??"AnonymousInterface",h=!!o[1],l=o[3]??"",p=this.findClosingBrace(n,a),d=h?`export interface ${c}${l?` extends ${l.trim()}`:""}`:`interface ${c}${l?` extends ${l.trim()}`:""}`;s.push({id:`${e}:${c}:${a}`,name:c,type:"interface",filePath:e,range:this.buildRange(a,p),signature:d,isExported:h})}return s}extractTypeAliases(t,e,n){let s=[],i=new RegExp(L.TYPE_ALIAS.source,"gm"),o;for(;(o=i.exec(t))!==null;){let a=this.getLineNumber(t,o.index),c=o[2]??"AnonymousType",h=!!o[1],l=(o[3]??"").trim().slice(0,100),p=h?`export type ${c} = ${l}`:`type ${c} = ${l}`;s.push({id:`${e}:${c}:${a}`,name:c,type:"type",filePath:e,range:this.buildRange(a,a),signature:p,isExported:h})}return s}extractVariables(t,e,n){let s=[],i=new RegExp(L.VARIABLE.source,"gm"),o,a=new Set,c=new RegExp(L.ARROW_FUNCTION.source,"gm"),h;for(;(h=c.exec(t))!==null;)h[3]&&a.add(h[3]);for(;(o=i.exec(t))!==null;){let l=o[3]??"anonymous";if(a.has(l))continue;let p=this.getLineNumber(t,o.index),d=!!o[1],g=o[2]??"const",f=o[4]?.trim()??null,x=g==="const",_=`${d?"export ":""}${g} ${l}${f?`: ${f}`:""}`;s.push({id:`${e}:${l}:${p}`,name:l,type:x?"constant":"variable",filePath:e,range:this.buildRange(p,p),signature:_,isExported:d,dataType:f,isConst:x})}return s}extractClassMethods(t,e,n){let s=[],i=new RegExp(L.METHOD.source,"gm"),o;for(;(o=i.exec(t))!==null;){let a=(o[1]??"").trim(),c=o[2];if(!c||c==="constructor"||c==="class"||c==="if"||c==="for"||c==="while")continue;let h=n+this.getLineNumber(t,o.index),l=o[3]??"",p=o[4]??null,d=`${a?a+" ":""}${c}(${l})${p?`: ${p}`:""}`;s.push({id:`${e}:${c}:${h}`,name:c,type:"method",filePath:e,range:this.buildRange(h,h),signature:d,isExported:!1})}return s}parseParameters(t){return t.trim()?t.split(",").map(e=>{let n=e.trim(),s=n.includes("?"),i=n.includes("="),o=n.split(/[?:=]/).map(l=>l.trim()).filter(Boolean),a=o[0]??"param",c=o[1]??null,h=i?o[2]??null:null;return{name:a,type:c,isOptional:s||i,defaultValue:h}}):[]}extractDocComments(t){let e=new Map,n=new RegExp(L.JSDOC.source,"g"),s;for(;(s=n.exec(t))!==null;){let i=this.getLineNumber(t,s.index+s[0].length),o=(s[1]??"").split(`
-`).map(a=>a.replace(/^\s*\*\s?/,"").trim()).filter(Boolean).join(" ");e.set(i+1,o)}return e}findDocComment(t,e){return t.get(e)??t.get(e-1)??null}getLineNumber(t,e){let n=0;for(let s=0;s<e&&s<t.length;s++)t[s]===`
-`&&n++;return n}findClosingBrace(t,e){let n=0,s=!1,i=!1,o=null;for(let a=e;a<t.length;a++){let c=t[a]??"";for(let h=0;h<c.length;h++){let l=c[h],p=c[h+1]??"";if(i){l==="*"&&p==="/"&&(i=!1,h++);continue}if(o!==null){if(l==="\\"){h++;continue}l===o&&(o=null);continue}if(l==="/"&&p==="/")break;if(l==="/"&&p==="*"){i=!0,h++;continue}if(l==="'"||l==='"'||l==="`"){o=l;continue}if(l==="{"?(n++,s=!0):l==="}"&&n--,s&&n===0)return a}}return Math.min(e+50,t.length-1)}buildRange(t,e){return{start:{line:t,column:0},end:{line:e,column:0}}}buildFunctionSignature(t,e,n,s,i){let o=[];t&&o.push("export"),e&&o.push("async"),o.push("function"),o.push(n);let a=s.map(c=>`${c.name}${c.isOptional?"?":""}${c.type?`: ${c.type}`:""}`).join(", ");return`${o.join(" ")}(${a})${i?`: ${i}`:""}`}buildClassSignature(t,e,n,s,i){let o=[];return t&&o.push("export"),e&&o.push("abstract"),o.push("class"),o.push(n),s&&o.push(`extends ${s}`),i.length>0&&o.push(`implements ${i.join(", ")}`),o.join(" ")}};var rt=class{level="L1";compactMode=!1;setCompactMode(t){this.compactMode=t}compress(t,e){let n=[];for(let a of t){let c=this.formatSymbol(a);c&&n.push(c)}let s=n.join(`
+#!/usr/bin/env node
 
-`),i=this.estimateTokens(e),o=this.estimateTokens(s);return{level:"L1",content:s,originalTokens:i,compressedTokens:o,compressionRatio:i>0?1-o/i:0,symbols:t}}formatSymbol(t){switch(t.type){case"function":case"method":return this.formatFunction(t);case"class":return this.formatClass(t);case"interface":case"type":case"variable":case"constant":case"property":return t.signature;default:return t.signature}}formatFunction(t){let e=[];if(t.docComment){let n=this.compactMode?this.compactJSDoc(t.docComment):t.docComment;n&&e.push(`/** ${n} */`)}return e.push(`${t.signature};`),e.join(`
-`)}formatClass(t){let e=[];e.push(`${t.signature} {`);for(let n of t.members)e.push(`  ${n.signature};`);return e.push("}"),e.join(`
-`)}compactJSDoc(t){let e=t.split(`
-`),n=[];for(let i of e){let o=i.trim().replace(/^\*\s?/,"");if(o.startsWith("@"))break;o.length>0&&n.push(o)}return(n[0]??"").slice(0,120)}estimateTokens(t){return Math.ceil(t.length/3.3)}};var it=class{level="L2";compress(t,e){let n=[];for(let a of t){let c=this.formatSymbol(a);c&&n.push(c)}let s=n.join(`
-`),i=this.estimateTokens(e),o=this.estimateTokens(s);return{level:"L2",content:s,originalTokens:i,compressedTokens:o,compressionRatio:i>0?1-o/i:0,symbols:t}}formatSymbol(t){switch(t.type){case"function":case"method":return this.formatFunction(t);case"class":return this.formatClass(t);case"interface":return`interface ${t.name}`;case"type":return`type ${t.name}`;case"variable":case"constant":return`${t.type} ${t.name}`;case"property":return`  ${t.name}`;default:return null}}formatFunction(t){let e=t.parameters.map(s=>`${s.name}${s.type?`: ${s.type}`:""}`).join(", "),n=t.returnType?` \u2192 ${t.returnType}`:"";return`${t.name}(${e})${n}`}formatClass(t){let e=[],n=`class ${t.name}`;t.extends&&(n+=` extends ${t.extends}`),e.push(n);for(let s of t.members)e.push(`  ${s.name}`);return e.join(`
-`)}estimateTokens(t){return Math.ceil(t.length/3.3)}};var ot=class{level="L3";compress(t,e){let n=this.groupByType(t),s=[];for(let[c,h]of n)s.push(`${c}: ${h.join(", ")}`);let i=s.join(`
-`),o=this.estimateTokens(e),a=this.estimateTokens(i);return{level:"L3",content:i,originalTokens:o,compressedTokens:a,compressionRatio:o>0?1-a/o:0,symbols:t}}groupByType(t){let e=new Map;for(let n of t){if(n.type==="class"){let o=n,a=o.members.map(l=>l.name),c=a.length>0?`${o.name} { ${a.join(", ")} }`:o.name,h=e.get("class")??[];h.push(c),e.set("class",h);continue}let s=this.getGroupKey(n.type),i=e.get(s)??[];i.push(n.name),e.set(s,i)}return e}getGroupKey(t){switch(t){case"function":case"method":return"fn";case"class":return"class";case"interface":return"iface";case"type":return"type";case"variable":case"constant":return"const";case"property":return"prop";default:return"other"}}estimateTokens(t){return Math.ceil(t.length/3.3)}};var at=class{parserRegistry;strategies;logger;constructor(t){this.logger=t,this.parserRegistry=new et,this.parserRegistry.register(new nt(t)),this.strategies=new Map([["L1",new rt],["L2",new it],["L3",new ot]])}compressFile(t,e="L1"){let n=le(t,"utf-8");return this.compressCode(n,t,e=void 0)}compressCode(t,e,n="L1"){if(n==="L0")return this.buildL0Result(t);let s=this.parserRegistry.getByFilePath(e);if(!s)return this.logger.warn(`\u041F\u0430\u0440\u0441\u0435\u0440 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D \u0434\u043B\u044F \u0444\u0430\u0439\u043B\u0430: ${e}. \u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u043C L0.`),this.buildL0Result(t);let i=s.parse(t,e);if(i.errors.length>0)return this.logger.warn(`\u041E\u0448\u0438\u0431\u043A\u0438 \u043F\u0430\u0440\u0441\u0438\u043D\u0433\u0430 ${e}: ${i.errors.length}. \u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u043C L0.`),this.buildL0Result(t);let o=this.strategies.get(n);if(!o){this.logger.warn(`\u0421\u0442\u0440\u0430\u0442\u0435\u0433\u0438\u044F \u0441\u0436\u0430\u0442\u0438\u044F ${n} \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430. \u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u043C L1.`);let c=this.strategies.get("L1");return c?c.compress(i.symbols,t):this.buildL0Result(t)}let a=o.compress(i.symbols,t);return this.logger.debug(`\u0421\u0436\u0430\u0442\u0438\u0435 ${e} [${n}]: ${a.originalTokens} \u2192 ${a.compressedTokens} (${(a.compressionRatio*100).toFixed(1)}% \u044D\u043A\u043E\u043D\u043E\u043C\u0438\u044F)`),a}extractSymbols(t){let e=le(t,"utf-8");return this.extractSymbolsFromCode(e,t)}extractSymbolsFromCode(t,e){let n=this.parserRegistry.getByFilePath(e);return n?n.parse(t,e).symbols:[]}findSymbolInFile(t,e){return this.extractSymbols(t).find(s=>s.name===e)??null}isFileSupported(t){return this.parserRegistry.isSupported(t)}getSupportedExtensions(){return this.parserRegistry.getSupportedExtensions()}getParser(t){return this.parserRegistry.getByFilePath(t)}setCompactJSDoc(t){let e=this.strategies.get("L1");e&&"setCompactMode"in e&&e.setCompactMode(t)}setStripImports(t){}buildL0Result(t){let e=Math.ceil(t.length/3.3);return{level:"L0",content:t,originalTokens:e,compressedTokens:e,compressionRatio:0,symbols:[]}}};import{gzipSync as $s}from"node:zlib";var Rs={maxRetries:3,baseDelayMs:500,maxDelayMs:5e3,timeoutMs:3e4},ct=class{serverUrl;authToken;projectId;onRetry;constructor(t){this.serverUrl=t.serverUrl.replace(/\/$/,""),this.authToken=t.authToken,this.projectId=t.projectId,this.onRetry=t.onRetry}async healthCheck(){try{return(await fetch(`${this.serverUrl}/health`,{signal:AbortSignal.timeout(5e3)})).ok}catch{return!1}}async pushBatch(t){let e=JSON.stringify({project_id:this.projectId,files:t.map(s=>({path:s.path,hash:s.hash,sizeBytes:s.sizeBytes,language:s.language,lineCount:s.lineCount,l1Summary:s.l1Summary,l3Summary:s.l3Summary,imports:s.imports,symbols:s.symbols,rawSnippet:s.rawSnippet}))}),n=$s(Buffer.from(e,"utf-8"));await this.fetchWithRetry(`${this.serverUrl}/api/push_indexed`,{method:"POST",headers:{"Content-Type":"application/json","Content-Encoding":"gzip",Authorization:`Bearer ${this.authToken}`,Connection:"close"},body:n},Rs)}async fetchWithRetry(t,e,n){let s=null;for(let i=0;i<=n.maxRetries;i++)try{let o=await fetch(t,{...e,signal:AbortSignal.timeout(n.timeoutMs)});if(o.status>=400&&o.status<500){let a=await o.text().catch(()=>"Unknown error");throw new Error(`HTTP ${o.status}: ${a}`)}if(o.status>=500){let a=await o.text().catch(()=>"Server error");if(s=new Error(`HTTP ${o.status}: ${a}`),i<n.maxRetries){await this.backoff(i,n);continue}throw s}return o}catch(o){let a=o instanceof Error?o:new Error(String(o));if(a.message.startsWith("HTTP 4")||(s=a,i>=n.maxRetries))throw a;this.onRetry?.(i+1,n.maxRetries,a.message),await this.backoff(i,n)}throw s??new Error("fetchWithRetry: unexpected end")}backoff(t,e){let n=e.baseDelayMs*Math.pow(2,t),s=Math.random()*500,i=Math.min(n+s,e.maxDelayMs);return new Promise(o=>setTimeout(o,i))}};var Ss="\x1B[0m",N="\x1B[1m",Ps="\x1B[2m",Is="\x1B[33m",Ts="\x1B[34m",ut="\x1B[36m",vs="\x1B[37m",k="\x1B[31m",b="\x1B[90m",I="\x1B[92m",Ft="\x1B[93m",pe="\x1B[94m",F="\x1B[96m",M="\x1B[97m",pt=process.stdout.isTTY!==!1;function u(r,t){return pt?`${r}${t}${Ss}`:t}function v(r){return r<1024?`${r} B`:r<1024*1024?`${(r/1024).toFixed(1)} KB`:`${(r/1024/1024).toFixed(2)} MB`}function Lt(r){return r<1e3?`${r}ms`:`${(r/1e3).toFixed(1)}s`}function B(){return u(b,new Date().toLocaleTimeString("ru-RU",{hour12:!1}))}function de(r,t,e=28){if(t===0)return u(b,"\u2591".repeat(e));let n=Math.min(r/t,1),s=Math.round(n*e),i=e-s,o=u(I,"\u2588".repeat(s))+u(b,"\u2591".repeat(i)),a=u(M,`${Math.round(n*100)}%`).padStart(4);return`${o} ${a}`}function me(r,t,e="0.7.0"){let s="\u2500".repeat(62);console.log(""),console.log(u(F,`  \u250C${s}\u2510`)),console.log(u(F,"  \u2502")+u(N+M,"  \u{1F9E0} Project Brain Smart Watcher")+u(b,`  v${e}`)+" ".repeat(26-e.length)+u(F,"\u2502")),console.log(u(F,"  \u2502")+u(ut,"  \u25CF ")+u(M,r.padEnd(24))+u(b,"\u2192  ")+u(Ts,t.slice(0,30).padEnd(30))+u(F,"\u2502")),console.log(u(F,`  \u2514${s}\u2518`)),console.log("")}function dt(r,t,e){let n=u(pe+N,` ${r}/${t} `),s=u(N+M,` ${e} `),i=u(b,"\u2500".repeat(46));console.log(`
-  ${n}${s}${i}`)}function mt(r){console.log(`  ${B()}  ${u(ut,"\xB7")}  ${r}`)}function O(r){console.log(`  ${B()}  ${u(I,"\u2713")}  ${r}`)}function ft(r){console.log(`  ${B()}  ${u(Ft,"\u26A0")}  ${u(Is,r)}`)}function A(r){console.log(`  ${B()}  ${u(k,"\u2717")}  ${u(k,r)}`)}function fe(r){console.log(`  ${B()}  ${u(b,"\u25CB")}  ${u(Ps+b,r)}`)}var he=0;function ge(r,t,e){if(r===1&&(he=Date.now()),!pt){(r%10===0||r===t)&&console.log(`  [${r}/${t}] ${e}`);return}let n=de(r,t),s=u(b,`${r}/${t}`),i=Date.now()-he,o=r>0?i/r:0,a=Math.round(o*(t-r)/1e3),c=a>0?u(b,`~${a}\u0441 \u043E\u0441\u0442\u0430\u043B\u043E\u0441\u044C`):u(I,"\u0433\u043E\u0442\u043E\u0432\u043E");process.stdout.write(`\r\x1B[2K  ${n}  ${s}  ${c}  ${u(b,e.slice(0,28))}  `),r===t&&process.stdout.write(`
-`)}var lt=0;function kt(r,t,e,n,s){r===1&&lt===0&&(lt=Date.now());let i=s?u(I,"\u2713"):u(k,"\u2717"),o=de(r,t,20),a=u(M,`${e} files`),c=u(b,`~${n}`),h=Date.now()-lt,l=r>0?h/r:0,p=Math.round(l*(t-r)/1e3),d=r<t?u(b,`~${p}\u0441`):u(I,"\u0433\u043E\u0442\u043E\u0432\u043E");pt?(process.stdout.write(`\r\x1B[2K  ${o}  ${i} ${a} ${c}  ${d}`),r===t&&process.stdout.write(`
-`)):console.log(`  Batch ${r}/${t}  ${s?"OK":"FAIL"}  ${e} files  ~${n}`)}function ye(){lt=0}var ue=["\u280B","\u2819","\u2839","\u2838","\u283C","\u2834","\u2826","\u2827","\u2807","\u280F"],ht=null,Dt=0;function Mt(r){pt&&(Dt=0,ht=setInterval(()=>{let t=u(F,ue[Dt%ue.length]);process.stdout.write(`\r\x1B[2K  ${t}  ${u(b,r)}`),Dt++},80))}function gt(){ht&&(clearInterval(ht),ht=null,process.stdout.write("\r\x1B[2K"))}function we(r){let t=r.originalKb>0?(r.originalKb/Math.max(r.summaryKb,1)).toFixed(1):"\u2014",e=r.originalKb>0?Math.round((1-r.summaryKb/r.originalKb)*100):0,n=62,s="\u2500".repeat(n);console.log(""),console.log(u(I,`  \u250C${s}\u2510`));let i=r.errors===0?`  \u2705  \u041F\u0440\u043E\u0438\u043D\u0434\u0435\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043E ${r.files} \u0444\u0430\u0439\u043B\u043E\u0432 \u0437\u0430 ${Lt(r.elapsedMs)}`:`  \u26A0\uFE0F   \u041F\u0440\u043E\u0438\u043D\u0434\u0435\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043E ${r.files} \u0444\u0430\u0439\u043B\u043E\u0432 (${r.errors} \u043E\u0448\u0438\u0431\u043E\u043A) \u0437\u0430 ${Lt(r.elapsedMs)}`;console.log(u(I,"  \u2502")+u(N+M,i).padEnd(n+8)+u(I,"\u2502"));let o=`  \u{1F4BE}  \u041E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E ${v(r.summaryKb*1024)}  (\u0438\u0437 ~${v(r.originalKb*1024)} \u0438\u0441\u0445\u043E\u0434\u043D\u044B\u0445)  \xD7${t} \u0441\u0436\u0430\u0442\u0438\u0435  (${e}%)`;console.log(u(I,"  \u2502")+u(ut,o).padEnd(n+9)+u(I,"\u2502")),console.log(u(I,`  \u2514${s}\u2518`)),console.log("")}function xe(r,t,e){if(e===0)return;let n=4,s=Math.round(r/n),i=Math.round(t/n),o=s-i,a=s>0?Math.round(o/s*100):0,c=s>0?(s/Math.max(i,1)).toFixed(0):"\u2014",h=Math.round(r/e),l=Math.round(t/e),p=S=>S>=1e6?`${(S/1e6).toFixed(2)}M`:S>=1e3?`${(S/1e3).toFixed(1)}K`:String(S),d=62,g="\u2500".repeat(d),f="\u2500".repeat(d-2),x=pe,_=(S,Y)=>u(x,"  \u2502")+u(Y,S).padEnd(d+9)+u(x,"\u2502");console.log(u(x,`  \u250C${g}\u2510`)),console.log(u(x,"  \u2502")+u(N+M,"  \u{1F9EE}  \u042D\u041A\u041E\u041D\u041E\u041C\u0418\u042F \u0422\u041E\u041A\u0415\u041D\u041E\u0412").padEnd(d+8)+u(x,"\u2502")),console.log(u(x,"  \u2502")+u(b,`  ${f}`).padEnd(d+8)+u(x,"\u2502")),console.log(_(`  \u{1F4C4}  \u0418\u0441\u0445\u043E\u0434\u043D\u044B\u0439 \u043A\u043E\u0434:   ~${p(s)} \u0442\u043E\u043A\u0435\u043D\u043E\u0432  (${v(r)})`,k)),console.log(_(`  \u{1F9E0}  L1+L3 \u0441\u0443\u043C\u043C\u0430\u0440\u0438:  ~${p(i)} \u0442\u043E\u043A\u0435\u043D\u043E\u0432  (${v(t)})`,I)),console.log(u(x,"  \u2502")+u(b,`  ${f}`).padEnd(d+8)+u(x,"\u2502")),console.log(_(`  \u{1F4B0}  \u042D\u043A\u043E\u043D\u043E\u043C\u0438\u044F:       ~${p(o)} \u0442\u043E\u043A\u0435\u043D\u043E\u0432  (${a}%)`,N+Ft)),console.log(_(`  \u{1F4CA}  \u0421\u0442\u0435\u043F\u0435\u043D\u044C \u0441\u0436\u0430\u0442\u0438\u044F: \xD7${c}  (${e} \u0444\u0430\u0439\u043B\u043E\u0432)`,F)),console.log(u(x,"  \u2502")+u(b,`  ${f}`).padEnd(d+8)+u(x,"\u2502")),console.log(_(`  \u{1F4D0}  \u0421\u0440\u0435\u0434\u043D\u0438\u0439 \u0444\u0430\u0439\u043B:   ${v(h)} \u2192 ${v(l)}`,b)),console.log(_("  \u26A1  \u041D\u0430 \u043F\u0440\u043E\u0432\u043E\u0434\u0435:     gzip \u0435\u0449\u0451 ~70% \u043C\u0435\u043D\u044C\u0448\u0435",b)),console.log(u(x,`  \u2514${g}\u2518`)),console.log("")}function _e(r){console.log(""),console.log(`  ${u(F+N,"  \u{1F441}  WATCH MODE  ")}  ${u(b,r)}`),console.log(u(b,`  ${"\u2500".repeat(60)}`)),console.log(u(b,`  Ctrl+C \u0434\u043B\u044F \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0438
-`))}function yt(r,t,e=void 0){let n={modified:u(Ft,"\u270E"),added:u(I,"+"),deleted:u(k,"\u2212"),error:u(k,"\u2717")},s={modified:M,added:I,deleted:b,error:k},i=n[r]??"\xB7",o=u(s[r]??vs,t.padEnd(40)),a=e?u(b,e):"";console.log(`  ${B()}  ${i}  ${o}  ${a}`)}function be(r,t,e){let n=t?u(I,"\u2713 \u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D"):u(k,"\u2717 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D");console.log(`  ${B()}  ${u(ut,"\u21D7")}  ${u(b,r)}  ${n}  ${u(b,Lt(e))}`)}function At(r){return new Promise(t=>setTimeout(t,r))}function Ms(r,t,e){let n=`  \u21BB \u043F\u043E\u043F\u044B\u0442\u043A\u0430 ${r}/${t}: ${e}`;process.stdout.write(`\x1B[33m${n}\x1B[0m
-`)}function As(r){let t=l=>{let p=r.indexOf(l);return p!==-1?r[p+1]:void 0},e=t("--path")??process.cwd(),n=t("--server")??"",s=t("--token")??"",i=t("--project")??e.split(/[/\\]/).pop()??"default",o=r.includes("--watch"),a=t("--exts")??".ts,.tsx,.js,.jsx,.py,.cs,.go,.rs",c=t("--ignore")??"node_modules,dist,.git,build,out,coverage",h=parseInt(t("--batch")??"10",10);return{path:e,server:n.replace(/\/$/,""),token:s,project:i,watch:o,exts:a.split(",").map(l=>l.trim()),ignore:c.split(",").map(l=>l.trim()),batchSize:h}}function js(r,t,e){let n=[];function s(i){let o;try{o=Ls(i,{withFileTypes:!0})}catch{return}for(let a of o){let c=String(a.name);if(t.includes(c)||c.startsWith("."))continue;let h=ks(i,c);if(a.isDirectory())s(h);else if(a.isFile()){let l=Bt(c);e.includes(l)&&n.push(h)}}}return s(r),n}var Ns=/import\s+(?:type\s+)?(?:\{[^}]*\}|[^;{]*)\s+from\s+['"]([^'"]+)['"]/g,Bs=/require\s*\(\s*['"]([^'"]+)['"]\s*\)/g,Os=/import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;function Ws(r){let t=new Set;for(let e of[Ns,Bs,Os]){e.lastIndex=0;let n;for(;(n=e.exec(r))!==null;)t.add(n[1])}return[...t]}var zs=[{regex:/export\s+(?:default\s+)?(?:async\s+)?function\s+(\w+)/g,type:"function",exported:!0},{regex:/export\s+(?:default\s+)?class\s+(\w+)/g,type:"class",exported:!0},{regex:/export\s+(?:default\s+)?(?:const|let|var)\s+(\w+)/g,type:"variable",exported:!0},{regex:/export\s+(?:default\s+)?(?:type|interface)\s+(\w+)/g,type:"type",exported:!0},{regex:/(?:^|\n)\s*(?:async\s+)?function\s+(\w+)/g,type:"function",exported:!1},{regex:/(?:^|\n)\s*class\s+(\w+)/g,type:"class",exported:!1}];function Hs(r){let t=new Set,e=[];for(let{regex:n,type:s,exported:i}of zs){n.lastIndex=0;let o;for(;(o=n.exec(r))!==null;){let a=o[1];t.has(a)||(t.add(a),e.push({name:a,type:s,isExported:i}))}}return e}var jt=3e3;function Ys(r){if(r.length<=jt)return r;let t=r.lastIndexOf(`
-`,jt);return r.slice(0,t>0?t:jt)}function Ee(r,t,e){try{let n=Ds(r,"utf-8"),s=wt(r);if(s.size>500*1024)return null;let i=Nt(t,r).replace(/\\/g,"/"),o=Cs("md5").update(n).digest("hex"),a=n.split(`
-`).length,c=Bt(r).toLowerCase(),h=e.compressCode(n,i,"L1"),l=e.compressCode(n,i,"L3"),p=Ws(n),d=Hs(n),g=Ys(n),f={".ts":"typescript",".tsx":"typescript",".js":"javascript",".jsx":"javascript",".py":"python",".cs":"csharp",".go":"go",".rs":"rust"};return{path:i,hash:o,sizeBytes:s.size,language:f[c]??null,lineCount:a,l1Summary:h.content,l3Summary:l.content,imports:p,symbols:d,rawSnippet:g}}catch{return null}}async function Us(){let r=As(process.argv.slice(2));r.server||(A("--server \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u0435\u043D  (\u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440: https://your-mcp.com)"),process.exit(1)),r.token||(A("--token \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u0435\u043D"),process.exit(1)),Fs(r.path)||(A(`\u041F\u0443\u0442\u044C \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D: ${r.path}`),process.exit(1)),me(r.project,r.server,"0.9.2"),dt(1,3,"\u041F\u041E\u0414\u041A\u041B\u042E\u0427\u0415\u041D\u0418\u0415");let t=Date.now(),e=new ct({serverUrl:r.server,authToken:r.token,projectId:r.project,batchSize:r.batchSize,onRetry:Ms});Mt(`\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435 \u043A ${r.server}...`);let n=await e.healthCheck();gt(),be(r.server,n,Date.now()-t),n||(A(`\u0421\u0435\u0440\u0432\u0435\u0440 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D: ${r.server}`),process.exit(1)),dt(2,3,"\u0421\u041A\u0410\u041D\u0418\u0420\u041E\u0412\u0410\u041D\u0418\u0415 \u0418 \u0421\u0416\u0410\u0422\u0418\u0415"),mt(`\u041F\u0443\u0442\u044C:  ${r.path}`),mt(`\u0420\u0430\u0441\u0448:  ${r.exts.join(", ")}   \u0411\u0430\u0442\u0447: ${r.batchSize}`);let s=Date.now(),i=js(r.path,r.ignore,r.exts);O(`\u041D\u0430\u0439\u0434\u0435\u043D\u043E ${i.length} \u0444\u0430\u0439\u043B\u043E\u0432  (${v(i.reduce((m,y)=>{try{return m+wt(y).size}catch{return m}},0))} \u0438\u0441\u0445\u043E\u0434\u043D\u044B\u0445)`);let o={info:()=>{},warn:()=>{},error:()=>{},debug:()=>{},trace:()=>{},fatal:()=>{}},a=new at(o),c=[],h=0;for(let m=0;m<i.length;m++){let y=i[m];ge(m+1,i.length,Nt(r.path,y).replace(/\\/g,"/"));let R=Ee(y,r.path,a);R?c.push(R):h++}let l=Date.now()-s,p=Math.round(i.reduce((m,y)=>{try{return m+wt(y).size}catch{return m}},0)/1024),d=Math.round(c.reduce((m,y)=>m+y.l1Summary.length,0)/1024),g=p>0?(p/Math.max(d,1)).toFixed(1):"\u2014";O(`\u0421\u0436\u0430\u0442\u043E ${c.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u0437\u0430 ${(l/1e3).toFixed(1)}\u0441  \u2192  ${v(d*1024)}  (\xD7${g})`),h>0&&ft(`${h} \u0444\u0430\u0439\u043B\u043E\u0432 \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E (\u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u0438\u0435 \u0438\u043B\u0438 \u043D\u0435\u0447\u0438\u0442\u0430\u0435\u043C\u044B\u0435)`),dt(3,3,"\u0417\u0410\u0413\u0420\u0423\u0417\u041A\u0410");let f=0,x=0,_=Math.ceil(c.length/r.batchSize),S=[];ye();let Y=Date.now(),U=[];for(let m=0;m<c.length;m+=r.batchSize)U.push({batchIndex:Math.floor(m/r.batchSize)+1,files:c.slice(m,m+r.batchSize)});for(let m=0;m<U.length;m++){let y=U[m],R=(y.files.reduce((C,P)=>C+(P.l1Summary?.length??0)+(P.rawSnippet?.length??0),0)/1024).toFixed(1);Mt(`\u0411\u0430\u0442\u0447 ${y.batchIndex}/${_} (${y.files.length} \u0444\u0430\u0439\u043B\u043E\u0432, ~${R}\u041A\u0411)...`);try{await e.pushBatch(y.files),f+=y.files.length,gt();let C=Date.now()-Y,P=_>1?` ~${((_-m-1)*(C/(m+1))/1e3).toFixed(0)}\u0441 \u043E\u0441\u0442\u0430\u043B\u043E\u0441\u044C`:"";O(`  \u0411\u0430\u0442\u0447 ${y.batchIndex}/${_}: ${y.files.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u2713${P}`)}catch(C){gt(),A(`  \u0411\u0430\u0442\u0447 ${y.batchIndex}/${_} \u043E\u0448\u0438\u0431\u043A\u0430: ${String(C)}`),S.push(y)}m<U.length-1&&await At(100)}let $e=Date.now()-Y;if(kt(_,_,f,v(d*1024),S.length===0),O(`\u0417\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043E: ${f} \u0444\u0430\u0439\u043B\u043E\u0432 \u0437\u0430 ${($e/1e3).toFixed(1)}\u0441 (${_} \u0431\u0430\u0442\u0447\u0435\u0439)`),S.length>0){let y=[...S];for(let R=1;R<=2&&y.length>0;R++){mt(`
-  \u21BB \u041F\u043E\u0432\u0442\u043E\u0440\u043D\u0430\u044F \u043F\u043E\u043F\u044B\u0442\u043A\u0430 ${R}/2: ${y.length} \u0431\u0430\u0442\u0447\u0435\u0439 \u0441 \u043E\u0448\u0438\u0431\u043A\u0430\u043C\u0438`),await At(2e3*R);let C=[];for(let P of y){let Ie=Math.round(P.files.reduce((xt,Te)=>xt+Te.l1Summary.length,0)/1024),Wt=!1;try{await e.pushBatch(P.files),f+=P.files.length,x+=P.files.length,Wt=!0}catch(xt){A(`  \u041F\u043E\u0432\u0442\u043E\u0440 \u0431\u0430\u0442\u0447\u0430 ${P.batchIndex} \u043E\u0448\u0438\u0431\u043A\u0430: ${String(xt)}`),C.push(P)}kt(P.batchIndex,_,P.files.length,v(Ie*1024),Wt),await At(500)}y=C,y.length===0&&O("  \u0412\u0441\u0435 \u043E\u0448\u0438\u0431\u043E\u0447\u043D\u044B\u0435 \u0431\u0430\u0442\u0447\u0438 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u044B!")}if(y.length>0){let R=y.reduce((C,P)=>C+P.files.length,0);ft(`  ${R} \u0444\u0430\u0439\u043B\u043E\u0432 \u043D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u043F\u043E\u0441\u043B\u0435 2 \u043F\u043E\u043F\u044B\u0442\u043E\u043A`)}}let Re=S.length>0?S.reduce((m,y)=>m+y.files.length,0)-x:0;we({files:f,batches:_,originalKb:p,summaryKb:d,elapsedMs:Date.now()-s,errors:Math.max(0,Re)+h}),x>0&&O(`  ${x} \u0444\u0430\u0439\u043B\u043E\u0432 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u0447\u0435\u0440\u0435\u0437 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u044B\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0438`);let Se=i.reduce((m,y)=>{try{return m+wt(y).size}catch{return m}},0),Pe=c.reduce((m,y)=>m+y.l1Summary.length+y.l3Summary.length,0);if(xe(Se,Pe,f),!r.watch){fe("\u0421\u043E\u0432\u0435\u0442: \u0434\u043E\u0431\u0430\u0432\u044C --watch \u0434\u043B\u044F \u043E\u0442\u0441\u043B\u0435\u0436\u0438\u0432\u0430\u043D\u0438\u044F \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0439 \u0432 \u0440\u0435\u0430\u043B\u044C\u043D\u043E\u043C \u0432\u0440\u0435\u043C\u0435\u043D\u0438");return}_e(r.path);let K=ce.watch(r.path,{ignored:m=>m.split(/[/\\]/).some(R=>r.ignore.includes(R)||R.startsWith(".")),ignoreInitial:!0,persistent:!0}),Ot=async(m,y)=>{if(!r.exts.includes(Bt(m)))return;let R=Ee(m,r.path,a);if(!R)return;let C=`${v(R.sizeBytes)} \u2192 ${v(R.l1Summary.length)} \u0441\u0443\u043C\u043C\u0430\u0440\u0438`;try{await e.pushBatch([R]),yt(y,R.path,C)}catch(P){yt("error",R.path,String(P))}};K.on("change",m=>void Ot(m,"modified")),K.on("add",m=>void Ot(m,"added")),K.on("unlink",m=>{let y=Nt(r.path,m).replace(/\\/g,"/");yt("deleted",y,"\u0443\u0434\u0430\u043B\u0451\u043D \u0438\u0437 \u0438\u043D\u0434\u0435\u043A\u0441\u0430 (\u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0441\u0442\u0438 \u0434\u043B\u044F \u043E\u0447\u0438\u0441\u0442\u043A\u0438)")}),process.on("SIGINT",async()=>{console.log(""),ft("\u041E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0430 \u0432\u043E\u0442\u0447\u0435\u0440\u0430..."),await K.close(),process.exit(0)})}Us().catch(r=>{A(`\u041A\u0440\u0438\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043E\u0448\u0438\u0431\u043A\u0430: ${String(r)}`),process.exit(1)});
-/*! Bundled license information:
+// cli/watch.ts
+import { createHash as createHash2 } from "node:crypto";
+import { readFileSync as readFileSync2, statSync, readdirSync, existsSync } from "node:fs";
+import { join, relative, extname } from "node:path";
+import chokidar from "chokidar";
 
-chokidar/esm/index.js:
-  (*! chokidar - MIT License (c) 2012 Paul Miller (paulmillr.com) *)
-*/
+// src/ast-compressor/ast-compressor.ts
+import { readFileSync } from "node:fs";
+
+// src/ast-compressor/parsers/parser-registry.ts
+var ParserRegistry = class {
+  parsersByExtension = /* @__PURE__ */ new Map();
+  parsersByLanguage = /* @__PURE__ */ new Map();
+  /**
+   * Регистрирует парсер для его расширений
+   */
+  register(parser) {
+    this.parsersByLanguage.set(parser.language, parser);
+    for (const ext of parser.extensions) {
+      this.parsersByExtension.set(ext.toLowerCase(), parser);
+    }
+  }
+  /**
+   * Находит парсер по расширению файла
+   */
+  getByExtension(extension) {
+    return this.parsersByExtension.get(extension.toLowerCase()) ?? null;
+  }
+  /**
+   * Находит парсер по языку
+   */
+  getByLanguage(language) {
+    return this.parsersByLanguage.get(language) ?? null;
+  }
+  /**
+   * Находит парсер по пути к файлу (извлекает расширение)
+   */
+  getByFilePath(filePath) {
+    const dotIndex = filePath.lastIndexOf(".");
+    if (dotIndex === -1) {
+      return null;
+    }
+    const extension = filePath.slice(dotIndex).toLowerCase();
+    return this.getByExtension(extension);
+  }
+  /**
+   * Возвращает все зарегистрированные расширения
+   */
+  getSupportedExtensions() {
+    return [...this.parsersByExtension.keys()];
+  }
+  /**
+   * Проверяет, поддерживается ли файл
+   */
+  isSupported(filePath) {
+    return this.getByFilePath(filePath) !== null;
+  }
+};
+
+// src/ast-compressor/parsers/base-parser.ts
+import { createHash } from "node:crypto";
+var BaseParser = class {
+  logger;
+  constructor(logger) {
+    this.logger = logger;
+  }
+  /**
+   * Основной метод парсинга: код → результат
+   */
+  parse(code, filePath) {
+    const buildMetadata = (code2, symbols) => ({
+      path: filePath,
+      language: this.language,
+      hash: createHash("md5").update(code2).digest("hex"),
+      sizeBytes: Buffer.byteLength(code2, "utf-8"),
+      lineCount: code2.split("\n").length,
+      symbolCount: symbols.length,
+      lastModified: Date.now(),
+      isIndexed: false
+    });
+    try {
+      const symbols = this.extractSymbols(code, filePath);
+      return {
+        metadata: buildMetadata(code, symbols),
+        symbols,
+        imports: this.extractImports(code),
+        exports: symbols.filter((s) => s.isExported).map((s) => s.name),
+        errors: []
+      };
+    } catch (err) {
+      this.logger.warn(`Parse error in ${filePath}: ${err}`);
+      return {
+        metadata: buildMetadata(code, []),
+        symbols: [],
+        imports: [],
+        exports: [],
+        errors: [{ message: String(err) }]
+      };
+    }
+  }
+  /**
+   * Извлекает импорты (может быть переопределён)
+   */
+  extractImports(code) {
+    const imports = [];
+    const importRegex = /^[ \t]*import\s+(?:type\s+)?(?:\{[^}]*\}|[\w*]+(?:\s*,\s*\{[^}]*\})?)\s+from\s+['"]([^'"]+)['"]/gm;
+    let match;
+    while ((match = importRegex.exec(code)) !== null) {
+      imports.push(match[1]);
+    }
+    return imports;
+  }
+  /**
+   * Извлекает JSDoc-комментарии с их позициями
+   */
+  extractDocComments(code) {
+    const comments = /* @__PURE__ */ new Map();
+    const regex = /\/\*\*\s*([\s\S]*?)\s*\*\//g;
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const line = code.substring(0, match.index).split("\n").length;
+      comments.set(line, match[1].replace(/^\s*\*\s?/gm, "").trim());
+    }
+    return comments;
+  }
+};
+
+// src/ast-compressor/parsers/typescript-parser.ts
+var PATTERNS = {
+  // Функции: export async function name(params): ReturnType { 
+  FUNCTION: /^[ \t]*(export\s+)?(default\s+)?(async\s+)?function\s+(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)(?:\s*:\s*([^\s{]+(?:\s*\|\s*[^\s{]+)*))?\s*\{/gm,
+  // Стрелочные функции: export const name = (async) (params): ReturnType =>
+  // Также ловит: export const name = async (params) => и export const name = param =>
+  ARROW_FUNCTION: /^[ \t]*(export\s+)?(const|let)\s+(\w+)\s*(?::\s*[^=]+)?\s*=\s*(async\s+)?(?:\(([^)]*)\)|(\w+))(?:\s*:\s*([^\s=]+(?:\s*\|\s*[^\s=]+)*))?\s*=>/gm,
+  // Классы: export class Name extends Base implements I1, I2 {
+  CLASS: /^[ \t]*(export\s+)?(default\s+)?(abstract\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([\w\s,]+))?\s*\{/gm,
+  // Интерфейсы: export interface Name extends Base {
+  INTERFACE: /^[ \t]*(export\s+)?interface\s+(\w+)(?:\s+extends\s+([\w\s,]+))?\s*\{/gm,
+  // Типы: export type Name = ...
+  TYPE_ALIAS: /^[ \t]*(export\s+)?type\s+(\w+)(?:<[^>]*>)?\s*=\s*(.+)/gm,
+  // Переменные/константы: export const/let NAME = value
+  VARIABLE: /^[ \t]*(export\s+)?(const|let|var)\s+(\w+)(?:\s*:\s*([^=]+))?\s*=/gm,
+  // Методы класса: async methodName(params): ReturnType {
+  METHOD: /^[ \t]*(public|private|protected|static|abstract|async|readonly|\s)*(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)(?:\s*:\s*([^\s{]+(?:\s*\|\s*[^\s{]+)*))?\s*\{/gm,
+  // Импорты
+  IMPORT: /^[ \t]*import\s+(?:type\s+)?(?:\{[^}]*\}|[\w*]+(?:\s*,\s*\{[^}]*\})?)\s+from\s+['"]([^'"]+)['"]/gm,
+  // JSDoc комментарий перед символом
+  JSDOC: /\/\*\*\s*([\s\S]*?)\s*\*\//g
+};
+var TypeScriptParser = class extends BaseParser {
+  language = "typescript";
+  extensions = [".ts", ".tsx", ".js", ".jsx"];
+  constructor(logger) {
+    super(logger);
+  }
+  extractSymbols(code, filePath) {
+    const symbols = [];
+    const lines = code.split("\n");
+    const docComments = this.extractDocComments(code);
+    symbols.push(...this.extractFunctions(code, filePath, lines, docComments));
+    symbols.push(...this.extractArrowFunctions(code, filePath, lines, docComments));
+    symbols.push(...this.extractClasses(code, filePath, lines));
+    symbols.push(...this.extractInterfaces(code, filePath, lines));
+    symbols.push(...this.extractTypeAliases(code, filePath, lines));
+    symbols.push(...this.extractVariables(code, filePath, lines));
+    return symbols;
+  }
+  extractImports(code) {
+    const imports = [];
+    const regex = new RegExp(PATTERNS.IMPORT.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      if (match[1]) {
+        imports.push(match[1]);
+      }
+    }
+    return imports;
+  }
+  extractExports(_code, symbols) {
+    return symbols.filter((s) => s.isExported).map((s) => s.name);
+  }
+  // === ПРИВАТНЫЕ МЕТОДЫ ИЗВЛЕЧЕНИЯ ===
+  extractFunctions(code, filePath, lines, docComments) {
+    const results = [];
+    const regex = new RegExp(PATTERNS.FUNCTION.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[4] ?? "anonymous";
+      const isExported = Boolean(match[1]);
+      const isAsync = Boolean(match[3]);
+      const paramsStr = match[5] ?? "";
+      const returnType = match[6] ?? null;
+      const parameters = this.parseParameters(paramsStr);
+      const docComment = this.findDocComment(docComments, lineNum);
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const signature = this.buildFunctionSignature(isExported, isAsync, name, parameters, returnType);
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "function",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported,
+        parameters,
+        returnType,
+        isAsync,
+        isStatic: false,
+        docComment
+      });
+    }
+    return results;
+  }
+  extractArrowFunctions(code, filePath, _lines, docComments) {
+    const results = [];
+    const regex = new RegExp(PATTERNS.ARROW_FUNCTION.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[3] ?? "anonymous";
+      const isExported = Boolean(match[1]);
+      const isAsync = Boolean(match[4]);
+      const paramsStr = match[5] ?? match[6] ?? "";
+      const returnType = match[7] ?? null;
+      const parameters = this.parseParameters(paramsStr);
+      const docComment = this.findDocComment(docComments, lineNum);
+      const signature = this.buildFunctionSignature(isExported, isAsync, name, parameters, returnType);
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "function",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature,
+        isExported,
+        parameters,
+        returnType,
+        isAsync,
+        isStatic: false,
+        docComment
+      });
+    }
+    return results;
+  }
+  extractClasses(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS.CLASS.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[4] ?? "AnonymousClass";
+      const isExported = Boolean(match[1]);
+      const isAbstract = Boolean(match[3]);
+      const extendsClass = match[5] ?? null;
+      const implementsList = match[6] ? match[6].split(",").map((s) => s.trim()).filter(Boolean) : [];
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const classBody = lines.slice(lineNum, endLine + 1).join("\n");
+      const members = this.extractClassMethods(classBody, filePath, lineNum);
+      const signature = this.buildClassSignature(isExported, isAbstract, name, extendsClass, implementsList);
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "class",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported,
+        extends: extendsClass,
+        implements: implementsList,
+        members,
+        isAbstract
+      });
+    }
+    return results;
+  }
+  extractInterfaces(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS.INTERFACE.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[2] ?? "AnonymousInterface";
+      const isExported = Boolean(match[1]);
+      const extendsStr = match[3] ?? "";
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const signature = isExported ? `export interface ${name}${extendsStr ? ` extends ${extendsStr.trim()}` : ""}` : `interface ${name}${extendsStr ? ` extends ${extendsStr.trim()}` : ""}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "interface",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported
+      });
+    }
+    return results;
+  }
+  extractTypeAliases(code, filePath, _lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS.TYPE_ALIAS.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[2] ?? "AnonymousType";
+      const isExported = Boolean(match[1]);
+      const value = (match[3] ?? "").trim().slice(0, 100);
+      const signature = isExported ? `export type ${name} = ${value}` : `type ${name} = ${value}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "type",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature,
+        isExported
+      });
+    }
+    return results;
+  }
+  extractVariables(code, filePath, _lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS.VARIABLE.source, "gm");
+    let match;
+    const arrowFnNames = /* @__PURE__ */ new Set();
+    const arrowRegex = new RegExp(PATTERNS.ARROW_FUNCTION.source, "gm");
+    let arrowMatch;
+    while ((arrowMatch = arrowRegex.exec(code)) !== null) {
+      if (arrowMatch[3]) {
+        arrowFnNames.add(arrowMatch[3]);
+      }
+    }
+    while ((match = regex.exec(code)) !== null) {
+      const name = match[3] ?? "anonymous";
+      if (arrowFnNames.has(name)) {
+        continue;
+      }
+      const lineNum = this.getLineNumber(code, match.index);
+      const isExported = Boolean(match[1]);
+      const kind = match[2] ?? "const";
+      const dataType = match[4]?.trim() ?? null;
+      const isConst = kind === "const";
+      const signature = `${isExported ? "export " : ""}${kind} ${name}${dataType ? `: ${dataType}` : ""}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: isConst ? "constant" : "variable",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature,
+        isExported,
+        dataType,
+        isConst
+      });
+    }
+    return results;
+  }
+  // === УТИЛИТАРНЫЕ МЕТОДЫ ===
+  extractClassMethods(classBody, filePath, classStartLine) {
+    const methods = [];
+    const regex = new RegExp(PATTERNS.METHOD.source, "gm");
+    let match;
+    while ((match = regex.exec(classBody)) !== null) {
+      const modifiers = (match[1] ?? "").trim();
+      const name = match[2];
+      if (!name || name === "constructor" || name === "class" || name === "if" || name === "for" || name === "while") {
+        continue;
+      }
+      const lineNum = classStartLine + this.getLineNumber(classBody, match.index);
+      const paramsStr = match[3] ?? "";
+      const returnType = match[4] ?? null;
+      const signature = `${modifiers ? modifiers + " " : ""}${name}(${paramsStr})${returnType ? `: ${returnType}` : ""}`;
+      methods.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "method",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature,
+        isExported: false
+      });
+    }
+    return methods;
+  }
+  parseParameters(paramsStr) {
+    if (!paramsStr.trim()) {
+      return [];
+    }
+    return paramsStr.split(",").map((param) => {
+      const trimmed = param.trim();
+      const isOptional = trimmed.includes("?");
+      const hasDefault = trimmed.includes("=");
+      const parts = trimmed.split(/[?:=]/).map((p) => p.trim()).filter(Boolean);
+      const name = parts[0] ?? "param";
+      const type = parts[1] ?? null;
+      const defaultValue = hasDefault ? parts[2] ?? null : null;
+      return { name, type, isOptional: isOptional || hasDefault, defaultValue };
+    });
+  }
+  extractDocComments(code) {
+    const comments = /* @__PURE__ */ new Map();
+    const regex = new RegExp(PATTERNS.JSDOC.source, "g");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const endLine = this.getLineNumber(code, match.index + match[0].length);
+      const content = (match[1] ?? "").split("\n").map((line) => line.replace(/^\s*\*\s?/, "").trim()).filter(Boolean).join(" ");
+      comments.set(endLine + 1, content);
+    }
+    return comments;
+  }
+  findDocComment(docComments, symbolLine) {
+    return docComments.get(symbolLine) ?? docComments.get(symbolLine - 1) ?? null;
+  }
+  getLineNumber(code, index) {
+    let line = 0;
+    for (let i = 0; i < index && i < code.length; i++) {
+      if (code[i] === "\n") {
+        line++;
+      }
+    }
+    return line;
+  }
+  /**
+   * Ищет закрывающую скобку, пропуская строки, шаблонные литералы и комментарии.
+   * Критично для корректного определения endLine классов/интерфейсов.
+   */
+  findClosingBrace(lines, startLine) {
+    let depth = 0;
+    let foundOpening = false;
+    let inMultiLineComment = false;
+    let inString = null;
+    for (let i = startLine; i < lines.length; i++) {
+      const line = lines[i] ?? "";
+      for (let j = 0; j < line.length; j++) {
+        const ch = line[j];
+        const next = line[j + 1] ?? "";
+        if (inMultiLineComment) {
+          if (ch === "*" && next === "/") {
+            inMultiLineComment = false;
+            j++;
+          }
+          continue;
+        }
+        if (inString !== null) {
+          if (ch === "\\") {
+            j++;
+            continue;
+          }
+          if (ch === inString) {
+            inString = null;
+          }
+          continue;
+        }
+        if (ch === "/" && next === "/") {
+          break;
+        }
+        if (ch === "/" && next === "*") {
+          inMultiLineComment = true;
+          j++;
+          continue;
+        }
+        if (ch === "'" || ch === '"' || ch === "`") {
+          inString = ch;
+          continue;
+        }
+        if (ch === "{") {
+          depth++;
+          foundOpening = true;
+        } else if (ch === "}") {
+          depth--;
+        }
+        if (foundOpening && depth === 0) {
+          return i;
+        }
+      }
+    }
+    return Math.min(startLine + 50, lines.length - 1);
+  }
+  buildRange(startLine, endLine) {
+    return {
+      start: { line: startLine, column: 0 },
+      end: { line: endLine, column: 0 }
+    };
+  }
+  buildFunctionSignature(isExported, isAsync, name, parameters, returnType) {
+    const parts = [];
+    if (isExported)
+      parts.push("export");
+    if (isAsync)
+      parts.push("async");
+    parts.push("function");
+    parts.push(name);
+    const paramsStr = parameters.map((p) => `${p.name}${p.isOptional ? "?" : ""}${p.type ? `: ${p.type}` : ""}`).join(", ");
+    return `${parts.join(" ")}(${paramsStr})${returnType ? `: ${returnType}` : ""}`;
+  }
+  buildClassSignature(isExported, isAbstract, name, extendsClass, implementsList) {
+    const parts = [];
+    if (isExported)
+      parts.push("export");
+    if (isAbstract)
+      parts.push("abstract");
+    parts.push("class");
+    parts.push(name);
+    if (extendsClass)
+      parts.push(`extends ${extendsClass}`);
+    if (implementsList.length > 0)
+      parts.push(`implements ${implementsList.join(", ")}`);
+    return parts.join(" ");
+  }
+};
+
+// src/ast-compressor/formatters/signature-formatter.ts
+var SignatureFormatter = class {
+  level = "L1";
+  /** Compact-режим: сокращает JSDoc до первой строки */
+  compactMode = false;
+  /**
+   * Активирует compact-режим (сокращённый JSDoc)
+   */
+  setCompactMode(enabled) {
+    this.compactMode = enabled;
+  }
+  compress(symbols, originalCode) {
+    const lines = [];
+    for (const symbol of symbols) {
+      const formatted = this.formatSymbol(symbol);
+      if (formatted) {
+        lines.push(formatted);
+      }
+    }
+    const content = lines.join("\n\n");
+    const originalTokens = this.estimateTokens(originalCode);
+    const compressedTokens = this.estimateTokens(content);
+    return {
+      level: "L1",
+      content,
+      originalTokens,
+      compressedTokens,
+      compressionRatio: originalTokens > 0 ? 1 - compressedTokens / originalTokens : 0,
+      symbols
+    };
+  }
+  formatSymbol(symbol) {
+    switch (symbol.type) {
+      case "function":
+      case "method":
+        return this.formatFunction(symbol);
+      case "class":
+        return this.formatClass(symbol);
+      case "interface":
+      case "type":
+      case "variable":
+      case "constant":
+      case "property":
+        return symbol.signature;
+      default:
+        return symbol.signature;
+    }
+  }
+  formatFunction(fn) {
+    const parts = [];
+    if (fn.docComment) {
+      const jsdoc = this.compactMode ? this.compactJSDoc(fn.docComment) : fn.docComment;
+      if (jsdoc) {
+        parts.push(`/** ${jsdoc} */`);
+      }
+    }
+    parts.push(`${fn.signature};`);
+    return parts.join("\n");
+  }
+  formatClass(cls) {
+    const parts = [];
+    parts.push(`${cls.signature} {`);
+    for (const member of cls.members) {
+      parts.push(`  ${member.signature};`);
+    }
+    parts.push("}");
+    return parts.join("\n");
+  }
+  /**
+   * Сокращает JSDoc до первой строки описания.
+   * Удаляет @param, @returns, @throws, @example, @see и другие теги.
+   *
+   * Пример:
+   *   Вход: "Вычисляет centroid-вектор.\n@param vectors — массив\n@returns number[]"
+   *   Выход: "Вычисляет centroid-вектор."
+   */
+  compactJSDoc(docComment) {
+    const lines = docComment.split("\n");
+    const descriptionLines = [];
+    for (const line of lines) {
+      const trimmed = line.trim().replace(/^\*\s?/, "");
+      if (trimmed.startsWith("@"))
+        break;
+      if (trimmed.length > 0) {
+        descriptionLines.push(trimmed);
+      }
+    }
+    const firstLine = descriptionLines[0] ?? "";
+    return firstLine.slice(0, 120);
+  }
+  /**
+   * Оценка токенов для кода (~3.3 символа = 1 токен для cl100k_base)
+   */
+  estimateTokens(text) {
+    return Math.ceil(text.length / 3.3);
+  }
+};
+
+// src/ast-compressor/formatters/skeleton-formatter.ts
+var SkeletonFormatter = class {
+  level = "L2";
+  compress(symbols, originalCode) {
+    const lines = [];
+    for (const symbol of symbols) {
+      const formatted = this.formatSymbol(symbol);
+      if (formatted) {
+        lines.push(formatted);
+      }
+    }
+    const content = lines.join("\n");
+    const originalTokens = this.estimateTokens(originalCode);
+    const compressedTokens = this.estimateTokens(content);
+    return {
+      level: "L2",
+      content,
+      originalTokens,
+      compressedTokens,
+      compressionRatio: originalTokens > 0 ? 1 - compressedTokens / originalTokens : 0,
+      symbols
+    };
+  }
+  formatSymbol(symbol) {
+    switch (symbol.type) {
+      case "function":
+      case "method":
+        return this.formatFunction(symbol);
+      case "class":
+        return this.formatClass(symbol);
+      case "interface":
+        return `interface ${symbol.name}`;
+      case "type":
+        return `type ${symbol.name}`;
+      case "variable":
+      case "constant":
+        return `${symbol.type} ${symbol.name}`;
+      case "property":
+        return `  ${symbol.name}`;
+      default:
+        return null;
+    }
+  }
+  formatFunction(fn) {
+    const params = fn.parameters.map((p) => `${p.name}${p.type ? `: ${p.type}` : ""}`).join(", ");
+    const ret = fn.returnType ? ` \u2192 ${fn.returnType}` : "";
+    return `${fn.name}(${params})${ret}`;
+  }
+  formatClass(cls) {
+    const parts = [];
+    let header = `class ${cls.name}`;
+    if (cls.extends)
+      header += ` extends ${cls.extends}`;
+    parts.push(header);
+    for (const member of cls.members) {
+      parts.push(`  ${member.name}`);
+    }
+    return parts.join("\n");
+  }
+  /**
+   * Оценка токенов для кода (~3.3 символа = 1 токен для cl100k_base)
+   */
+  estimateTokens(text) {
+    return Math.ceil(text.length / 3.3);
+  }
+};
+
+// src/ast-compressor/formatters/map-formatter.ts
+var MapFormatter = class {
+  level = "L3";
+  compress(symbols, originalCode) {
+    const groups = this.groupByType(symbols);
+    const lines = [];
+    for (const [type, names] of groups) {
+      lines.push(`${type}: ${names.join(", ")}`);
+    }
+    const content = lines.join("\n");
+    const originalTokens = this.estimateTokens(originalCode);
+    const compressedTokens = this.estimateTokens(content);
+    return {
+      level: "L3",
+      content,
+      originalTokens,
+      compressedTokens,
+      compressionRatio: originalTokens > 0 ? 1 - compressedTokens / originalTokens : 0,
+      symbols
+    };
+  }
+  /**
+   * Группирует символы по типу для компактного представления
+   */
+  groupByType(symbols) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const symbol of symbols) {
+      if (symbol.type === "class") {
+        const cls = symbol;
+        const memberNames = cls.members.map((m) => m.name);
+        const value = memberNames.length > 0 ? `${cls.name} { ${memberNames.join(", ")} }` : cls.name;
+        const list2 = groups.get("class") ?? [];
+        list2.push(value);
+        groups.set("class", list2);
+        continue;
+      }
+      const key = this.getGroupKey(symbol.type);
+      const list = groups.get(key) ?? [];
+      list.push(symbol.name);
+      groups.set(key, list);
+    }
+    return groups;
+  }
+  getGroupKey(type) {
+    switch (type) {
+      case "function":
+      case "method":
+        return "fn";
+      case "class":
+        return "class";
+      case "interface":
+        return "iface";
+      case "type":
+        return "type";
+      case "variable":
+      case "constant":
+        return "const";
+      case "property":
+        return "prop";
+      default:
+        return "other";
+    }
+  }
+  /**
+   * Оценка токенов для кода (~3.3 символа = 1 токен для cl100k_base)
+   */
+  estimateTokens(text) {
+    return Math.ceil(text.length / 3.3);
+  }
+};
+
+// src/ast-compressor/ast-compressor.ts
+var AstCompressor = class {
+  parserRegistry;
+  strategies;
+  logger;
+  constructor(logger) {
+    this.logger = logger;
+    this.parserRegistry = new ParserRegistry();
+    this.parserRegistry.register(new TypeScriptParser(logger));
+    this.strategies = /* @__PURE__ */ new Map([
+      ["L1", new SignatureFormatter()],
+      ["L2", new SkeletonFormatter()],
+      ["L3", new MapFormatter()]
+    ]);
+  }
+  /**
+   * Сжимает файл до указанного уровня
+   *
+   * L0 — полный код (без сжатия)
+   * L1 — сигнатуры + JSDoc
+   * L2 — скелет (имена + типы)
+   * L3 — карта (список символов)
+   */
+  compressFile(filePath, level = "L1") {
+    const code = readFileSync(filePath, "utf-8");
+    return this.compressCode(code, filePath, level = void 0);
+  }
+  /**
+   * Сжимает код (строку) до указанного уровня
+   */
+  compressCode(code, filePath, level = "L1") {
+    if (level === "L0") {
+      return this.buildL0Result(code);
+    }
+    const parser = this.parserRegistry.getByFilePath(filePath);
+    if (!parser) {
+      this.logger.warn(`\u041F\u0430\u0440\u0441\u0435\u0440 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D \u0434\u043B\u044F \u0444\u0430\u0439\u043B\u0430: ${filePath}. \u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u043C L0.`);
+      return this.buildL0Result(code);
+    }
+    const parseResult = parser.parse(code, filePath);
+    if (parseResult.errors.length > 0) {
+      this.logger.warn(`\u041E\u0448\u0438\u0431\u043A\u0438 \u043F\u0430\u0440\u0441\u0438\u043D\u0433\u0430 ${filePath}: ${parseResult.errors.length}. \u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u043C L0.`);
+      return this.buildL0Result(code);
+    }
+    const strategy = this.strategies.get(level);
+    if (!strategy) {
+      this.logger.warn(`\u0421\u0442\u0440\u0430\u0442\u0435\u0433\u0438\u044F \u0441\u0436\u0430\u0442\u0438\u044F ${level} \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430. \u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u043C L1.`);
+      const fallbackStrategy = this.strategies.get("L1");
+      if (!fallbackStrategy) {
+        return this.buildL0Result(code);
+      }
+      return fallbackStrategy.compress(parseResult.symbols, code);
+    }
+    const result = strategy.compress(parseResult.symbols, code);
+    this.logger.debug(`\u0421\u0436\u0430\u0442\u0438\u0435 ${filePath} [${level}]: ${result.originalTokens} \u2192 ${result.compressedTokens} (${(result.compressionRatio * 100).toFixed(1)}% \u044D\u043A\u043E\u043D\u043E\u043C\u0438\u044F)`);
+    return result;
+  }
+  /**
+   * Извлекает символы из файла (без сжатия)
+   */
+  extractSymbols(filePath) {
+    const code = readFileSync(filePath, "utf-8");
+    return this.extractSymbolsFromCode(code, filePath);
+  }
+  /**
+   * Извлекает символы из кода
+   */
+  extractSymbolsFromCode(code, filePath) {
+    const parser = this.parserRegistry.getByFilePath(filePath);
+    if (!parser) {
+      return [];
+    }
+    const result = parser.parse(code, filePath);
+    return result.symbols;
+  }
+  /**
+   * Ищет конкретный символ по имени в файле
+   */
+  findSymbolInFile(filePath, symbolName) {
+    const symbols = this.extractSymbols(filePath);
+    return symbols.find((s) => s.name === symbolName) ?? null;
+  }
+  /**
+   * Проверяет, поддерживается ли файл
+   */
+  isFileSupported(filePath) {
+    return this.parserRegistry.isSupported(filePath);
+  }
+  /**
+   * Возвращает список поддерживаемых расширений
+   */
+  getSupportedExtensions() {
+    return this.parserRegistry.getSupportedExtensions();
+  }
+  /**
+   * Получает парсер по пути к файлу
+   */
+  getParser(filePath) {
+    return this.parserRegistry.getByFilePath(filePath);
+  }
+  /**
+   * HVC v2: включает/выключает compact JSDoc в L1 (сокращение до первой строки).
+   * Делегирует в SignatureFormatter.setCompactMode()
+   */
+  setCompactJSDoc(enabled) {
+    const l1Strategy = this.strategies.get("L1");
+    if (l1Strategy && "setCompactMode" in l1Strategy) {
+      l1Strategy.setCompactMode(enabled);
+    }
+  }
+  /**
+   * HVC v2: no-op для AstCompressor (import stripping реализован в CachedCompressor).
+   * Метод необходим для соответствия ICodeCompressor интерфейсу.
+   */
+  setStripImports(_enabled) {
+  }
+  /**
+   * L0 — полный код без сжатия
+   */
+  buildL0Result(code) {
+    const tokens = Math.ceil(code.length / 3.3);
+    return {
+      level: "L0",
+      content: code,
+      originalTokens: tokens,
+      compressedTokens: tokens,
+      compressionRatio: 0,
+      symbols: []
+    };
+  }
+};
+
+// cli/watcher-client.ts
+import { gzipSync } from "node:zlib";
+var DEFAULT_RETRY = {
+  maxRetries: 3,
+  baseDelayMs: 500,
+  maxDelayMs: 5e3,
+  timeoutMs: 3e4
+};
+var WatcherClient = class {
+  serverUrl;
+  authToken;
+  projectId;
+  onRetry;
+  onSplit;
+  constructor(options) {
+    this.serverUrl = options.serverUrl.replace(/\/$/, "");
+    this.authToken = options.authToken;
+    this.projectId = options.projectId;
+    this.onRetry = options.onRetry;
+    this.onSplit = options.onSplit;
+  }
+  /**
+   * Проверяет доступность сервера
+   */
+  async healthCheck() {
+    try {
+      const res = await fetch(`${this.serverUrl}/health`, {
+        signal: AbortSignal.timeout(5e3)
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+  /**
+   * Отправляет батч сжатых файлов на сервер с retry-логикой.
+   *
+   * Оптимизации:
+   *   - gzip-сжатие тела (экономия ~70-80% трафика)
+   *   - Connection: close (избегаем ECONNRESET на VPS)
+   */
+  async pushBatch(files) {
+    const jsonBody = JSON.stringify({
+      project_id: this.projectId,
+      files: files.map((f) => ({
+        path: f.path,
+        hash: f.hash,
+        sizeBytes: f.sizeBytes,
+        language: f.language,
+        lineCount: f.lineCount,
+        l1Summary: f.l1Summary,
+        l3Summary: f.l3Summary,
+        imports: f.imports,
+        symbols: f.symbols,
+        rawSnippet: f.rawSnippet
+      }))
+    });
+    const gzipped = gzipSync(Buffer.from(jsonBody, "utf-8"));
+    await this.fetchWithRetry(
+      `${this.serverUrl}/api/push_indexed`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Encoding": "gzip",
+          "Authorization": `Bearer ${this.authToken}`,
+          // Новое TCP-соединение на каждый запрос —
+          // исключает ECONNRESET от stale keep-alive
+          "Connection": "close"
+        },
+        body: gzipped
+      },
+      DEFAULT_RETRY
+    );
+  }
+  /**
+   * Адаптивная отправка батча с рекурсивным дроблением.
+   *
+   * Стратегия:
+   *   1. Попытка отправить весь батч целиком (pushBatch + retry)
+   *   2. При неудаче — делим пополам, последовательно отправляем каждую половину
+   *   3. Рекурсия до одного файла; если единичный файл не проходит — failed
+   *
+   * Решает проблему "толстого батча": payload > 40KB может не пройти
+   * через нестабильный VPS-канал. Дробление гарантирует, что мелкие файлы
+   * всегда доставляются, а гиганты изолируются.
+   *
+   * @param files — массив файлов для отправки
+   * @param depth — текущая глубина рекурсии (для логирования)
+   * @returns Результат: какие файлы загружены, какие нет
+   */
+  async pushBatchAdaptive(files, depth = 0) {
+    if (files.length === 0) {
+      return { uploaded: [], failed: [] };
+    }
+    try {
+      await this.pushBatch(files);
+      return { uploaded: files, failed: [] };
+    } catch {
+      if (files.length === 1) {
+        return { uploaded: [], failed: files };
+      }
+      const mid = Math.ceil(files.length / 2);
+      const leftHalf = files.slice(0, mid);
+      const rightHalf = files.slice(mid);
+      this.onSplit?.(files.length, mid, depth + 1);
+      const leftResult = await this.pushBatchAdaptive(leftHalf, depth + 1);
+      await new Promise((r) => setTimeout(r, 200));
+      const rightResult = await this.pushBatchAdaptive(rightHalf, depth + 1);
+      return {
+        uploaded: [...leftResult.uploaded, ...rightResult.uploaded],
+        failed: [...leftResult.failed, ...rightResult.failed]
+      };
+    }
+  }
+  /**
+   * fetch с экспоненциальным backoff + jitter
+   *
+   * Обрабатывает:
+   * - TypeError: fetch failed (сетевой сброс, DNS)
+   * - TimeoutError (AbortSignal.timeout)
+   * - HTTP 5xx (серверные ошибки)
+   *
+   * Не ретраит:
+   * - HTTP 4xx (клиентские ошибки — проблема в данных)
+   */
+  async fetchWithRetry(url, init, config) {
+    let lastError = null;
+    for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+      try {
+        const res = await fetch(url, {
+          ...init,
+          signal: AbortSignal.timeout(config.timeoutMs)
+        });
+        if (res.status >= 400 && res.status < 500) {
+          const text = await res.text().catch(() => "Unknown error");
+          throw new Error(`HTTP ${res.status}: ${text}`);
+        }
+        if (res.status >= 500) {
+          const text = await res.text().catch(() => "Server error");
+          lastError = new Error(`HTTP ${res.status}: ${text}`);
+          if (attempt < config.maxRetries) {
+            await this.backoff(attempt, config);
+            continue;
+          }
+          throw lastError;
+        }
+        return res;
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        if (error.message.startsWith("HTTP 4")) {
+          throw error;
+        }
+        lastError = error;
+        if (attempt >= config.maxRetries) {
+          throw error;
+        }
+        this.onRetry?.(attempt + 1, config.maxRetries, error.message);
+        await this.backoff(attempt, config);
+      }
+    }
+    throw lastError ?? new Error("fetchWithRetry: unexpected end");
+  }
+  /**
+   * Экспоненциальная задержка с jitter
+   * delay = min(baseDelay × 2^attempt + jitter, maxDelay)
+   */
+  backoff(attempt, config) {
+    const exponential = config.baseDelayMs * Math.pow(2, attempt);
+    const jitter = Math.random() * 500;
+    const delay = Math.min(exponential + jitter, config.maxDelayMs);
+    return new Promise((resolve) => setTimeout(resolve, delay));
+  }
+};
+
+// cli/pretty-logger.ts
+var R = "\x1B[0m";
+var B = "\x1B[1m";
+var D = "\x1B[2m";
+var cYellow = "\x1B[33m";
+var cBlue = "\x1B[34m";
+var cCyan = "\x1B[36m";
+var cWhite = "\x1B[37m";
+var cRed = "\x1B[31m";
+var cGray = "\x1B[90m";
+var cBGreen = "\x1B[92m";
+var cBYellow = "\x1B[93m";
+var cBBlue = "\x1B[94m";
+var cBCyan = "\x1B[96m";
+var cBWhite = "\x1B[97m";
+var supportsColor = process.stdout.isTTY !== false;
+function c(code, text) {
+  return supportsColor ? `${code}${text}${R}` : text;
+}
+function formatBytes(bytes) {
+  if (bytes < 1024)
+    return `${bytes} B`;
+  if (bytes < 1024 * 1024)
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+function formatMs(ms) {
+  if (ms < 1e3)
+    return `${ms}ms`;
+  return `${(ms / 1e3).toFixed(1)}s`;
+}
+function ts() {
+  return c(cGray, (/* @__PURE__ */ new Date()).toLocaleTimeString("ru-RU", { hour12: false }));
+}
+function progressBar(current, total, width = 28) {
+  if (total === 0)
+    return c(cGray, "\u2591".repeat(width));
+  const pct = Math.min(current / total, 1);
+  const filled = Math.round(pct * width);
+  const empty = width - filled;
+  const bar = c(cBGreen, "\u2588".repeat(filled)) + c(cGray, "\u2591".repeat(empty));
+  const pctStr = c(cBWhite, `${Math.round(pct * 100)}%`).padStart(4);
+  return `${bar} ${pctStr}`;
+}
+function printHeader(project, server, version = "0.7.0") {
+  const w = 62;
+  const line = "\u2500".repeat(w);
+  console.log("");
+  console.log(c(cBCyan, `  \u250C${line}\u2510`));
+  console.log(c(cBCyan, "  \u2502") + c(B + cBWhite, `  \u{1F9E0} Project Brain Smart Watcher`) + c(cGray, `  v${version}`) + " ".repeat(w - 36 - version.length) + c(cBCyan, "\u2502"));
+  console.log(c(cBCyan, "  \u2502") + c(cCyan, `  \u25CF `) + c(cBWhite, project.padEnd(24)) + c(cGray, `\u2192  `) + c(cBlue, server.slice(0, 30).padEnd(30)) + c(cBCyan, "\u2502"));
+  console.log(c(cBCyan, `  \u2514${line}\u2518`));
+  console.log("");
+}
+function printPhase(n, total, label) {
+  const badge = c(cBBlue + B, ` ${n}/${total} `);
+  const name = c(B + cBWhite, ` ${label} `);
+  const line = c(cGray, "\u2500".repeat(46));
+  console.log(`
+  ${badge}${name}${line}`);
+}
+function printInfo(msg) {
+  console.log(`  ${ts()}  ${c(cCyan, "\xB7")}  ${msg}`);
+}
+function printOk(msg) {
+  console.log(`  ${ts()}  ${c(cBGreen, "\u2713")}  ${msg}`);
+}
+function printWarn(msg) {
+  console.log(`  ${ts()}  ${c(cBYellow, "\u26A0")}  ${c(cYellow, msg)}`);
+}
+function printError(msg) {
+  console.log(`  ${ts()}  ${c(cRed, "\u2717")}  ${c(cRed, msg)}`);
+}
+function printSkip(msg) {
+  console.log(`  ${ts()}  ${c(cGray, "\u25CB")}  ${c(D + cGray, msg)}`);
+}
+var _progressStart = 0;
+function printProgress(current, total, label) {
+  if (current === 1) _progressStart = Date.now();
+  if (!supportsColor) {
+    if (current % 10 === 0 || current === total) {
+      console.log(`  [${current}/${total}] ${label}`);
+    }
+    return;
+  }
+  const bar = progressBar(current, total);
+  const count = c(cGray, `${current}/${total}`);
+  const elapsed = Date.now() - _progressStart;
+  const perFile = current > 0 ? elapsed / current : 0;
+  const eta = Math.round(perFile * (total - current) / 1e3);
+  const etaStr = eta > 0 ? c(cGray, `~${eta}\u0441 \u043E\u0441\u0442\u0430\u043B\u043E\u0441\u044C`) : c(cBGreen, "\u0433\u043E\u0442\u043E\u0432\u043E");
+  process.stdout.write(`\r\x1B[2K  ${bar}  ${count}  ${etaStr}  ${c(cGray, label.slice(0, 28))}  `);
+  if (current === total)
+    process.stdout.write("\n");
+}
+var _uploadStart = 0;
+function printBatch(batchN, totalBatches, fileCount, sizeStr, ok) {
+  if (batchN === 1 && _uploadStart === 0) _uploadStart = Date.now();
+  const status = ok ? c(cBGreen, "\u2713") : c(cRed, "\u2717");
+  const bar = progressBar(batchN, totalBatches, 20);
+  const files = c(cBWhite, `${fileCount} files`);
+  const size = c(cGray, `~${sizeStr}`);
+  const elapsed = Date.now() - _uploadStart;
+  const perBatch = batchN > 0 ? elapsed / batchN : 0;
+  const eta = Math.round(perBatch * (totalBatches - batchN) / 1e3);
+  const etaStr = batchN < totalBatches ? c(cGray, `~${eta}\u0441`) : c(cBGreen, "\u0433\u043E\u0442\u043E\u0432\u043E");
+  if (supportsColor) {
+    process.stdout.write(`\r\x1B[2K  ${bar}  ${status} ${files} ${size}  ${etaStr}`);
+    if (batchN === totalBatches) process.stdout.write("\n");
+  } else {
+    console.log(`  Batch ${batchN}/${totalBatches}  ${ok ? "OK" : "FAIL"}  ${fileCount} files  ~${sizeStr}`);
+  }
+}
+function resetUploadTimer() {
+  _uploadStart = 0;
+}
+var SPINNER = ["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"];
+var _spinnerInterval = null;
+var _spinnerIdx = 0;
+function startSpinner(label) {
+  if (!supportsColor) return;
+  _spinnerIdx = 0;
+  _spinnerInterval = setInterval(() => {
+    const frame = c(cBCyan, SPINNER[_spinnerIdx % SPINNER.length]);
+    process.stdout.write(`\r\x1B[2K  ${frame}  ${c(cGray, label)}`);
+    _spinnerIdx++;
+  }, 80);
+}
+function stopSpinner() {
+  if (_spinnerInterval) {
+    clearInterval(_spinnerInterval);
+    _spinnerInterval = null;
+    process.stdout.write("\r\x1B[2K");
+  }
+}
+function printSummary(opts) {
+  const ratio = opts.originalKb > 0 ? (opts.originalKb / Math.max(opts.summaryKb, 1)).toFixed(1) : "\u2014";
+  const savedPct = opts.originalKb > 0 ? Math.round((1 - opts.summaryKb / opts.originalKb) * 100) : 0;
+  const w = 62;
+  const line = "\u2500".repeat(w);
+  console.log("");
+  console.log(c(cBGreen, `  \u250C${line}\u2510`));
+  const title = opts.errors === 0 ? `  \u2705  \u041F\u0440\u043E\u0438\u043D\u0434\u0435\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043E ${opts.files} \u0444\u0430\u0439\u043B\u043E\u0432 \u0437\u0430 ${formatMs(opts.elapsedMs)}` : `  \u26A0\uFE0F   \u041F\u0440\u043E\u0438\u043D\u0434\u0435\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043E ${opts.files} \u0444\u0430\u0439\u043B\u043E\u0432 (${opts.errors} \u043E\u0448\u0438\u0431\u043E\u043A) \u0437\u0430 ${formatMs(opts.elapsedMs)}`;
+  console.log(c(cBGreen, "  \u2502") + c(B + cBWhite, title).padEnd(w + 8) + c(cBGreen, "\u2502"));
+  const stat = `  \u{1F4BE}  \u041E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E ${formatBytes(opts.summaryKb * 1024)}  (\u0438\u0437 ~${formatBytes(opts.originalKb * 1024)} \u0438\u0441\u0445\u043E\u0434\u043D\u044B\u0445)  \xD7${ratio} \u0441\u0436\u0430\u0442\u0438\u0435  (${savedPct}%)`;
+  console.log(c(cBGreen, "  \u2502") + c(cCyan, stat).padEnd(w + 9) + c(cBGreen, "\u2502"));
+  console.log(c(cBGreen, `  \u2514${line}\u2518`));
+  console.log("");
+}
+function printTokenSavings(rawBytes, summaryBytes, fileCount) {
+  if (fileCount === 0) return;
+  const CpT = 4;
+  const rawTok = Math.round(rawBytes / CpT);
+  const sumTok = Math.round(summaryBytes / CpT);
+  const savedTok = rawTok - sumTok;
+  const savedPct = rawTok > 0 ? Math.round(savedTok / rawTok * 100) : 0;
+  const ratio = rawTok > 0 ? (rawTok / Math.max(sumTok, 1)).toFixed(0) : "\u2014";
+  const avgRaw = Math.round(rawBytes / fileCount);
+  const avgSum = Math.round(summaryBytes / fileCount);
+  const fmt = (n) => {
+    if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+    if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
+    return String(n);
+  };
+  const w = 62;
+  const ln = "\u2500".repeat(w);
+  const sep = "\u2500".repeat(w - 2);
+  const bL = cBBlue;
+  const pad = (s, color) => c(bL, "  \u2502") + c(color, s).padEnd(w + 9) + c(bL, "\u2502");
+  console.log(c(bL, `  \u250C${ln}\u2510`));
+  console.log(c(bL, "  \u2502") + c(B + cBWhite, `  \u{1F9EE}  \u042D\u041A\u041E\u041D\u041E\u041C\u0418\u042F \u0422\u041E\u041A\u0415\u041D\u041E\u0412`).padEnd(w + 8) + c(bL, "\u2502"));
+  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  console.log(pad(`  \u{1F4C4}  \u0418\u0441\u0445\u043E\u0434\u043D\u044B\u0439 \u043A\u043E\u0434:   ~${fmt(rawTok)} \u0442\u043E\u043A\u0435\u043D\u043E\u0432  (${formatBytes(rawBytes)})`, cRed));
+  console.log(pad(`  \u{1F9E0}  L1+L3 \u0441\u0443\u043C\u043C\u0430\u0440\u0438:  ~${fmt(sumTok)} \u0442\u043E\u043A\u0435\u043D\u043E\u0432  (${formatBytes(summaryBytes)})`, cBGreen));
+  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  console.log(pad(`  \u{1F4B0}  \u042D\u043A\u043E\u043D\u043E\u043C\u0438\u044F:       ~${fmt(savedTok)} \u0442\u043E\u043A\u0435\u043D\u043E\u0432  (${savedPct}%)`, B + cBYellow));
+  console.log(pad(`  \u{1F4CA}  \u0421\u0442\u0435\u043F\u0435\u043D\u044C \u0441\u0436\u0430\u0442\u0438\u044F: \xD7${ratio}  (${fileCount} \u0444\u0430\u0439\u043B\u043E\u0432)`, cBCyan));
+  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  console.log(pad(`  \u{1F4D0}  \u0421\u0440\u0435\u0434\u043D\u0438\u0439 \u0444\u0430\u0439\u043B:   ${formatBytes(avgRaw)} \u2192 ${formatBytes(avgSum)}`, cGray));
+  console.log(pad(`  \u26A1  \u041D\u0430 \u043F\u0440\u043E\u0432\u043E\u0434\u0435:     gzip \u0435\u0449\u0451 ~70% \u043C\u0435\u043D\u044C\u0448\u0435`, cGray));
+  console.log(c(bL, `  \u2514${ln}\u2518`));
+  console.log("");
+}
+function printRescanResult(opts) {
+  const parts = [];
+  if (opts.added > 0) parts.push(c(cBGreen, `+${opts.added} \u043D\u043E\u0432\u044B\u0445`));
+  if (opts.changed > 0) parts.push(c(cBYellow, `~${opts.changed} \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u043E`));
+  if (opts.removed > 0) parts.push(c(cRed, `-${opts.removed} \u0443\u0434\u0430\u043B\u0435\u043D\u043E`));
+  if (parts.length === 0) {
+    console.log(`  ${ts()}  ${c(cGray, "\u25CB")}  ${c(cGray, `Rescan: \u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0439 (${opts.unchanged} \u0444\u0430\u0439\u043B\u043E\u0432)  \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0447\u0435\u0440\u0435\u0437 ${opts.nextInMin} \u043C\u0438\u043D`)}`);
+    return;
+  }
+  const diff = parts.join(c(cGray, ", "));
+  const time = c(cGray, formatMs(opts.elapsedMs));
+  const next = c(cGray, `\u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0447\u0435\u0440\u0435\u0437 ${opts.nextInMin} \u043C\u0438\u043D`);
+  console.log(`  ${ts()}  ${c(cBCyan, "\u21BB")}  Rescan: ${diff}  ${c(cGray, "|")}  \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043E ${opts.uploaded}  ${time}  ${next}`);
+}
+function printVerification(opts) {
+  const w = 62;
+  const ln = "\u2500".repeat(w);
+  const sep = "\u2500".repeat(w - 2);
+  const bL = cBCyan;
+  const pad = (s, color) => c(bL, "  \u2502") + c(color, s).padEnd(w + 9) + c(bL, "\u2502");
+  console.log(c(bL, `  \u250C${ln}\u2510`));
+  console.log(c(bL, "  \u2502") + c(B + cBWhite, `  \u{1F4CB}  \u0412\u0415\u0420\u0418\u0424\u0418\u041A\u0410\u0426\u0418\u042F \u0421\u041A\u0410\u041D\u0418\u0420\u041E\u0412\u0410\u041D\u0418\u042F`).padEnd(w + 8) + c(bL, "\u2502"));
+  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  const extEntries = Object.entries(opts.byExt).sort((a, b) => b[1] - a[1]);
+  console.log(pad(`  \u{1F4C2}  \u041E\u0431\u0440\u0430\u0431\u043E\u0442\u0430\u043D\u043E \u043F\u043E \u0442\u0438\u043F\u0430\u043C \u0444\u0430\u0439\u043B\u043E\u0432:`, B + cBWhite));
+  for (const [ext, count] of extEntries) {
+    const pct = opts.compressed > 0 ? Math.round(count / opts.compressed * 100) : 0;
+    const bar = "\u2588".repeat(Math.max(1, Math.round(pct / 5)));
+    console.log(pad(`       ${ext.padEnd(8)} ${String(count).padStart(4)} \u0444\u0430\u0439\u043B(\u043E\u0432)  ${pct}%  ${bar}`, cCyan));
+  }
+  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  const skippedExtEntries = Object.entries(opts.skippedByExt).sort((a, b) => b[1] - a[1]);
+  if (skippedExtEntries.length > 0) {
+    console.log(pad(`  \u{1F6AB}  \u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043D\u044B\u0435 \u0440\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u0438\u044F (\u043D\u0435 \u0432 \u0441\u043F\u0438\u0441\u043A\u0435 --exts):`, B + cBYellow));
+    const top = skippedExtEntries.slice(0, 10);
+    for (const [ext, count] of top) {
+      console.log(pad(`       ${ext.padEnd(8)} ${String(count).padStart(4)} \u0444\u0430\u0439\u043B(\u043E\u0432)`, cYellow));
+    }
+    if (skippedExtEntries.length > 10) {
+      const rest = skippedExtEntries.slice(10).reduce((s, [, c2]) => s + c2, 0);
+      console.log(pad(`       ...\u0438 \u0435\u0449\u0451 ${skippedExtEntries.length - 10} \u0442\u0438\u043F\u043E\u0432 (${rest} \u0444\u0430\u0439\u043B\u043E\u0432)`, cGray));
+    }
+    console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  }
+  const { tooLarge, readError, compressError } = opts.skipInfo;
+  const totalSkips = tooLarge.length + readError.length + compressError.length;
+  if (totalSkips > 0) {
+    console.log(pad(`  \u26A0\uFE0F   \u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B: ${totalSkips}`, B + cBYellow));
+    if (tooLarge.length > 0) {
+      console.log(pad(`       \u{1F5C4}\uFE0F  \u0421\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u0438\u0435 (>500KB): ${tooLarge.length}`, cYellow));
+      for (const f of tooLarge.slice(0, 5)) {
+        console.log(pad(`          ${f}`, cGray));
+      }
+      if (tooLarge.length > 5) console.log(pad(`          ...\u0438 \u0435\u0449\u0451 ${tooLarge.length - 5}`, cGray));
+    }
+    if (readError.length > 0) {
+      console.log(pad(`       \u{1F4DB}  \u041E\u0448\u0438\u0431\u043A\u0438 \u0447\u0442\u0435\u043D\u0438\u044F: ${readError.length}`, cRed));
+      for (const f of readError.slice(0, 5)) {
+        console.log(pad(`          ${f}`, cGray));
+      }
+      if (readError.length > 5) console.log(pad(`          ...\u0438 \u0435\u0449\u0451 ${readError.length - 5}`, cGray));
+    }
+    if (compressError.length > 0) {
+      console.log(pad(`       \u{1F527}  AST \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D (raw fallback): ${compressError.length}`, cYellow));
+      for (const f of compressError.slice(0, 5)) {
+        console.log(pad(`          ${f}`, cGray));
+      }
+      if (compressError.length > 5) console.log(pad(`          ...\u0438 \u0435\u0449\u0451 ${compressError.length - 5}`, cGray));
+    }
+    console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  }
+  const coveragePct = opts.total > 0 ? Math.round(opts.compressed / opts.total * 100) : 0;
+  console.log(pad(`  \u2705  \u041F\u043E\u043A\u0440\u044B\u0442\u0438\u0435: ${opts.compressed}/${opts.total} \u0444\u0430\u0439\u043B\u043E\u0432 (${coveragePct}%)`, B + cBGreen));
+  if (skippedExtEntries.length > 0) {
+    const missedTotal = skippedExtEntries.reduce((s, [, c2]) => s + c2, 0);
+    console.log(pad(`  \u{1F4A1}  +${missedTotal} \u0444\u0430\u0439\u043B\u043E\u0432 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E \u0441 \u0440\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u043D\u044B\u043C --exts`, cGray));
+  }
+  console.log(c(bL, `  \u2514${ln}\u2518`));
+  console.log("");
+}
+function printWatchReady(path) {
+  console.log("");
+  console.log(`  ${c(cBCyan + B, "  \u{1F441}  WATCH MODE  ")}  ${c(cGray, path)}`);
+  console.log(c(cGray, `  ${"\u2500".repeat(60)}`));
+  console.log(c(cGray, "  Ctrl+C \u0434\u043B\u044F \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0438\n"));
+}
+function printFileChange(event, relPath, detail = void 0) {
+  const icons = {
+    modified: c(cBYellow, "\u270E"),
+    added: c(cBGreen, "+"),
+    deleted: c(cRed, "\u2212"),
+    error: c(cRed, "\u2717")
+  };
+  const colors = {
+    modified: cBWhite,
+    added: cBGreen,
+    deleted: cGray,
+    error: cRed
+  };
+  const icon = icons[event] ?? "\xB7";
+  const path = c(colors[event] ?? cWhite, relPath.padEnd(40));
+  const det = detail ? c(cGray, detail) : "";
+  console.log(`  ${ts()}  ${icon}  ${path}  ${det}`);
+}
+function printServerCheck(url, ok, ms) {
+  const status = ok ? c(cBGreen, "\u2713 \u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D") : c(cRed, "\u2717 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D");
+  console.log(`  ${ts()}  ${c(cCyan, "\u21D7")}  ${c(cGray, url)}  ${status}  ${c(cGray, formatMs(ms))}`);
+}
+
+// cli/watch.ts
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+function printRetry(attempt, maxRetries, error) {
+  const msg = `  \u21BB \u043F\u043E\u043F\u044B\u0442\u043A\u0430 ${attempt}/${maxRetries}: ${error}`;
+  process.stdout.write(`\x1B[33m${msg}\x1B[0m
+`);
+}
+function parseArgs(argv) {
+  const get = (flag) => {
+    const idx = argv.indexOf(flag);
+    return idx !== -1 ? argv[idx + 1] : void 0;
+  };
+  const path = get("--path") ?? process.cwd();
+  const server = get("--server") ?? "";
+  const token = get("--token") ?? "";
+  const project = get("--project") ?? path.split(/[/\\]/).pop() ?? "default";
+  const watch = argv.includes("--watch");
+  const extsArg = get("--exts") ?? ".ts,.tsx,.js,.jsx,.mjs,.cjs,.py,.cs,.go,.rs,.java,.kt,.swift,.rb,.php,.c,.cpp,.h,.hpp,.cc,.vue,.svelte,.html,.htm,.css,.scss,.sass,.less,.json,.yaml,.yml,.xml,.sql,.sh,.md,.graphql,.gql,.dart,.scala,.lua,.r,.ex,.exs,.proto";
+  const ignoreArg = get("--ignore") ?? "node_modules,dist,.git,build,out,coverage,__pycache__,.venv,venv,env,.next,.nuxt,vendor,target,.cache,bin,obj,.idea,.vscode,.DS_Store,package-lock.json,yarn.lock,pnpm-lock.yaml";
+  const batchSize = parseInt(get("--batch") ?? "10", 10);
+  const intervalMin = parseInt(get("--interval") ?? "3", 10);
+  return {
+    path,
+    server: server.replace(/\/$/, ""),
+    token,
+    project,
+    watch,
+    exts: extsArg.split(",").map((e) => e.trim()),
+    ignore: ignoreArg.split(",").map((e) => e.trim()),
+    batchSize,
+    intervalMin
+  };
+}
+function collectFiles(dir, ignore, exts) {
+  const files = [];
+  const skippedByExt = {};
+  const extsLower = exts.map((e) => e.toLowerCase());
+  const ignoreFiles = new Set(ignore.filter((i) => i.includes(".")));
+  const ignoreDirs = new Set(ignore.filter((i) => !i.includes(".")));
+  function walk(current) {
+    let entries;
+    try {
+      entries = readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const name = String(entry.name);
+      if (name.startsWith(".")) continue;
+      const fullPath = join(current, name);
+      if (entry.isDirectory()) {
+        if (ignoreDirs.has(name)) continue;
+        walk(fullPath);
+      } else if (entry.isFile()) {
+        if (ignoreFiles.has(name)) continue;
+        const ext = extname(name).toLowerCase();
+        if (extsLower.includes(ext)) {
+          files.push(fullPath);
+        } else if (ext) {
+          skippedByExt[ext] = (skippedByExt[ext] || 0) + 1;
+        }
+      }
+    }
+  }
+  walk(dir);
+  return { files, skippedByExt };
+}
+var IMPORT_REGEX = /import\s+(?:type\s+)?(?:\{[^}]*\}|[^;{]*)\s+from\s+['"]([^'"]+)['"]/g;
+var REQUIRE_REGEX = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+var DYNAMIC_IMPORT_REGEX = /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+function extractImports(code) {
+  const paths = /* @__PURE__ */ new Set();
+  for (const regex of [IMPORT_REGEX, REQUIRE_REGEX, DYNAMIC_IMPORT_REGEX]) {
+    regex.lastIndex = 0;
+    let m;
+    while ((m = regex.exec(code)) !== null) {
+      paths.add(m[1]);
+    }
+  }
+  return [...paths];
+}
+var SYMBOL_PATTERNS = [
+  { regex: /export\s+(?:default\s+)?(?:async\s+)?function\s+(\w+)/g, type: "function", exported: true },
+  { regex: /export\s+(?:default\s+)?class\s+(\w+)/g, type: "class", exported: true },
+  { regex: /export\s+(?:default\s+)?(?:const|let|var)\s+(\w+)/g, type: "variable", exported: true },
+  { regex: /export\s+(?:default\s+)?(?:type|interface)\s+(\w+)/g, type: "type", exported: true },
+  { regex: /(?:^|\n)\s*(?:async\s+)?function\s+(\w+)/g, type: "function", exported: false },
+  { regex: /(?:^|\n)\s*class\s+(\w+)/g, type: "class", exported: false }
+];
+function extractSymbols(code) {
+  const seen = /* @__PURE__ */ new Set();
+  const symbols = [];
+  for (const { regex, type, exported } of SYMBOL_PATTERNS) {
+    regex.lastIndex = 0;
+    let m;
+    while ((m = regex.exec(code)) !== null) {
+      const name = m[1];
+      if (!seen.has(name)) {
+        seen.add(name);
+        symbols.push({ name, type, isExported: exported });
+      }
+    }
+  }
+  return symbols;
+}
+var RAW_SNIPPET_LIMIT = 3e3;
+var MAX_L1_SUMMARY_SIZE = 15e3;
+var MAX_L3_SUMMARY_SIZE = 2e3;
+function extractRawSnippet(code) {
+  if (code.length <= RAW_SNIPPET_LIMIT) return code;
+  const cut = code.lastIndexOf("\n", RAW_SNIPPET_LIMIT);
+  return code.slice(0, cut > 0 ? cut : RAW_SNIPPET_LIMIT);
+}
+function truncateSummary(text, maxSize, label) {
+  if (text.length <= maxSize) return text;
+  const cut = text.lastIndexOf("\n", maxSize);
+  const truncated = text.slice(0, cut > 0 ? cut : maxSize);
+  return `${truncated}
+// ... ${label}: \u043E\u0431\u0440\u0435\u0437\u0430\u043D\u043E (${text.length} \u2192 ${truncated.length} \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432)`;
+}
+var LANG_MAP = {
+  ".ts": "typescript",
+  ".tsx": "typescript",
+  ".js": "javascript",
+  ".jsx": "javascript",
+  ".mjs": "javascript",
+  ".cjs": "javascript",
+  ".py": "python",
+  ".cs": "csharp",
+  ".go": "go",
+  ".rs": "rust",
+  ".java": "java",
+  ".kt": "kotlin",
+  ".kts": "kotlin",
+  ".swift": "swift",
+  ".rb": "ruby",
+  ".php": "php",
+  ".c": "c",
+  ".cpp": "cpp",
+  ".cc": "cpp",
+  ".h": "c-header",
+  ".hpp": "cpp-header",
+  ".vue": "vue",
+  ".svelte": "svelte",
+  ".html": "html",
+  ".htm": "html",
+  ".css": "css",
+  ".scss": "scss",
+  ".sass": "sass",
+  ".less": "less",
+  ".json": "json",
+  ".yaml": "yaml",
+  ".yml": "yaml",
+  ".xml": "xml",
+  ".svg": "xml",
+  ".sql": "sql",
+  ".sh": "shell",
+  ".bash": "shell",
+  ".md": "markdown",
+  ".graphql": "graphql",
+  ".gql": "graphql",
+  ".proto": "protobuf",
+  ".dart": "dart",
+  ".scala": "scala",
+  ".lua": "lua",
+  ".r": "r",
+  ".ex": "elixir",
+  ".exs": "elixir"
+};
+function compressFile(absPath, projectRoot, compressor, skipInfo) {
+  const relPath = relative(projectRoot, absPath).replace(/\\/g, "/");
+  let stat;
+  try {
+    stat = statSync(absPath);
+  } catch {
+    skipInfo?.readError.push(relPath);
+    return null;
+  }
+  if (stat.size > 500 * 1024) {
+    skipInfo?.tooLarge.push(`${relPath} (${formatBytes(stat.size)})`);
+    return null;
+  }
+  let content;
+  try {
+    content = readFileSync2(absPath, "utf-8");
+  } catch {
+    skipInfo?.readError.push(relPath);
+    return null;
+  }
+  const hash = createHash2("md5").update(content).digest("hex");
+  const lineCount = content.split("\n").length;
+  const ext = extname(absPath).toLowerCase();
+  let l1Summary;
+  let l3Summary;
+  try {
+    const l1Result = compressor.compressCode(content, relPath, "L1");
+    const l3Result = compressor.compressCode(content, relPath, "L3");
+    l1Summary = l1Result.content;
+    l3Summary = l3Result.content;
+  } catch {
+    l1Summary = extractRawSnippet(content);
+    l3Summary = `// ${relPath} (${lineCount} lines, ${LANG_MAP[ext] ?? ext})`;
+    skipInfo?.compressError.push(relPath);
+  }
+  l1Summary = truncateSummary(l1Summary, MAX_L1_SUMMARY_SIZE, "L1");
+  l3Summary = truncateSummary(l3Summary, MAX_L3_SUMMARY_SIZE, "L3");
+  const imports = extractImports(content);
+  const symbols = extractSymbols(content);
+  const rawSnippet = extractRawSnippet(content);
+  return {
+    path: relPath,
+    hash,
+    sizeBytes: stat.size,
+    language: LANG_MAP[ext] ?? null,
+    lineCount,
+    l1Summary,
+    l3Summary,
+    imports,
+    symbols,
+    rawSnippet
+  };
+}
+var MAX_BATCH_BYTES = 30 * 1024;
+function estimatePayloadSize(file) {
+  const l1 = file.l1Summary?.length ?? 0;
+  const l3 = file.l3Summary?.length ?? 0;
+  const snippet = file.rawSnippet?.length ?? 0;
+  const path = file.path?.length ?? 0;
+  const importsSize = file.imports ? file.imports.reduce((s, i) => s + i.length + 4, 20) : 0;
+  const symbolsSize = file.symbols ? file.symbols.reduce((s, sym) => s + sym.name.length + sym.type.length + 30, 20) : 0;
+  return l1 + l3 + snippet + path + importsSize + symbolsSize + 200;
+}
+function createSmartBatches(files, maxBytes = MAX_BATCH_BYTES) {
+  if (files.length === 0) return [];
+  const sorted = [...files].sort(
+    (a, b) => estimatePayloadSize(a) - estimatePayloadSize(b)
+  );
+  const batches = [];
+  let currentFiles = [];
+  let currentSize = 0;
+  for (const file of sorted) {
+    const fileSize = estimatePayloadSize(file);
+    if (fileSize > maxBytes) {
+      if (currentFiles.length > 0) {
+        batches.push({ batchIndex: batches.length + 1, files: currentFiles });
+        currentFiles = [];
+        currentSize = 0;
+      }
+      batches.push({ batchIndex: batches.length + 1, files: [file] });
+      continue;
+    }
+    if (currentSize + fileSize > maxBytes && currentFiles.length > 0) {
+      batches.push({ batchIndex: batches.length + 1, files: currentFiles });
+      currentFiles = [];
+      currentSize = 0;
+    }
+    currentFiles.push(file);
+    currentSize += fileSize;
+  }
+  if (currentFiles.length > 0) {
+    batches.push({ batchIndex: batches.length + 1, files: currentFiles });
+  }
+  return batches;
+}
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (!args.server) {
+    printError("--server \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u0435\u043D  (\u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440: https://your-mcp.com)");
+    process.exit(1);
+  }
+  if (!args.token) {
+    printError("--token \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u0435\u043D");
+    process.exit(1);
+  }
+  if (!existsSync(args.path)) {
+    printError(`\u041F\u0443\u0442\u044C \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D: ${args.path}`);
+    process.exit(1);
+  }
+  printHeader(args.project, args.server, "0.10.0");
+  printPhase(1, 3, "\u041F\u041E\u0414\u041A\u041B\u042E\u0427\u0415\u041D\u0418\u0415");
+  const t0 = Date.now();
+  const client = new WatcherClient({
+    serverUrl: args.server,
+    authToken: args.token,
+    projectId: args.project,
+    batchSize: args.batchSize,
+    onRetry: printRetry,
+    onSplit: (original, half, depth) => {
+      const indent = "  ".repeat(depth);
+      printWarn(`${indent}\u26A1 \u0414\u0440\u043E\u0431\u043B\u0435\u043D\u0438\u0435 \u0431\u0430\u0442\u0447\u0430: ${original} \u2192 ${half} + ${original - half} \u0444\u0430\u0439\u043B\u043E\u0432 (\u0433\u043B\u0443\u0431\u0438\u043D\u0430 ${depth})`);
+    }
+  });
+  startSpinner(`\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435 \u043A ${args.server}...`);
+  const healthy = await client.healthCheck();
+  stopSpinner();
+  printServerCheck(args.server, healthy, Date.now() - t0);
+  if (!healthy) {
+    printError(`\u0421\u0435\u0440\u0432\u0435\u0440 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D: ${args.server}`);
+    process.exit(1);
+  }
+  printPhase(2, 3, "\u0421\u041A\u0410\u041D\u0418\u0420\u041E\u0412\u0410\u041D\u0418\u0415 \u0418 \u0421\u0416\u0410\u0422\u0418\u0415");
+  printInfo(`\u041F\u0443\u0442\u044C:  ${args.path}`);
+  printInfo(`\u0420\u0430\u0441\u0448:  ${args.exts.join(", ")}   Smart Batch: \u2264${Math.round(MAX_BATCH_BYTES / 1024)} \u041A\u0411`);
+  const tScan = Date.now();
+  const collectResult = collectFiles(args.path, args.ignore, args.exts);
+  const allFiles = collectResult.files;
+  printOk(`\u041D\u0430\u0439\u0434\u0435\u043D\u043E ${allFiles.length} \u0444\u0430\u0439\u043B\u043E\u0432  (${formatBytes(allFiles.reduce((s, f) => {
+    try {
+      return s + statSync(f).size;
+    } catch {
+      return s;
+    }
+  }, 0))} \u0438\u0441\u0445\u043E\u0434\u043D\u044B\u0445)`);
+  const skippedExtTotal = Object.values(collectResult.skippedByExt).reduce((s, c2) => s + c2, 0);
+  if (skippedExtTotal > 0) {
+    const topSkipped = Object.entries(collectResult.skippedByExt).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([ext, cnt]) => `${ext}(${cnt})`).join(", ");
+    printWarn(`${skippedExtTotal} \u0444\u0430\u0439\u043B\u043E\u0432 \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E (\u0440\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u0438\u0435 \u043D\u0435 \u0432 --exts): ${topSkipped}`);
+  }
+  const silentLogger = {
+    info: () => {
+    },
+    warn: () => {
+    },
+    error: () => {
+    },
+    debug: () => {
+    },
+    trace: () => {
+    },
+    fatal: () => {
+    }
+  };
+  const compressor = new AstCompressor(silentLogger);
+  const compressed = [];
+  const skipInfo = { tooLarge: [], readError: [], compressError: [] };
+  for (let i = 0; i < allFiles.length; i++) {
+    const absPath = allFiles[i];
+    printProgress(i + 1, allFiles.length, relative(args.path, absPath).replace(/\\/g, "/"));
+    const file = compressFile(absPath, args.path, compressor, skipInfo);
+    if (file) {
+      compressed.push(file);
+    }
+  }
+  const compressErrors = skipInfo.tooLarge.length + skipInfo.readError.length;
+  const compressElapsed = Date.now() - tScan;
+  const rawKb = Math.round(allFiles.reduce((s, f) => {
+    try {
+      return s + statSync(f).size;
+    } catch {
+      return s;
+    }
+  }, 0) / 1024);
+  const sumKb = Math.round(compressed.reduce((s, f) => s + f.l1Summary.length, 0) / 1024);
+  const ratio = rawKb > 0 ? (rawKb / Math.max(sumKb, 1)).toFixed(1) : "\u2014";
+  printOk(`\u0421\u0436\u0430\u0442\u043E ${compressed.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u0437\u0430 ${(compressElapsed / 1e3).toFixed(1)}\u0441  \u2192  ${formatBytes(sumKb * 1024)}  (\xD7${ratio})`);
+  if (compressErrors > 0) printWarn(`${compressErrors} \u0444\u0430\u0439\u043B\u043E\u0432 \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E (\u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u0438\u0435 \u0438\u043B\u0438 \u043D\u0435\u0447\u0438\u0442\u0430\u0435\u043C\u044B\u0435)`);
+  if (skipInfo.compressError.length > 0) printInfo(`${skipInfo.compressError.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u0431\u0435\u0437 AST (raw fallback)`);
+  printPhase(3, 3, "\u0417\u0410\u0413\u0420\u0423\u0417\u041A\u0410");
+  const allBatches = createSmartBatches(compressed);
+  const totalBatches = allBatches.length;
+  printInfo(`${totalBatches} \u0431\u0430\u0442\u0447\u0435\u0439 (smart: \u2264${Math.round(MAX_BATCH_BYTES / 1024)} \u041A\u0411/\u0431\u0430\u0442\u0447)`);
+  resetUploadTimer();
+  const uploadStart = Date.now();
+  let uploaded = 0;
+  const allFailed = [];
+  const uploadedPaths = /* @__PURE__ */ new Set();
+  for (let bIdx = 0; bIdx < allBatches.length; bIdx++) {
+    const entry = allBatches[bIdx];
+    const batchBytes = entry.files.reduce((s, f) => s + estimatePayloadSize(f), 0);
+    const batchKb = (batchBytes / 1024).toFixed(1);
+    startSpinner(`\u0411\u0430\u0442\u0447 ${entry.batchIndex}/${totalBatches} (${entry.files.length} \u0444\u0430\u0439\u043B\u043E\u0432, ~${batchKb} \u041A\u0411)...`);
+    const result = await client.pushBatchAdaptive(entry.files);
+    stopSpinner();
+    uploaded += result.uploaded.length;
+    for (const f of result.uploaded) uploadedPaths.add(f.path);
+    allFailed.push(...result.failed);
+    const elapsed = Date.now() - uploadStart;
+    const eta = totalBatches > 1 ? ` ~${((totalBatches - bIdx - 1) * (elapsed / (bIdx + 1)) / 1e3).toFixed(0)}\u0441` : "";
+    if (result.failed.length === 0) {
+      printOk(`  \u0411\u0430\u0442\u0447 ${entry.batchIndex}/${totalBatches}: ${entry.files.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u2713${eta}`);
+    } else if (result.uploaded.length > 0) {
+      printWarn(
+        `  \u0411\u0430\u0442\u0447 ${entry.batchIndex}/${totalBatches}: ${result.uploaded.length} \u2713 / ${result.failed.length} \u2717${eta}`
+      );
+    } else {
+      printError(`  \u0411\u0430\u0442\u0447 ${entry.batchIndex}/${totalBatches}: \u0432\u0441\u0435 ${entry.files.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u2717${eta}`);
+    }
+    if (bIdx < allBatches.length - 1) {
+      await sleep(150);
+    }
+  }
+  const uploadElapsed = Date.now() - uploadStart;
+  printBatch(totalBatches, totalBatches, uploaded, formatBytes(sumKb * 1024), allFailed.length === 0);
+  printOk(`\u0417\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043E: ${uploaded} \u0444\u0430\u0439\u043B\u043E\u0432 \u0437\u0430 ${(uploadElapsed / 1e3).toFixed(1)}\u0441 (${totalBatches} \u0431\u0430\u0442\u0447\u0435\u0439)`);
+  if (allFailed.length > 0) {
+    printWarn(`  ${allFailed.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u043D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C:`);
+    for (const f of allFailed.slice(0, 10)) {
+      printError(`    \u2717 ${f.path} (~${(estimatePayloadSize(f) / 1024).toFixed(1)} \u041A\u0411)`);
+    }
+    if (allFailed.length > 10) {
+      printError(`    ... \u0438 \u0435\u0449\u0451 ${allFailed.length - 10}`);
+    }
+  }
+  printSummary({
+    files: uploaded,
+    batches: totalBatches,
+    originalKb: rawKb,
+    summaryKb: sumKb,
+    elapsedMs: Date.now() - tScan,
+    errors: allFailed.length + compressErrors
+  });
+  const rawBytesTotal = allFiles.reduce((s, f) => {
+    try {
+      return s + statSync(f).size;
+    } catch {
+      return s;
+    }
+  }, 0);
+  const summaryBytesTotal = compressed.reduce((s, f) => s + f.l1Summary.length + f.l3Summary.length, 0);
+  printTokenSavings(rawBytesTotal, summaryBytesTotal, uploaded);
+  const byExt = {};
+  for (const f of compressed) {
+    const ext = extname(f.path).toLowerCase() || "(\u0431\u0435\u0437 \u0440\u0430\u0441\u0448.)";
+    byExt[ext] = (byExt[ext] || 0) + 1;
+  }
+  printVerification({
+    byExt,
+    skipInfo,
+    total: allFiles.length + skippedExtTotal,
+    compressed: compressed.length,
+    skippedByExt: collectResult.skippedByExt
+  });
+  const hashMap = /* @__PURE__ */ new Map();
+  for (const file of compressed) {
+    if (uploadedPaths.has(file.path)) {
+      hashMap.set(file.path, file.hash);
+    }
+  }
+  const intervalMs = args.intervalMin * 60 * 1e3;
+  let rescanRunning = false;
+  const doRescan = async () => {
+    if (rescanRunning) return;
+    rescanRunning = true;
+    const t = Date.now();
+    try {
+      const { files } = collectFiles(args.path, args.ignore, args.exts);
+      const currentPaths = /* @__PURE__ */ new Set();
+      const changedFiles = [];
+      let addedCount = 0;
+      let changedCount = 0;
+      for (const absPath of files) {
+        const content = (() => {
+          try {
+            return readFileSync2(absPath, "utf-8");
+          } catch {
+            return null;
+          }
+        })();
+        if (!content) continue;
+        const relPath = relative(args.path, absPath).replace(/\\/g, "/");
+        currentPaths.add(relPath);
+        const hash = createHash2("md5").update(content).digest("hex");
+        const prevHash = hashMap.get(relPath);
+        if (prevHash === hash) continue;
+        const file = compressFile(absPath, args.path, compressor);
+        if (!file) continue;
+        changedFiles.push(file);
+        if (prevHash === void 0) {
+          addedCount++;
+        } else {
+          changedCount++;
+        }
+      }
+      const removedPaths = [];
+      for (const [path] of hashMap) {
+        if (!currentPaths.has(path)) {
+          removedPaths.push(path);
+        }
+      }
+      for (const p of removedPaths) {
+        hashMap.delete(p);
+      }
+      let uploadedCount = 0;
+      if (changedFiles.length > 0) {
+        const rescanBatches = createSmartBatches(changedFiles);
+        for (const batch of rescanBatches) {
+          const result = await client.pushBatchAdaptive(batch.files);
+          uploadedCount += result.uploaded.length;
+          for (const f of result.uploaded) {
+            hashMap.set(f.path, f.hash);
+          }
+          for (const f of result.failed) {
+            hashMap.delete(f.path);
+          }
+          if (result.failed.length > 0) {
+            printError(`  Rescan: ${result.failed.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u043D\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043E`);
+          }
+          await sleep(150);
+        }
+      }
+      printRescanResult({
+        changed: changedCount,
+        added: addedCount,
+        removed: removedPaths.length,
+        unchanged: currentPaths.size - changedFiles.length,
+        uploaded: uploadedCount,
+        elapsedMs: Date.now() - t,
+        nextInMin: args.intervalMin
+      });
+    } catch (err) {
+      printError(`Rescan \u043E\u0448\u0438\u0431\u043A\u0430: ${String(err)}`);
+    } finally {
+      rescanRunning = false;
+    }
+  };
+  const rescanTimer = setInterval(() => void doRescan(), intervalMs);
+  printOk(`Periodic rescan \u043A\u0430\u0436\u0434\u044B\u0435 ${args.intervalMin} \u043C\u0438\u043D (${hashMap.size} \u0444\u0430\u0439\u043B\u043E\u0432 \u043E\u0442\u0441\u043B\u0435\u0436\u0438\u0432\u0430\u044E\u0442\u0441\u044F)`);
+  if (args.watch) {
+    printWatchReady(args.path);
+    const watcher = chokidar.watch(args.path, {
+      ignored: (p) => {
+        const parts = p.split(/[/\\]/);
+        return parts.some((part) => args.ignore.includes(part) || part.startsWith("."));
+      },
+      ignoreInitial: true,
+      persistent: true
+    });
+    const handleChange = async (absPath, event) => {
+      if (!args.exts.includes(extname(absPath))) return;
+      const file = compressFile(absPath, args.path, compressor);
+      if (!file) return;
+      hashMap.set(file.path, file.hash);
+      const detail = `${formatBytes(file.sizeBytes)} \u2192 ${formatBytes(file.l1Summary.length)} \u0441\u0443\u043C\u043C\u0430\u0440\u0438`;
+      try {
+        await client.pushBatch([file]);
+        printFileChange(event, file.path, detail);
+      } catch (err) {
+        printFileChange("error", file.path, String(err));
+      }
+    };
+    watcher.on("change", (p) => void handleChange(p, "modified"));
+    watcher.on("add", (p) => void handleChange(p, "added"));
+    watcher.on("unlink", (absPath) => {
+      const relPath = relative(args.path, absPath).replace(/\\/g, "/");
+      hashMap.delete(relPath);
+      printFileChange("deleted", relPath, "\u0443\u0434\u0430\u043B\u0451\u043D \u0438\u0437 \u0438\u043D\u0434\u0435\u043A\u0441\u0430");
+    });
+    process.on("SIGINT", async () => {
+      console.log("");
+      printWarn("\u041E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0430 \u0432\u043E\u0442\u0447\u0435\u0440\u0430...");
+      clearInterval(rescanTimer);
+      await watcher.close();
+      process.exit(0);
+    });
+  } else {
+    printSkip("\u0421\u043E\u0432\u0435\u0442: \u0434\u043E\u0431\u0430\u0432\u044C --watch \u0434\u043B\u044F \u043C\u0433\u043D\u043E\u0432\u0435\u043D\u043D\u043E\u0439 \u0440\u0435\u0430\u043A\u0446\u0438\u0438 \u043D\u0430 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0444\u0430\u0439\u043B\u043E\u0432");
+    printInfo("\u041F\u0440\u043E\u0446\u0435\u0441\u0441 \u043E\u0441\u0442\u0430\u0451\u0442\u0441\u044F \u0437\u0430\u043F\u0443\u0449\u0435\u043D\u043D\u044B\u043C \u0434\u043B\u044F periodic rescan. Ctrl+C \u0434\u043B\u044F \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0438.");
+    process.on("SIGINT", () => {
+      console.log("");
+      printWarn("\u041E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0430...");
+      clearInterval(rescanTimer);
+      process.exit(0);
+    });
+  }
+}
+main().catch((err) => {
+  printError(`\u041A\u0440\u0438\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043E\u0448\u0438\u0431\u043A\u0430: ${String(err)}`);
+  process.exit(1);
+});
