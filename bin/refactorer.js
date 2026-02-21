@@ -11,7 +11,9 @@ var DEFAULT_THRESHOLDS = {
   maxLines: 200,
   maxSymbols: 15,
   maxResponsibilities: 3,
-  minGodScore: 0.35
+  minGodScore: 0.35,
+  criticalThreshold: 0.7,
+  warningThreshold: 0.5
 };
 function parseCliArgs(argv) {
   const args = argv.slice(2);
@@ -54,11 +56,14 @@ function buildConfig(cliArgs) {
       maxLines: cliArgs.maxLines,
       maxSymbols: cliArgs.maxSymbols,
       maxResponsibilities: DEFAULT_THRESHOLDS.maxResponsibilities,
-      minGodScore: cliArgs.minScore
+      minGodScore: cliArgs.minScore,
+      criticalThreshold: DEFAULT_THRESHOLDS.criticalThreshold,
+      warningThreshold: DEFAULT_THRESHOLDS.warningThreshold
     },
     dryRun: cliArgs.dryRun,
     autoApprove: cliArgs.autoApprove,
-    verbose: cliArgs.verbose
+    verbose: cliArgs.verbose,
+    target: cliArgs.target
   };
 }
 function printUsage() {
@@ -269,7 +274,8 @@ var FileAnalyzer = class {
       if (addedNames.has(name)) continue;
       arrowNames.add(name);
       addedNames.add(name);
-      symbols.push(this.buildSymbol(name, "function", !!m[1], line, line, content, lines));
+      const endLine = this.findArrowEnd(lines, line);
+      symbols.push(this.buildSymbol(name, "function", !!m[1], line, endLine, content, lines));
     }
     for (const m of content.matchAll(new RegExp(FUNC_RE.source, "gm"))) {
       const line = this.getLineAt(content, m.index ?? 0);
@@ -304,7 +310,8 @@ var FileAnalyzer = class {
       const name = m[2] ?? "UnknownType";
       if (addedNames.has(name)) continue;
       addedNames.add(name);
-      symbols.push(this.buildSymbol(name, "type", !!m[1], line, line, content, lines));
+      const endLine = this.findStatementEnd(lines, line);
+      symbols.push(this.buildSymbol(name, "type", !!m[1], line, endLine, content, lines));
     }
     for (const m of content.matchAll(new RegExp(CONST_RE.source, "gm"))) {
       const name = m[3] ?? "unknown";
@@ -314,7 +321,8 @@ var FileAnalyzer = class {
       if (addedNames.has(name)) continue;
       addedNames.add(name);
       const isConst = m[2] === "const";
-      symbols.push(this.buildSymbol(name, isConst ? "constant" : "variable", !!m[1], line, line, content, lines));
+      const endLine = this.findStatementEnd(lines, line);
+      symbols.push(this.buildSymbol(name, isConst ? "constant" : "variable", !!m[1], line, endLine, content, lines));
     }
     return symbols;
   }
@@ -402,12 +410,96 @@ var FileAnalyzer = class {
     }
     return line;
   }
+  /** Находит конец стрелочной функции: если тело — блок {}, ищем закрытие; иначе — до ; */
+  findArrowEnd(lines, startLine) {
+    for (let i = startLine; i < Math.min(startLine + 5, lines.length); i++) {
+      const line = lines[i] ?? "";
+      const arrowIdx = line.indexOf("=>");
+      if (arrowIdx === -1) continue;
+      const afterArrow = line.slice(arrowIdx + 2).trim();
+      if (afterArrow.startsWith("{")) {
+        return this.findClosingBrace(lines, i);
+      }
+      return this.findStatementEnd(lines, startLine);
+    }
+    return this.findStatementEnd(lines, startLine);
+  }
+  /** Находит конец инструкции: ; на уровне 0 скобок, или конец блока {} */
+  findStatementEnd(lines, startLine) {
+    let braceDepth = 0;
+    let parenDepth = 0;
+    let bracketDepth = 0;
+    let inString = null;
+    let inTemplate = false;
+    for (let i = startLine; i < lines.length; i++) {
+      const line = lines[i] ?? "";
+      for (let j = 0; j < line.length; j++) {
+        const ch = line[j] ?? "";
+        const prev = j > 0 ? line[j - 1] : "";
+        if (inString) {
+          if (ch === inString && prev !== "\\") inString = null;
+          continue;
+        }
+        if (inTemplate) {
+          if (ch === "`" && prev !== "\\") inTemplate = false;
+          continue;
+        }
+        if (ch === '"' || ch === "'") {
+          inString = ch;
+          continue;
+        }
+        if (ch === "`") {
+          inTemplate = true;
+          continue;
+        }
+        if (ch === "/" && j + 1 < line.length && line[j + 1] === "/") break;
+        if (ch === "(") parenDepth++;
+        if (ch === ")") parenDepth--;
+        if (ch === "[") bracketDepth++;
+        if (ch === "]") bracketDepth--;
+        if (ch === "{") braceDepth++;
+        if (ch === "}") {
+          braceDepth--;
+          if (braceDepth === 0 && parenDepth === 0 && bracketDepth === 0) return i;
+        }
+        if (ch === ";" && braceDepth === 0 && parenDepth === 0 && bracketDepth === 0) {
+          return i;
+        }
+      }
+      if (i > startLine && braceDepth === 0 && parenDepth === 0 && bracketDepth === 0) {
+        const trimmed = line.trimEnd();
+        if (trimmed.endsWith(";") || trimmed === "") return i > startLine ? i - 1 : i;
+      }
+    }
+    return Math.min(startLine + 50, lines.length - 1);
+  }
   findClosingBrace(lines, startLine) {
     let depth = 0;
     let found = false;
+    let inString = null;
+    let inTemplate = false;
     for (let i = startLine; i < lines.length; i++) {
       const line = lines[i] ?? "";
-      for (const ch of line) {
+      for (let j = 0; j < line.length; j++) {
+        const ch = line[j] ?? "";
+        const prev = j > 0 ? line[j - 1] : "";
+        if (inString) {
+          if (ch === inString && prev !== "\\") inString = null;
+          continue;
+        }
+        if (inTemplate) {
+          if (ch === "`" && prev !== "\\") inTemplate = false;
+          continue;
+        }
+        if (ch === '"' || ch === "'") {
+          inString = ch;
+          continue;
+        }
+        if (ch === "`") {
+          inTemplate = true;
+          continue;
+        }
+        if (ch === "/" && j + 1 < line.length && line[j + 1] === "/") break;
         if (ch === "{") {
           depth++;
           found = true;
@@ -444,7 +536,9 @@ var DEFAULT_THRESHOLDS2 = {
   maxLines: 200,
   maxSymbols: 15,
   maxResponsibilities: 3,
-  minGodScore: 0.4
+  minGodScore: 0.4,
+  criticalThreshold: 0.7,
+  warningThreshold: 0.5
 };
 var GodFileDetector = class {
   logger;
@@ -516,8 +610,8 @@ var GodFileDetector = class {
     return Math.min(1, Math.max(0, normalized));
   }
   classifySeverity(total) {
-    if (total >= 0.7) return "critical";
-    if (total >= 0.5) return "warning";
+    if (total >= this.thresholds.criticalThreshold) return "critical";
+    if (total >= this.thresholds.warningThreshold) return "warning";
     return "info";
   }
 };
@@ -795,6 +889,29 @@ var ImportResolver = class {
     this.logger.debug(`\u041F\u043E\u0442\u0440\u0435\u0431\u0438\u0442\u0435\u043B\u0438 ${filePath}: \u043D\u0430\u0439\u0434\u0435\u043D\u043E ${consumers.length}`);
     return consumers;
   }
+  findUsedSymbolsFrom(consumerFile, targetFile) {
+    try {
+      const content = readFileSync2(consumerFile, "utf-8");
+      const consumerDir = dirname(consumerFile);
+      const targetNoExt = targetFile.replace(/\.(ts|tsx|js|jsx)$/, "");
+      const importRe = /import\s+(?:type\s+)?(?:\{([^}]*)\}|(\w+)(?:\s*,\s*\{([^}]*)\})?)\s+from\s+['"]([^'"]+)['"]/g;
+      const symbols = [];
+      for (const m of content.matchAll(importRe)) {
+        const source = m[4] ?? "";
+        if (!source.startsWith(".")) continue;
+        const resolved = resolve2(consumerDir, source);
+        const resolvedNoExt = resolved.replace(/\.(ts|tsx|js|jsx)$/, "");
+        if (resolvedNoExt === targetNoExt || resolved === targetFile) {
+          const named = (m[1] ?? m[3] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+          const defaultName = m[2] ? [m[2]] : [];
+          symbols.push(...defaultName, ...named);
+        }
+      }
+      return symbols;
+    } catch {
+      return [];
+    }
+  }
   computeNewPath(consumerFile, newModuleFile) {
     const from = dirname(consumerFile);
     let rel = relative2(from, newModuleFile);
@@ -906,21 +1023,31 @@ var SplitPlanner = class {
     const estimatedLines = cluster.linesCount + imports.length * 2 + 5;
     return { targetPath, symbols: cluster.symbols, imports, exports, estimatedLines };
   }
-  /** Собирает зависимости (imports) для символов кластера */
+  /** Собирает зависимости (imports) для символов кластера, объединяя по source */
   resolveClusterImports(cluster, godFile) {
     const allImports = godFile.analysis.imports;
     const symbolNames = new Set(cluster.symbols.flatMap((s) => [...s.calledSymbols, ...s.usedThisProps]));
-    const deps = [];
-    const addedSources = /* @__PURE__ */ new Set();
+    const merged = /* @__PURE__ */ new Map();
     for (const imp of allImports) {
       const usedSymbols = imp.symbols.filter((s) => symbolNames.has(s));
       if (usedSymbols.length === 0) continue;
-      if (addedSources.has(imp.source)) continue;
-      addedSources.add(imp.source);
+      const existing = merged.get(imp.source);
+      if (existing) {
+        for (const s of usedSymbols) existing.symbols.add(s);
+        if (!imp.isTypeOnly) existing.isTypeOnly = false;
+      } else {
+        merged.set(imp.source, {
+          symbols: new Set(usedSymbols),
+          isTypeOnly: imp.isTypeOnly
+        });
+      }
+    }
+    const deps = [];
+    for (const [source, entry] of merged) {
       deps.push({
-        source: imp.source,
-        symbols: usedSymbols,
-        isTypeOnly: imp.isTypeOnly
+        source,
+        symbols: [...entry.symbols],
+        isTypeOnly: entry.isTypeOnly
       });
     }
     return deps;
@@ -935,8 +1062,15 @@ var SplitPlanner = class {
       }
     }
     for (const consumer of consumers) {
+      const usedSymbols = this.importResolver.findUsedSymbolsFrom(
+        consumer,
+        godFile.filePath
+      );
+      if (usedSymbols.length === 0) continue;
       const targetGroups = /* @__PURE__ */ new Map();
-      for (const [symbolName, target] of symbolToTarget) {
+      for (const symbolName of usedSymbols) {
+        const target = symbolToTarget.get(symbolName);
+        if (!target) continue;
         const key = target.targetPath;
         const group = targetGroups.get(key) ?? [];
         group.push(symbolName);
@@ -974,14 +1108,14 @@ var SplitPlanner = class {
 };
 
 // solid-refactor/planners/split-validator.ts
-import { existsSync as existsSync2 } from "node:fs";
+import { existsSync as existsSync2, readFileSync as readFileSync3 } from "node:fs";
 import { basename as basename2 } from "node:path";
 var SplitValidator = class {
   logger;
   constructor(logger) {
     this.logger = logger;
   }
-  validate(plan, projectRoot) {
+  validate(plan, projectRoot, maxLinesThreshold = 200) {
     const errors = [];
     const warnings = [];
     this.checkEmptyTargets(plan.targets, errors);
@@ -996,8 +1130,7 @@ var SplitValidator = class {
         severity: "warning"
       });
     }
-    const originalExports = plan.targets.flatMap((t) => t.exports);
-    const missingExports = this.checkExportIntegrity(plan, originalExports);
+    const missingExports = this.checkExportIntegrity(plan);
     for (const missing of missingExports) {
       errors.push({
         code: "MISSING_EXPORT",
@@ -1007,7 +1140,7 @@ var SplitValidator = class {
       });
     }
     this.checkExistingFiles(plan.targets, warnings);
-    this.checkTargetSizes(plan.targets, warnings);
+    this.checkTargetSizes(plan.targets, warnings, maxLinesThreshold);
     const isValid = errors.length === 0;
     this.logger.debug(
       `\u0412\u0430\u043B\u0438\u0434\u0430\u0446\u0438\u044F \u043F\u043B\u0430\u043D\u0430: ${isValid ? "OK" : "FAIL"} (${errors.length} \u043E\u0448\u0438\u0431\u043E\u043A, ${warnings.length} \u043F\u0440\u0435\u0434\u0443\u043F\u0440\u0435\u0436\u0434\u0435\u043D\u0438\u0439)`
@@ -1057,9 +1190,25 @@ var SplitValidator = class {
     }
     return cycles;
   }
-  checkExportIntegrity(plan, originalExports) {
+  checkExportIntegrity(plan) {
+    const originalExports = this.extractOriginalExports(plan.sourceFile);
     const allPlannedExports = new Set(plan.targets.flatMap((t) => t.exports));
     return originalExports.filter((e) => !allPlannedExports.has(e));
+  }
+  /** Извлекает имена экспортируемых символов из оригинального файла */
+  extractOriginalExports(filePath) {
+    try {
+      const content = readFileSync3(filePath, "utf-8");
+      const exports = [];
+      const exportRe = /^[ \t]*export\s+(?:default\s+)?(?:type|interface|class|function|const|let|var|async|abstract)\s+(\w+)/gm;
+      for (const m of content.matchAll(exportRe)) {
+        if (m[1]) exports.push(m[1]);
+      }
+      return exports;
+    } catch {
+      this.logger.warn(`\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u0444\u0430\u0439\u043B \u0434\u043B\u044F \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u044D\u043A\u0441\u043F\u043E\u0440\u0442\u043E\u0432: ${filePath}`);
+      return [];
+    }
   }
   checkEmptyTargets(targets, errors) {
     for (const target of targets) {
@@ -1116,12 +1265,12 @@ var SplitValidator = class {
       }
     }
   }
-  checkTargetSizes(targets, warnings) {
+  checkTargetSizes(targets, warnings, maxLines) {
     for (const target of targets) {
-      if (target.estimatedLines > 200) {
+      if (target.estimatedLines > maxLines) {
         warnings.push({
           code: "TARGET_TOO_LARGE",
-          message: `\u041C\u043E\u0434\u0443\u043B\u044C ${basename2(target.targetPath)} \u2248${target.estimatedLines} \u0441\u0442\u0440\u043E\u043A (\u043F\u043E\u0440\u043E\u0433: 200)`,
+          message: `\u041C\u043E\u0434\u0443\u043B\u044C ${basename2(target.targetPath)} \u2248${target.estimatedLines} \u0441\u0442\u0440\u043E\u043A (\u043F\u043E\u0440\u043E\u0433: ${maxLines})`,
           file: target.targetPath,
           severity: "warning"
         });
@@ -1305,44 +1454,107 @@ var ModuleGenerator = class {
       isNew: true
     };
   }
-  /** Строит строки импортов для модуля */
+  /** Строит строки импортов для модуля (без дубликатов) */
   buildImportLines(targetImports, allImports, symbols) {
-    const lines = [];
     const usedIdentifiers = this.collectAllUsedIdentifiers(symbols);
+    const merged = /* @__PURE__ */ new Map();
+    const addToMerged = (source, syms, isTypeOnly) => {
+      const needed = syms.filter((s) => usedIdentifiers.has(s));
+      if (needed.length === 0) return;
+      const existing = merged.get(source);
+      if (existing) {
+        for (const s of needed) existing.symbols.add(s);
+        if (!isTypeOnly) existing.isTypeOnly = false;
+      } else {
+        merged.set(source, {
+          symbols: new Set(needed),
+          isTypeOnly
+        });
+      }
+    };
     for (const dep of targetImports) {
-      const needed = dep.symbols.filter((s) => usedIdentifiers.has(s));
-      if (needed.length === 0) continue;
-      const typePrefix = dep.isTypeOnly ? "type " : "";
-      lines.push(`import ${typePrefix}{ ${needed.join(", ")} } from '${dep.source}';`);
+      addToMerged(dep.source, dep.symbols, dep.isTypeOnly);
     }
-    const crossImports = this.findCrossDependencyImports(symbols, allImports, usedIdentifiers);
-    lines.push(...crossImports);
-    return lines;
-  }
-  /** Находит импорты для зависимостей на символы из других кластеров */
-  findCrossDependencyImports(symbols, allImports, usedIdentifiers) {
-    const lines = [];
-    const alreadyImported = /* @__PURE__ */ new Set();
     for (const imp of allImports) {
-      const needed = imp.symbols.filter((s) => usedIdentifiers.has(s));
-      if (needed.length === 0) continue;
-      const key = `${imp.source}:${needed.join(",")}`;
-      if (alreadyImported.has(key)) continue;
-      alreadyImported.add(key);
-      const typePrefix = imp.isTypeOnly ? "type " : "";
-      lines.push(`import ${typePrefix}{ ${needed.join(", ")} } from '${imp.source}';`);
+      addToMerged(imp.source, imp.symbols, imp.isTypeOnly);
+    }
+    const lines = [];
+    for (const [source, entry] of merged) {
+      const typePrefix = entry.isTypeOnly ? "type " : "";
+      const sortedSymbols = [...entry.symbols].sort();
+      lines.push(`import ${typePrefix}{ ${sortedSymbols.join(", ")} } from '${source}';`);
     }
     return lines;
   }
-  /** Собирает все идентификаторы, используемые символами */
+  /** Собирает все идентификаторы, используемые символами (PascalCase + camelCase) */
   collectAllUsedIdentifiers(symbols) {
     const ids = /* @__PURE__ */ new Set();
+    const reserved = /* @__PURE__ */ new Set([
+      "if",
+      "else",
+      "for",
+      "while",
+      "do",
+      "switch",
+      "case",
+      "break",
+      "continue",
+      "return",
+      "throw",
+      "try",
+      "catch",
+      "finally",
+      "new",
+      "delete",
+      "typeof",
+      "instanceof",
+      "void",
+      "this",
+      "class",
+      "interface",
+      "type",
+      "enum",
+      "extends",
+      "implements",
+      "import",
+      "export",
+      "default",
+      "from",
+      "as",
+      "async",
+      "await",
+      "const",
+      "let",
+      "var",
+      "function",
+      "true",
+      "false",
+      "null",
+      "undefined",
+      "string",
+      "number",
+      "boolean",
+      "object",
+      "any",
+      "unknown",
+      "never",
+      "readonly",
+      "private",
+      "public",
+      "protected",
+      "static",
+      "abstract",
+      "override"
+    ]);
     for (const s of symbols) {
       for (const call of s.calledSymbols) ids.add(call);
       for (const prop of s.usedThisProps) ids.add(prop);
-      const typeRe = /\b([A-Z][a-zA-Z0-9]+)\b/g;
-      for (const m of s.body.matchAll(typeRe)) {
-        if (m[1]) ids.add(m[1]);
+      const idRe = /\b([A-Za-z][a-zA-Z0-9]{1,})\b/g;
+      for (const m of s.body.matchAll(idRe)) {
+        const name = m[1] ?? "";
+        if (name.length >= 2 && !reserved.has(name)) {
+          ids.add(name);
+        }
       }
     }
     return ids;
@@ -1413,27 +1625,33 @@ var ImportRewriter = class {
     }
     return grouped;
   }
-  /** Перезаписывает группу импортов с одного старого пути */
+  /** Перезаписывает ВСЕ импорты с одного старого пути */
   rewriteImportGroup(content, oldPath, updates) {
     const lines = content.split("\n");
     const oldPathNoExt = oldPath.replace(/\.(ts|tsx|js|jsx)$/, "");
-    let importLineIdx = -1;
-    let importLine = "";
+    const matchedIndices = [];
+    let firstImportLine = "";
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i] ?? "";
       const match = line.match(/from\s+['"]([^'"]+)['"]/);
       if (!match) continue;
       const source = (match[1] ?? "").replace(/\.(ts|tsx|js|jsx)$/, "");
       if (source === oldPathNoExt) {
-        importLineIdx = i;
-        importLine = line;
-        break;
+        matchedIndices.push(i);
+        if (!firstImportLine) firstImportLine = line;
       }
     }
-    if (importLineIdx === -1) return content;
-    const newImportLines = this.buildNewImportLines(updates, importLine);
+    if (matchedIndices.length === 0) return content;
+    const newImportLines = this.buildNewImportLines(updates, firstImportLine);
     const result = [...lines];
-    result.splice(importLineIdx, 1, ...newImportLines);
+    for (let i = matchedIndices.length - 1; i >= 0; i--) {
+      const idx = matchedIndices[i];
+      if (i === 0) {
+        result.splice(idx, 1, ...newImportLines);
+      } else {
+        result.splice(idx, 1);
+      }
+    }
     return result.join("\n");
   }
   /** Строит новые строки импортов на основе обновлений */
@@ -1593,7 +1811,7 @@ var CompilationChecker = class {
 };
 
 // solid-refactor/verifiers/rollback-manager.ts
-import { readFileSync as readFileSync3, writeFileSync, existsSync as existsSync4, mkdirSync, unlinkSync, rmdirSync } from "node:fs";
+import { readFileSync as readFileSync4, writeFileSync, existsSync as existsSync4, mkdirSync, unlinkSync, rmdirSync } from "node:fs";
 import { dirname as dirname5 } from "node:path";
 import { randomUUID } from "node:crypto";
 var RollbackManager = class {
@@ -1607,7 +1825,7 @@ var RollbackManager = class {
     let savedCount = 0;
     for (const filePath of filePaths) {
       if (existsSync4(filePath)) {
-        const content = readFileSync3(filePath, "utf-8");
+        const content = readFileSync4(filePath, "utf-8");
         files.set(filePath, content);
         savedCount++;
       } else {
@@ -1679,7 +1897,7 @@ var RollbackManager = class {
 };
 
 // solid-refactor/orchestrator.ts
-import { readFileSync as readFileSync4, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2, existsSync as existsSync5 } from "node:fs";
+import { readFileSync as readFileSync5, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2, existsSync as existsSync5 } from "node:fs";
 import { dirname as dirname6, relative as relative4, basename as basename5 } from "node:path";
 var RefactorOrchestrator = class {
   deps;
@@ -1696,20 +1914,25 @@ var RefactorOrchestrator = class {
       logger.success("God-\u0444\u0430\u0439\u043B\u044B \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B. \u041F\u0440\u043E\u0435\u043A\u0442 \u0447\u0438\u0441\u0442!");
       return this.buildResult("analyze", 0, 0, [], [], [], startTime);
     }
-    logger.info(`\u041D\u0430\u0439\u0434\u0435\u043D\u043E ${reports.length} god-\u0444\u0430\u0439\u043B(\u043E\u0432)`);
+    const filteredReports = config.target ? reports.filter((r) => r.godFile.filePath.includes(config.target ?? "")) : reports;
+    if (filteredReports.length === 0 && config.target) {
+      logger.warn(`\u0424\u0430\u0439\u043B "${config.target}" \u043D\u0435 \u044F\u0432\u043B\u044F\u0435\u0442\u0441\u044F god-\u0444\u0430\u0439\u043B\u043E\u043C.`);
+      return this.buildResult("analyze", reports.length, 0, [], [], [], startTime);
+    }
+    logger.info(`\u041D\u0430\u0439\u0434\u0435\u043D\u043E ${filteredReports.length} god-\u0444\u0430\u0439\u043B(\u043E\u0432)`);
     logger.phase(2, 5, "\u041F\u041B\u0410\u041D\u0418\u0420\u041E\u0412\u0410\u041D\u0418\u0415");
     const plans = [];
-    for (const report of reports) {
+    for (const report of filteredReports) {
       const plan = this.planSingleFile(report, config);
       if (plan) plans.push(plan);
     }
     if (plans.length === 0) {
       logger.warn("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u0444\u043E\u0440\u043C\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u043D\u0438 \u043E\u0434\u043D\u043E\u0433\u043E \u043F\u043B\u0430\u043D\u0430");
-      return this.buildResult("plan", reports.length, 0, [], [], [], startTime);
+      return this.buildResult("plan", filteredReports.length, 0, [], [], [], startTime);
     }
     if (config.dryRun) {
       this.printPlans(plans);
-      return this.buildResult("plan", reports.length, 0, [], [], [], startTime);
+      return this.buildResult("plan", filteredReports.length, 0, [], [], [], startTime);
     }
     logger.phase(3, 5, "\u0413\u0415\u041D\u0415\u0420\u0410\u0426\u0418\u042F \u041A\u041E\u0414\u0410");
     const allFilesToWrite = [];
@@ -1730,7 +1953,7 @@ var RefactorOrchestrator = class {
       const errors = compileResult.errors.map(
         (e) => `${e.file}:${e.line} \u2014 ${e.code}: ${e.message}`
       );
-      return this.buildResult("verify", reports.length, 0, [], [], errors, startTime);
+      return this.buildResult("verify", filteredReports.length, 0, [], [], errors, startTime);
     }
     this.deps.rollbackManager.commit(snapshot);
     const created = allFilesToWrite.filter((f) => f.isNew).map((f) => f.path);
@@ -1738,7 +1961,7 @@ var RefactorOrchestrator = class {
     logger.success(
       `\u0420\u0435\u0444\u0430\u043A\u0442\u043E\u0440\u0438\u043D\u0433 \u0437\u0430\u0432\u0435\u0440\u0448\u0451\u043D: ${created.length} \u0441\u043E\u0437\u0434\u0430\u043D\u043E, ${modified.length} \u043C\u043E\u0434\u0438\u0444\u0438\u0446\u0438\u0440\u043E\u0432\u0430\u043D\u043E`
     );
-    return this.buildResult("verify", reports.length, plans.length, created, modified, [], startTime);
+    return this.buildResult("verify", filteredReports.length, plans.length, created, modified, [], startTime);
   }
   analyzeOnly(config) {
     const { fileAnalyzer, godDetector, depAnalyzer, clusterer, logger } = this.deps;
@@ -1771,7 +1994,7 @@ var RefactorOrchestrator = class {
       report.symbolGraph,
       config.projectRoot
     );
-    const validation = splitValidator.validate(plan, config.projectRoot);
+    const validation = splitValidator.validate(plan, config.projectRoot, config.thresholds.maxLines);
     if (!validation.isValid) {
       for (const err of validation.errors) {
         logger.error(`\u0412\u0430\u043B\u0438\u0434\u0430\u0446\u0438\u044F: [${err.code}] ${err.message}`);
@@ -1788,12 +2011,13 @@ var RefactorOrchestrator = class {
     const { moduleGenerator, importRewriter, barrelGenerator, logger } = this.deps;
     const files = [];
     const affectedPaths = [plan.sourceFile];
-    const sourceContent = readFileSync4(plan.sourceFile, "utf-8");
+    const sourceContent = readFileSync5(plan.sourceFile, "utf-8");
+    const sourceImports = this.deps.fileAnalyzer.analyzeFile(plan.sourceFile).imports;
     for (const target of plan.targets) {
       const generated = moduleGenerator.generate(
         target,
         sourceContent,
-        this.deps.fileAnalyzer.analyzeFile(plan.sourceFile).imports
+        sourceImports
       );
       files.push(generated);
       affectedPaths.push(target.targetPath);
@@ -1804,7 +2028,7 @@ var RefactorOrchestrator = class {
     const consumerGroups = this.groupUpdatesByConsumer(plan);
     for (const [consumerPath, updates] of consumerGroups) {
       try {
-        const consumerContent = readFileSync4(consumerPath, "utf-8");
+        const consumerContent = readFileSync5(consumerPath, "utf-8");
         const rewritten = importRewriter.rewriteFile(consumerPath, consumerContent, updates);
         files.push(rewritten);
         affectedPaths.push(consumerPath);
@@ -1928,6 +2152,27 @@ function printSummary(log, result, reports) {
   log.boxLine(`\u23F1   \u0412\u0440\u0435\u043C\u044F:                     ${log.elapsed()}`);
   log.boxBot();
 }
+function printDryRunPlans(log, plans) {
+  console.log("");
+  log.boxTop();
+  log.boxLine(`\u{1F5C2}   \u041F\u041B\u0410\u041D\u042B \u0420\u0415\u0424\u0410\u041A\u0422\u041E\u0420\u0418\u041D\u0413\u0410  (${plans.length} \u0444\u0430\u0439\u043B\u043E\u0432)`);
+  log.boxDiv();
+  for (const plan of plans) {
+    const rel = relative5(process.cwd(), plan.sourceFile);
+    log.boxEmpty();
+    log.boxLine(`\u{1F4C4} ${rel}`);
+    for (let i = 0; i < plan.targets.length; i++) {
+      const t = plan.targets[i];
+      const names = t.symbols.map((s) => s.name).slice(0, 3).join(", ");
+      const more = t.symbols.length > 3 ? ` +${t.symbols.length - 3}` : "";
+      const prefix = i < plan.targets.length - 1 ? "\u251C\u2500\u2500" : "\u2514\u2500\u2500";
+      log.boxLine(`   ${prefix} \u2192 ${basename6(t.targetPath)}  (${names}${more})`);
+    }
+    log.boxLine(`   \u{1F4CA} ${plan.impact.filesCreated} \u0441\u043E\u0437\u0434\u0430\u043D\u043E \xB7 ${plan.impact.consumersAffected} \u043F\u043E\u0442\u0440\u0435\u0431\u0438\u0442\u0435\u043B\u0435\u0439`);
+  }
+  log.boxEmpty();
+  log.boxBot();
+}
 function printRefactorResult(log, result) {
   const icon = result.success ? "\u2705" : "\u274C";
   console.log("");
@@ -2013,6 +2258,10 @@ function main() {
     runAnalyzeOnly(log, orchestrator, config);
     process.exit(0);
   }
+  if (config.target && config.dryRun) {
+    runTargetDryRun(log, orchestrator, config);
+    process.exit(0);
+  }
   runFullOrDryRun(log, orchestrator, config);
 }
 function runAnalyzeOnly(log, orchestrator, config) {
@@ -2041,6 +2290,20 @@ function runAnalyzeOnly(log, orchestrator, config) {
   printSummary(log, result, reports);
   console.log("");
   log.success(`\u0410\u043D\u0430\u043B\u0438\u0437 \u0437\u0430\u0432\u0435\u0440\u0448\u0451\u043D \u0437\u0430 ${log.elapsed()}.  --dry-run \u0434\u043B\u044F \u043F\u043B\u0430\u043D\u043E\u0432 \u0440\u0435\u0444\u0430\u043A\u0442\u043E\u0440\u0438\u043D\u0433\u0430.`);
+}
+function runTargetDryRun(log, orchestrator, config) {
+  const target = config.target;
+  if (!target) return;
+  log.phase(1, 2, "\u0410\u041D\u0410\u041B\u0418\u0417 \u0426\u0415\u041B\u0415\u0412\u041E\u0413\u041E \u0424\u0410\u0419\u041B\u0410");
+  log.info(`\u0424\u0430\u0439\u043B: ${target}`);
+  const plan = orchestrator.planOnly(target, config);
+  if (!plan) {
+    log.warn(`\u0424\u0430\u0439\u043B "${target}" \u043D\u0435 \u044F\u0432\u043B\u044F\u0435\u0442\u0441\u044F god-\u0444\u0430\u0439\u043B\u043E\u043C \u0438\u043B\u0438 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D.`);
+    return;
+  }
+  log.phase(2, 2, "\u041F\u041B\u0410\u041D \u0420\u0410\u0417\u0411\u0418\u0415\u041D\u0418\u042F");
+  printDryRunPlans(log, [plan]);
+  log.success(`\u041F\u043B\u0430\u043D \u0433\u043E\u0442\u043E\u0432. \u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u0431\u0435\u0437 --dry-run \u0434\u043B\u044F \u043F\u0440\u0438\u043C\u0435\u043D\u0435\u043D\u0438\u044F.`);
 }
 function runFullOrDryRun(log, orchestrator, config) {
   const result = orchestrator.runFullRefactor(config);
