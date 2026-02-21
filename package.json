@@ -1,11 +1,12 @@
 {
   "name": "project-brain-watcher",
-  "version": "0.10.1",
-  "description": "Smart Local Watcher for Project Brain MCP Server — indexes your codebase and pushes compressed summaries",
+  "version": "0.11.0",
+  "description": "Smart Local Watcher & SOLID Refactorer for Project Brain MCP Server",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "project-brain-watcher": "bin/watcher.js"
+    "project-brain-watcher": "bin/watcher.js",
+    "project-brain-refactor": "bin/refactorer.js"
   },
   "keywords": [
     "mcp",
@@ -13,10 +14,13 @@
     "code-intelligence",
     "watcher",
     "indexer",
+    "refactorer",
+    "solid",
     "project-brain"
   ],
   "files": [
     "bin/watcher.js",
+    "bin/refactorer.js",
     "README.md"
   ],
   "engines": {
