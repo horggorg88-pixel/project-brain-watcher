@@ -1,49 +1,3540 @@
 #!/usr/bin/env node
-import{createRequire}from'module';const require=createRequire(import.meta.url);
-import{createHash as ys}from"node:crypto";import{readFileSync as se,writeFileSync as we,mkdirSync as xs,statSync as Zt,readdirSync as Tn,existsSync as pt}from"node:fs";import{join as it,relative as te,extname as ee}from"node:path";import{stat as en}from"fs";import{stat as sn,readdir as nn}from"fs/promises";import{EventEmitter as rn}from"events";import*as $ from"path";import{stat as _s,lstat as Ce,readdir as vs,realpath as Cs}from"node:fs/promises";import{Readable as Ts}from"node:stream";import{resolve as Te,relative as Ls,join as Ps,sep as Ns}from"node:path";var A={FILE_TYPE:"files",DIR_TYPE:"directories",FILE_DIR_TYPE:"files_directories",EVERYTHING_TYPE:"all"},re={root:".",fileFilter:c=>!0,directoryFilter:c=>!0,type:A.FILE_TYPE,lstat:!1,depth:2147483648,alwaysStat:!1,highWaterMark:4096};Object.freeze(re);var Ae="READDIRP_RECURSIVE_ERROR",As=new Set(["ENOENT","EPERM","EACCES","ELOOP",Ae]),Le=[A.DIR_TYPE,A.EVERYTHING_TYPE,A.FILE_DIR_TYPE,A.FILE_TYPE],Ms=new Set([A.DIR_TYPE,A.EVERYTHING_TYPE,A.FILE_DIR_TYPE]),ks=new Set([A.EVERYTHING_TYPE,A.FILE_DIR_TYPE,A.FILE_TYPE]),js=c=>As.has(c.code),Fs=process.platform==="win32",Pe=c=>!0,Ne=c=>{if(c===void 0)return Pe;if(typeof c=="function")return c;if(typeof c=="string"){let t=c.trim();return e=>e.basename===t}if(Array.isArray(c)){let t=c.map(e=>e.trim());return e=>t.some(n=>e.basename===n)}return Pe},ie=class extends Ts{constructor(t={}){super({objectMode:!0,autoDestroy:!0,highWaterMark:t.highWaterMark});let e={...re,...t},{root:n,type:s}=e;this._fileFilter=Ne(e.fileFilter),this._directoryFilter=Ne(e.directoryFilter);let i=e.lstat?Ce:_s;Fs?this._stat=r=>i(r,{bigint:!0}):this._stat=i,this._maxDepth=e.depth??re.depth,this._wantsDir=s?Ms.has(s):!1,this._wantsFile=s?ks.has(s):!1,this._wantsEverything=s===A.EVERYTHING_TYPE,this._root=Te(n),this._isDirent=!e.alwaysStat,this._statsProp=this._isDirent?"dirent":"stats",this._rdOptions={encoding:"utf8",withFileTypes:this._isDirent},this.parents=[this._exploreDir(n,1)],this.reading=!1,this.parent=void 0}async _read(t){if(!this.reading){this.reading=!0;try{for(;!this.destroyed&&t>0;){let e=this.parent,n=e&&e.files;if(n&&n.length>0){let{path:s,depth:i}=e,r=n.splice(0,t).map(a=>this._formatEntry(a,s)),o=await Promise.all(r);for(let a of o){if(!a)continue;if(this.destroyed)return;let l=await this._getEntryType(a);l==="directory"&&this._directoryFilter(a)?(i<=this._maxDepth&&this.parents.push(this._exploreDir(a.fullPath,i+1)),this._wantsDir&&(this.push(a),t--)):(l==="file"||this._includeAsFile(a))&&this._fileFilter(a)&&this._wantsFile&&(this.push(a),t--)}}else{let s=this.parents.pop();if(!s){this.push(null);break}if(this.parent=await s,this.destroyed)return}}}catch(e){this.destroy(e)}finally{this.reading=!1}}}async _exploreDir(t,e){let n;try{n=await vs(t,this._rdOptions)}catch(s){this._onError(s)}return{files:n,depth:e,path:t}}async _formatEntry(t,e){let n,s=this._isDirent?t.name:t;try{let i=Te(Ps(e,s));n={path:Ls(this._root,i),fullPath:i,basename:s},n[this._statsProp]=this._isDirent?t:await this._stat(i)}catch(i){this._onError(i);return}return n}_onError(t){js(t)&&!this.destroyed?this.emit("warn",t):this.destroy(t)}async _getEntryType(t){if(!t&&this._statsProp in t)return"";let e=t[this._statsProp];if(e.isFile())return"file";if(e.isDirectory())return"directory";if(e&&e.isSymbolicLink()){let n=t.fullPath;try{let s=await Cs(n),i=await Ce(s);if(i.isFile())return"file";if(i.isDirectory()){let r=s.length;if(n.startsWith(s)&&n.substr(r,1)===Ns){let o=new Error(`Circular symlink detected: "${n}" points to "${s}"`);return o.code=Ae,this._onError(o)}return"directory"}}catch(s){return this._onError(s),""}}}_includeAsFile(t){let e=t&&t[this._statsProp];return e&&this._wantsEverything&&!e.isDirectory()}};function Me(c,t={}){let e=t.entryType||t.type;if(e==="both"&&(e=A.FILE_DIR_TYPE),e&&(t.type=e),c){if(typeof c!="string")throw new TypeError("readdirp: root argument must be a string. Usage: readdirp(root, options)");if(e&&!Le.includes(e))throw new Error(`readdirp: Invalid type passed. Use one of ${Le.join(", ")}`)}else throw new Error("readdirp: root argument is required. Usage: readdirp(root, options)");return t.root=c,new ie(t)}import{watchFile as Ds,unwatchFile as ke,watch as Bs}from"fs";import{open as Os,stat as Fe,lstat as Ws,realpath as oe}from"fs/promises";import*as I from"path";import{type as zs}from"os";var Hs="data",le="end",De="close",_t=()=>{};var vt=process.platform,ue=vt==="win32",Us=vt==="darwin",Gs=vt==="linux",Ys=vt==="freebsd",Be=zs()==="OS400",_={ALL:"all",READY:"ready",ADD:"add",CHANGE:"change",ADD_DIR:"addDir",UNLINK:"unlink",UNLINK_DIR:"unlinkDir",RAW:"raw",ERROR:"error"},D=_,Vs="watch",Ks={lstat:Ws,stat:Fe},st="listeners",Et="errHandlers",lt="rawEmitters",qs=[st,Et,lt],Js=new Set(["3dm","3ds","3g2","3gp","7z","a","aac","adp","afdesign","afphoto","afpub","ai","aif","aiff","alz","ape","apk","appimage","ar","arj","asf","au","avi","bak","baml","bh","bin","bk","bmp","btif","bz2","bzip2","cab","caf","cgm","class","cmx","cpio","cr2","cur","dat","dcm","deb","dex","djvu","dll","dmg","dng","doc","docm","docx","dot","dotm","dra","DS_Store","dsk","dts","dtshd","dvb","dwg","dxf","ecelp4800","ecelp7470","ecelp9600","egg","eol","eot","epub","exe","f4v","fbs","fh","fla","flac","flatpak","fli","flv","fpx","fst","fvt","g3","gh","gif","graffle","gz","gzip","h261","h263","h264","icns","ico","ief","img","ipa","iso","jar","jpeg","jpg","jpgv","jpm","jxr","key","ktx","lha","lib","lvp","lz","lzh","lzma","lzo","m3u","m4a","m4v","mar","mdi","mht","mid","midi","mj2","mka","mkv","mmr","mng","mobi","mov","movie","mp3","mp4","mp4a","mpeg","mpg","mpga","mxu","nef","npx","numbers","nupkg","o","odp","ods","odt","oga","ogg","ogv","otf","ott","pages","pbm","pcx","pdb","pdf","pea","pgm","pic","png","pnm","pot","potm","potx","ppa","ppam","ppm","pps","ppsm","ppsx","ppt","pptm","pptx","psd","pya","pyc","pyo","pyv","qt","rar","ras","raw","resources","rgb","rip","rlc","rmf","rmvb","rpm","rtf","rz","s3m","s7z","scpt","sgi","shar","snap","sil","sketch","slk","smv","snk","so","stl","suo","sub","swf","tar","tbz","tbz2","tga","tgz","thmx","tif","tiff","tlz","ttc","ttf","txz","udf","uvh","uvi","uvm","uvp","uvs","uvu","viv","vob","war","wav","wax","wbmp","wdp","weba","webm","webp","whl","wim","wm","wma","wmv","wmx","woff","woff2","wrm","wvx","xbm","xif","xla","xlam","xls","xlsb","xlsm","xlsx","xlt","xltm","xltx","xm","xmind","xpi","xpm","xwd","xz","z","zip","zipx"]),Xs=c=>Js.has(I.extname(c).slice(1).toLowerCase()),ce=(c,t)=>{c instanceof Set?c.forEach(t):t(c)},ht=(c,t,e)=>{let n=c[t];n instanceof Set||(c[t]=n=new Set([n])),n.add(e)},Qs=c=>t=>{let e=c[t];e instanceof Set?e.clear():delete c[t]},gt=(c,t,e)=>{let n=c[t];n instanceof Set?n.delete(e):n===e&&delete c[t]},Oe=c=>c instanceof Set?c.size===0:!c,St=new Map;function je(c,t,e,n,s){let i=(r,o)=>{e(c),s(r,o,{watchedPath:c}),o&&c!==o&&It(I.resolve(c,o),st,I.join(c,o))};try{return Bs(c,{persistent:t.persistent},i)}catch(r){n(r);return}}var It=(c,t,e,n,s)=>{let i=St.get(c);i&&ce(i[t],r=>{r(e,n,s)})},Zs=(c,t,e,n)=>{let{listener:s,errHandler:i,rawEmitter:r}=n,o=St.get(t),a;if(!e.persistent)return a=je(c,e,s,i,r),a?a.close.bind(a):void 0;if(o)ht(o,st,s),ht(o,Et,i),ht(o,lt,r);else{if(a=je(c,e,It.bind(null,t,st),i,It.bind(null,t,lt)),!a)return;a.on(D.ERROR,async l=>{let u=It.bind(null,t,Et);if(o&&(o.watcherUnusable=!0),ue&&l.code==="EPERM")try{await(await Os(c,"r")).close(),u(l)}catch{}else u(l)}),o={listeners:s,errHandlers:i,rawEmitters:r,watcher:a},St.set(t,o)}return()=>{gt(o,st,s),gt(o,Et,i),gt(o,lt,r),Oe(o.listeners)&&(o.watcher.close(),St.delete(t),qs.forEach(Qs(o)),o.watcher=void 0,Object.freeze(o))}},ae=new Map,tn=(c,t,e,n)=>{let{listener:s,rawEmitter:i}=n,r=ae.get(t),o=r&&r.options;return o&&(o.persistent<e.persistent||o.interval>e.interval)&&(ke(t),r=void 0),r?(ht(r,st,s),ht(r,lt,i)):(r={listeners:s,rawEmitters:i,options:e,watcher:Ds(t,e,(a,l)=>{ce(r.rawEmitters,p=>{p(D.CHANGE,t,{curr:a,prev:l})});let u=a.mtimeMs;(a.size!==l.size||u>l.mtimeMs||u===0)&&ce(r.listeners,p=>p(c,a))})},ae.set(t,r)),()=>{gt(r,st,s),gt(r,lt,i),Oe(r.listeners)&&(ae.delete(t),ke(t),r.options=r.watcher=void 0,Object.freeze(r))}},Rt=class{constructor(t){this.fsw=t,this._boundHandleError=e=>t._handleError(e)}_watchWithNodeFs(t,e){let n=this.fsw.options,s=I.dirname(t),i=I.basename(t);this.fsw._getWatchedDir(s).add(i);let o=I.resolve(t),a={persistent:n.persistent};e||(e=_t);let l;if(n.usePolling){let u=n.interval!==n.binaryInterval;a.interval=u&&Xs(i)?n.binaryInterval:n.interval,l=tn(t,o,a,{listener:e,rawEmitter:this.fsw._emitRaw})}else l=Zs(t,o,a,{listener:e,errHandler:this._boundHandleError,rawEmitter:this.fsw._emitRaw});return l}_handleFile(t,e,n){if(this.fsw.closed)return;let s=I.dirname(t),i=I.basename(t),r=this.fsw._getWatchedDir(s),o=e;if(r.has(i))return;let a=async(u,p)=>{if(this.fsw._throttle(Vs,t,5)){if(!p||p.mtimeMs===0)try{let m=await Fe(t);if(this.fsw.closed)return;let h=m.atimeMs,g=m.mtimeMs;if((!h||h<=g||g!==o.mtimeMs)&&this.fsw._emit(D.CHANGE,t,m),(Us||Gs||Ys)&&o.ino!==m.ino){this.fsw._closeFile(u),o=m;let f=this._watchWithNodeFs(t,a);f&&this.fsw._addPathCloser(u,f)}else o=m}catch{this.fsw._remove(s,i)}else if(r.has(i)){let m=p.atimeMs,h=p.mtimeMs;(!m||m<=h||h!==o.mtimeMs)&&this.fsw._emit(D.CHANGE,t,p),o=p}}},l=this._watchWithNodeFs(t,a);if(!(n&&this.fsw.options.ignoreInitial)&&this.fsw._isntIgnored(t)){if(!this.fsw._throttle(D.ADD,t,0))return;this.fsw._emit(D.ADD,t,e)}return l}async _handleSymlink(t,e,n,s){if(this.fsw.closed)return;let i=t.fullPath,r=this.fsw._getWatchedDir(e);if(!this.fsw.options.followSymlinks){this.fsw._incrReadyCount();let o;try{o=await oe(n)}catch{return this.fsw._emitReady(),!0}return this.fsw.closed?void 0:(r.has(s)?this.fsw._symlinkPaths.get(i)!==o&&(this.fsw._symlinkPaths.set(i,o),this.fsw._emit(D.CHANGE,n,t.stats)):(r.add(s),this.fsw._symlinkPaths.set(i,o),this.fsw._emit(D.ADD,n,t.stats)),this.fsw._emitReady(),!0)}if(this.fsw._symlinkPaths.has(i))return!0;this.fsw._symlinkPaths.set(i,!0)}_handleRead(t,e,n,s,i,r,o){if(t=I.join(t,""),o=this.fsw._throttle("readdir",t,1e3),!o)return;let a=this.fsw._getWatchedDir(n.path),l=new Set,u=this.fsw._readdirp(t,{fileFilter:p=>n.filterPath(p),directoryFilter:p=>n.filterDir(p)});if(u)return u.on(Hs,async p=>{if(this.fsw.closed){u=void 0;return}let m=p.path,h=I.join(t,m);if(l.add(m),!(p.stats.isSymbolicLink()&&await this._handleSymlink(p,t,h,m))){if(this.fsw.closed){u=void 0;return}(m===s||!s&&!a.has(m))&&(this.fsw._incrReadyCount(),h=I.join(i,I.relative(i,h)),this._addToNodeFs(h,e,n,r+1))}}).on(D.ERROR,this._boundHandleError),new Promise((p,m)=>{if(!u)return m();u.once(le,()=>{if(this.fsw.closed){u=void 0;return}let h=o?o.clear():!1;p(void 0),a.getChildren().filter(g=>g!==t&&!l.has(g)).forEach(g=>{this.fsw._remove(t,g)}),u=void 0,h&&this._handleRead(t,!1,n,s,i,r,o)})})}async _handleDir(t,e,n,s,i,r,o){let a=this.fsw._getWatchedDir(I.dirname(t)),l=a.has(I.basename(t));!(n&&this.fsw.options.ignoreInitial)&&!i&&!l&&this.fsw._emit(D.ADD_DIR,t,e),a.add(I.basename(t)),this.fsw._getWatchedDir(t);let u,p,m=this.fsw.options.depth;if((m==null||s<=m)&&!this.fsw._symlinkPaths.has(o)){if(!i&&(await this._handleRead(t,n,r,i,t,s,u),this.fsw.closed))return;p=this._watchWithNodeFs(t,(h,g)=>{g&&g.mtimeMs===0||this._handleRead(h,!1,r,i,t,s,u)})}return p}async _addToNodeFs(t,e,n,s,i){let r=this.fsw._emitReady;if(this.fsw._isIgnored(t)||this.fsw.closed)return r(),!1;let o=this.fsw._getWatchHelpers(t);n&&(o.filterPath=a=>n.filterPath(a),o.filterDir=a=>n.filterDir(a));try{let a=await Ks[o.statMethod](o.watchPath);if(this.fsw.closed)return;if(this.fsw._isIgnored(o.watchPath,a))return r(),!1;let l=this.fsw.options.followSymlinks,u;if(a.isDirectory()){let p=I.resolve(t),m=l?await oe(t):t;if(this.fsw.closed||(u=await this._handleDir(o.watchPath,a,e,s,i,o,m),this.fsw.closed))return;p!==m&&m!==void 0&&this.fsw._symlinkPaths.set(p,m)}else if(a.isSymbolicLink()){let p=l?await oe(t):t;if(this.fsw.closed)return;let m=I.dirname(o.watchPath);if(this.fsw._getWatchedDir(m).add(o.watchPath),this.fsw._emit(D.ADD,o.watchPath,a),u=await this._handleDir(m,a,e,s,t,o,p),this.fsw.closed)return;p!==void 0&&this.fsw._symlinkPaths.set(I.resolve(t),p)}else u=this._handleFile(o.watchPath,a,e);return r(),u&&this.fsw._addPathCloser(t,u),!1}catch(a){if(this.fsw._handleError(a))return r(),t}}};var me="/",on="//",Ye=".",an="..",cn="string",ln=/\\/g,We=/\/\//,un=/\..*\.(sw[px])$|~$|\.subl.*\.tmp/,mn=/^\.[/\\]/;function Ct(c){return Array.isArray(c)?c:[c]}var pe=c=>typeof c=="object"&&c!==null&&!(c instanceof RegExp);function pn(c){return typeof c=="function"?c:typeof c=="string"?t=>c===t:c instanceof RegExp?t=>c.test(t):typeof c=="object"&&c!==null?t=>{if(c.path===t)return!0;if(c.recursive){let e=$.relative(c.path,t);return e?!e.startsWith("..")&&!$.isAbsolute(e):!1}return!1}:()=>!1}function hn(c){if(typeof c!="string")throw new Error("string expected");c=$.normalize(c),c=c.replace(/\\/g,"/");let t=!1;c.startsWith("//")&&(t=!0);let e=/\/\//;for(;c.match(e);)c=c.replace(e,"/");return t&&(c="/"+c),c}function ze(c,t,e){let n=hn(t);for(let s=0;s<c.length;s++){let i=c[s];if(i(n,e))return!0}return!1}function gn(c,t){if(c==null)throw new TypeError("anymatch: specify first argument");let n=Ct(c).map(s=>pn(s));return t==null?(s,i)=>ze(n,s,i):ze(n,t)}var He=c=>{let t=Ct(c).flat();if(!t.every(e=>typeof e===cn))throw new TypeError(`Non-string provided as watch path: ${t}`);return t.map(Ve)},Ue=c=>{let t=c.replace(ln,me),e=!1;for(t.startsWith(on)&&(e=!0);t.match(We);)t=t.replace(We,me);return e&&(t=me+t),t},Ve=c=>Ue($.normalize(Ue(c))),Ge=(c="")=>t=>typeof t=="string"?Ve($.isAbsolute(t)?t:$.join(c,t)):t,dn=(c,t)=>$.isAbsolute(c)?c:$.join(t,c),fn=Object.freeze(new Set),he=class{constructor(t,e){this.path=t,this._removeWatcher=e,this.items=new Set}add(t){let{items:e}=this;e&&t!==Ye&&t!==an&&e.add(t)}async remove(t){let{items:e}=this;if(!e||(e.delete(t),e.size>0))return;let n=this.path;try{await nn(n)}catch{this._removeWatcher&&this._removeWatcher($.dirname(n),$.basename(n))}}has(t){let{items:e}=this;if(e)return e.has(t)}getChildren(){let{items:t}=this;return t?[...t.values()]:[]}dispose(){this.items.clear(),this.path="",this._removeWatcher=_t,this.items=fn,Object.freeze(this)}},yn="stat",xn="lstat",ge=class{constructor(t,e,n){this.fsw=n;let s=t;this.path=t=t.replace(mn,""),this.watchPath=s,this.fullWatchPath=$.resolve(s),this.dirParts=[],this.dirParts.forEach(i=>{i.length>1&&i.pop()}),this.followSymlinks=e,this.statMethod=e?yn:xn}entryPath(t){return $.join(this.watchPath,$.relative(this.watchPath,t.fullPath))}filterPath(t){let{stats:e}=t;if(e&&e.isSymbolicLink())return this.filterDir(t);let n=this.entryPath(t);return this.fsw._isntIgnored(n,e)&&this.fsw._hasReadPermissions(e)}filterDir(t){return this.fsw._isntIgnored(this.entryPath(t),t.stats)}},Tt=class extends rn{constructor(t={}){super(),this.closed=!1,this._closers=new Map,this._ignoredPaths=new Set,this._throttled=new Map,this._streams=new Set,this._symlinkPaths=new Map,this._watched=new Map,this._pendingWrites=new Map,this._pendingUnlinks=new Map,this._readyCount=0,this._readyEmitted=!1;let e=t.awaitWriteFinish,n={stabilityThreshold:2e3,pollInterval:100},s={persistent:!0,ignoreInitial:!1,ignorePermissionErrors:!1,interval:100,binaryInterval:300,followSymlinks:!0,usePolling:!1,atomic:!0,...t,ignored:t.ignored?Ct(t.ignored):Ct([]),awaitWriteFinish:e===!0?n:typeof e=="object"?{...n,...e}:!1};Be&&(s.usePolling=!0),s.atomic===void 0&&(s.atomic=!s.usePolling);let i=process.env.CHOKIDAR_USEPOLLING;if(i!==void 0){let a=i.toLowerCase();a==="false"||a==="0"?s.usePolling=!1:a==="true"||a==="1"?s.usePolling=!0:s.usePolling=!!a}let r=process.env.CHOKIDAR_INTERVAL;r&&(s.interval=Number.parseInt(r,10));let o=0;this._emitReady=()=>{o++,o>=this._readyCount&&(this._emitReady=_t,this._readyEmitted=!0,process.nextTick(()=>this.emit(_.READY)))},this._emitRaw=(...a)=>this.emit(_.RAW,...a),this._boundRemove=this._remove.bind(this),this.options=s,this._nodeFsHandler=new Rt(this),Object.freeze(s)}_addIgnoredPath(t){if(pe(t)){for(let e of this._ignoredPaths)if(pe(e)&&e.path===t.path&&e.recursive===t.recursive)return}this._ignoredPaths.add(t)}_removeIgnoredPath(t){if(this._ignoredPaths.delete(t),typeof t=="string")for(let e of this._ignoredPaths)pe(e)&&e.path===t&&this._ignoredPaths.delete(e)}add(t,e,n){let{cwd:s}=this.options;this.closed=!1,this._closePromise=void 0;let i=He(t);return s&&(i=i.map(r=>dn(r,s))),i.forEach(r=>{this._removeIgnoredPath(r)}),this._userIgnored=void 0,this._readyCount||(this._readyCount=0),this._readyCount+=i.length,Promise.all(i.map(async r=>{let o=await this._nodeFsHandler._addToNodeFs(r,!n,void 0,0,e);return o&&this._emitReady(),o})).then(r=>{this.closed||r.forEach(o=>{o&&this.add($.dirname(o),$.basename(e||o))})}),this}unwatch(t){if(this.closed)return this;let e=He(t),{cwd:n}=this.options;return e.forEach(s=>{!$.isAbsolute(s)&&!this._closers.has(s)&&(n&&(s=$.join(n,s)),s=$.resolve(s)),this._closePath(s),this._addIgnoredPath(s),this._watched.has(s)&&this._addIgnoredPath({path:s,recursive:!0}),this._userIgnored=void 0}),this}close(){if(this._closePromise)return this._closePromise;this.closed=!0,this.removeAllListeners();let t=[];return this._closers.forEach(e=>e.forEach(n=>{let s=n();s instanceof Promise&&t.push(s)})),this._streams.forEach(e=>e.destroy()),this._userIgnored=void 0,this._readyCount=0,this._readyEmitted=!1,this._watched.forEach(e=>e.dispose()),this._closers.clear(),this._watched.clear(),this._streams.clear(),this._symlinkPaths.clear(),this._throttled.clear(),this._closePromise=t.length?Promise.all(t).then(()=>{}):Promise.resolve(),this._closePromise}getWatched(){let t={};return this._watched.forEach((e,n)=>{let i=(this.options.cwd?$.relative(this.options.cwd,n):n)||Ye;t[i]=e.getChildren().sort()}),t}emitWithAll(t,e){this.emit(t,...e),t!==_.ERROR&&this.emit(_.ALL,t,...e)}async _emit(t,e,n){if(this.closed)return;let s=this.options;ue&&(e=$.normalize(e)),s.cwd&&(e=$.relative(s.cwd,e));let i=[e];n!=null&&i.push(n);let r=s.awaitWriteFinish,o;if(r&&(o=this._pendingWrites.get(e)))return o.lastChange=new Date,this;if(s.atomic){if(t===_.UNLINK)return this._pendingUnlinks.set(e,[t,...i]),setTimeout(()=>{this._pendingUnlinks.forEach((a,l)=>{this.emit(...a),this.emit(_.ALL,...a),this._pendingUnlinks.delete(l)})},typeof s.atomic=="number"?s.atomic:100),this;t===_.ADD&&this._pendingUnlinks.has(e)&&(t=_.CHANGE,this._pendingUnlinks.delete(e))}if(r&&(t===_.ADD||t===_.CHANGE)&&this._readyEmitted){let a=(l,u)=>{l?(t=_.ERROR,i[0]=l,this.emitWithAll(t,i)):u&&(i.length>1?i[1]=u:i.push(u),this.emitWithAll(t,i))};return this._awaitWriteFinish(e,r.stabilityThreshold,t,a),this}if(t===_.CHANGE&&!this._throttle(_.CHANGE,e,50))return this;if(s.alwaysStat&&n===void 0&&(t===_.ADD||t===_.ADD_DIR||t===_.CHANGE)){let a=s.cwd?$.join(s.cwd,e):e,l;try{l=await sn(a)}catch{}if(!l||this.closed)return;i.push(l)}return this.emitWithAll(t,i),this}_handleError(t){let e=t&&t.code;return t&&e!=="ENOENT"&&e!=="ENOTDIR"&&(!this.options.ignorePermissionErrors||e!=="EPERM"&&e!=="EACCES")&&this.emit(_.ERROR,t),t||this.closed}_throttle(t,e,n){this._throttled.has(t)||this._throttled.set(t,new Map);let s=this._throttled.get(t);if(!s)throw new Error("invalid throttle");let i=s.get(e);if(i)return i.count++,!1;let r,o=()=>{let l=s.get(e),u=l?l.count:0;return s.delete(e),clearTimeout(r),l&&clearTimeout(l.timeoutObject),u};r=setTimeout(o,n);let a={timeoutObject:r,clear:o,count:0};return s.set(e,a),a}_incrReadyCount(){return this._readyCount++}_awaitWriteFinish(t,e,n,s){let i=this.options.awaitWriteFinish;if(typeof i!="object")return;let r=i.pollInterval,o,a=t;this.options.cwd&&!$.isAbsolute(t)&&(a=$.join(this.options.cwd,t));let l=new Date,u=this._pendingWrites;function p(m){en(a,(h,g)=>{if(h||!u.has(t)){h&&h.code!=="ENOENT"&&s(h);return}let f=Number(new Date);m&&g.size!==m.size&&(u.get(t).lastChange=f);let x=u.get(t);f-x.lastChange>=e?(u.delete(t),s(void 0,g)):o=setTimeout(p,r,g)})}u.has(t)||(u.set(t,{lastChange:l,cancelWait:()=>(u.delete(t),clearTimeout(o),n)}),o=setTimeout(p,r))}_isIgnored(t,e){if(this.options.atomic&&un.test(t))return!0;if(!this._userIgnored){let{cwd:n}=this.options,i=(this.options.ignored||[]).map(Ge(n)),o=[...[...this._ignoredPaths].map(Ge(n)),...i];this._userIgnored=gn(o,void 0)}return this._userIgnored(t,e)}_isntIgnored(t,e){return!this._isIgnored(t,e)}_getWatchHelpers(t){return new ge(t,this.options.followSymlinks,this)}_getWatchedDir(t){let e=$.resolve(t);return this._watched.has(e)||this._watched.set(e,new he(e,this._boundRemove)),this._watched.get(e)}_hasReadPermissions(t){return this.options.ignorePermissionErrors?!0:!!(Number(t.mode)&256)}_remove(t,e,n){let s=$.join(t,e),i=$.resolve(s);if(n=n??(this._watched.has(s)||this._watched.has(i)),!this._throttle("remove",s,100))return;!n&&this._watched.size===1&&this.add(t,e,!0),this._getWatchedDir(s).getChildren().forEach(m=>this._remove(s,m));let a=this._getWatchedDir(t),l=a.has(e);a.remove(e),this._symlinkPaths.has(i)&&this._symlinkPaths.delete(i);let u=s;if(this.options.cwd&&(u=$.relative(this.options.cwd,s)),this.options.awaitWriteFinish&&this._pendingWrites.has(u)&&this._pendingWrites.get(u).cancelWait()===_.ADD)return;this._watched.delete(s),this._watched.delete(i);let p=n?_.UNLINK_DIR:_.UNLINK;l&&!this._isIgnored(s)&&this._emit(p,s),this._closePath(s)}_closePath(t){this._closeFile(t);let e=$.dirname(t);this._getWatchedDir(e).remove($.basename(t))}_closeFile(t){let e=this._closers.get(t);e&&(e.forEach(n=>n()),this._closers.delete(t))}_addPathCloser(t,e){if(!e)return;let n=this._closers.get(t);n||(n=[],this._closers.set(t,n)),n.push(e)}_readdirp(t,e){if(this.closed)return;let n={type:_.ALL,alwaysStat:!0,lstat:!0,...e,depth:0},s=Me(t,n);return this._streams.add(s),s.once(De,()=>{s=void 0}),s.once(le,()=>{s&&(this._streams.delete(s),s=void 0)}),s}};function bn(c,t={}){let e=new Tt(t);return e.add(c),e}var Ke={watch:bn,FSWatcher:Tt};import{readFileSync as qe}from"node:fs";var Lt=class{parsersByExtension=new Map;parsersByLanguage=new Map;register(t){this.parsersByLanguage.set(t.language,t);for(let e of t.extensions)this.parsersByExtension.set(e.toLowerCase(),t)}getByExtension(t){return this.parsersByExtension.get(t.toLowerCase())??null}getByLanguage(t){return this.parsersByLanguage.get(t)??null}getByFilePath(t){let e=t.lastIndexOf(".");if(e===-1)return null;let n=t.slice(e).toLowerCase();return this.getByExtension(n)}getSupportedExtensions(){return[...this.parsersByExtension.keys()]}isSupported(t){return this.getByFilePath(t)!==null}};import{createHash as wn}from"node:crypto";var L=class{logger;constructor(t){this.logger=t}parse(t,e){let n=(s,i)=>({path:e,language:this.language,hash:wn("md5").update(s).digest("hex"),sizeBytes:Buffer.byteLength(s,"utf-8"),lineCount:s.split(`
-`).length,symbolCount:i.length,lastModified:Date.now(),isIndexed:!1});try{let s=this.extractSymbols(t,e);return{metadata:n(t,s),symbols:s,imports:this.extractImports(t),exports:s.filter(i=>i.isExported).map(i=>i.name),errors:[]}}catch(s){return this.logger.warn(`Parse error in ${e}: ${s}`),{metadata:n(t,[]),symbols:[],imports:[],exports:[],errors:[{message:String(s)}]}}}extractImports(t){let e=[],n=/^[ \t]*import\s+(?:type\s+)?(?:\{[^}]*\}|[\w*]+(?:\s*,\s*\{[^}]*\})?)\s+from\s+['"]([^'"]+)['"]/gm,s;for(;(s=n.exec(t))!==null;)e.push(s[1]);return e}extractDocComments(t){let e=new Map,n=/\/\*\*\s*([\s\S]*?)\s*\*\//g,s;for(;(s=n.exec(t))!==null;){let i=t.substring(0,s.index).split(`
-`).length;e.set(i,s[1].replace(/^\s*\*\s?/gm,"").trim())}return e}getLineNumber(t,e){let n=0;for(let s=0;s<e&&s<t.length;s++)t[s]===`
-`&&n++;return n}buildRange(t,e){return{start:{line:t,column:0},end:{line:e,column:0}}}findClosingBrace(t,e){let n=0,s=!1,i=!1,r=null;for(let o=e;o<t.length;o++){let a=t[o]??"";for(let l=0;l<a.length;l++){let u=a[l],p=a[l+1]??"";if(i){u==="*"&&p==="/"&&(i=!1,l++);continue}if(r!==null){if(u==="\\"){l++;continue}u===r&&(r=null);continue}if(u==="/"&&p==="/")break;if(u==="/"&&p==="*"){i=!0,l++;continue}if(u==="'"||u==='"'||u==="`"){r=u;continue}if(u==="{"?(n++,s=!0):u==="}"&&n--,s&&n===0)return o}}return Math.min(e+50,t.length-1)}};var W={FUNCTION:/^[ \t]*(export\s+)?(default\s+)?(async\s+)?function\s+(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)(?:\s*:\s*([^\s{]+(?:\s*\|\s*[^\s{]+)*))?\s*\{/gm,ARROW_FUNCTION:/^[ \t]*(export\s+)?(const|let)\s+(\w+)\s*(?::\s*[^=]+)?\s*=\s*(async\s+)?(?:\(([^)]*)\)|(\w+))(?:\s*:\s*([^\s=]+(?:\s*\|\s*[^\s=]+)*))?\s*=>/gm,CLASS:/^[ \t]*(export\s+)?(default\s+)?(abstract\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([\w\s,]+))?\s*\{/gm,INTERFACE:/^[ \t]*(export\s+)?interface\s+(\w+)(?:\s+extends\s+([\w\s,]+))?\s*\{/gm,TYPE_ALIAS:/^[ \t]*(export\s+)?type\s+(\w+)(?:<[^>]*>)?\s*=\s*(.+)/gm,VARIABLE:/^[ \t]*(export\s+)?(const|let|var)\s+(\w+)(?:\s*:\s*([^=]+))?\s*=/gm,METHOD:/^[ \t]*(public|private|protected|static|abstract|async|readonly|\s)*(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)(?:\s*:\s*([^\s{]+(?:\s*\|\s*[^\s{]+)*))?\s*\{/gm,IMPORT:/^[ \t]*import\s+(?:type\s+)?(?:\{[^}]*\}|[\w*]+(?:\s*,\s*\{[^}]*\})?)\s+from\s+['"]([^'"]+)['"]/gm,JSDOC:/\/\*\*\s*([\s\S]*?)\s*\*\//g},Pt=class extends L{language="typescript";extensions=[".ts",".tsx",".js",".jsx"];constructor(t){super(t)}extractSymbols(t,e){let n=[],s=t.split(`
-`),i=this.extractDocComments(t);return n.push(...this.extractFunctions(t,e,s,i)),n.push(...this.extractArrowFunctions(t,e,s,i)),n.push(...this.extractClasses(t,e,s)),n.push(...this.extractInterfaces(t,e,s)),n.push(...this.extractTypeAliases(t,e,s)),n.push(...this.extractVariables(t,e,s)),n}extractImports(t){let e=[],n=new RegExp(W.IMPORT.source,"gm"),s;for(;(s=n.exec(t))!==null;)s[1]&&e.push(s[1]);return e}extractExports(t,e){return e.filter(n=>n.isExported).map(n=>n.name)}extractFunctions(t,e,n,s){let i=[],r=new RegExp(W.FUNCTION.source,"gm"),o;for(;(o=r.exec(t))!==null;){let a=this.getLineNumber(t,o.index),l=o[4]??"anonymous",u=!!o[1],p=!!o[3],m=o[5]??"",h=o[6]??null,g=this.parseParameters(m),f=this.findDocComment(s,a),x=this.findClosingBrace(n,a),E=this.buildFunctionSignature(u,p,l,g,h);i.push({id:`${e}:${l}:${a}`,name:l,type:"function",filePath:e,range:this.buildRange(a,x),signature:E,isExported:u,parameters:g,returnType:h,isAsync:p,isStatic:!1,docComment:f})}return i}extractArrowFunctions(t,e,n,s){let i=[],r=new RegExp(W.ARROW_FUNCTION.source,"gm"),o;for(;(o=r.exec(t))!==null;){let a=this.getLineNumber(t,o.index),l=o[3]??"anonymous",u=!!o[1],p=!!o[4],m=o[5]??o[6]??"",h=o[7]??null,g=this.parseParameters(m),f=this.findDocComment(s,a),x=this.buildFunctionSignature(u,p,l,g,h);i.push({id:`${e}:${l}:${a}`,name:l,type:"function",filePath:e,range:this.buildRange(a,a),signature:x,isExported:u,parameters:g,returnType:h,isAsync:p,isStatic:!1,docComment:f})}return i}extractClasses(t,e,n){let s=[],i=new RegExp(W.CLASS.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=r[4]??"AnonymousClass",l=!!r[1],u=!!r[3],p=r[5]??null,m=r[6]?r[6].split(",").map(E=>E.trim()).filter(Boolean):[],h=this.findClosingBrace(n,o),g=n.slice(o,h+1).join(`
-`),f=this.extractClassMethods(g,e,o),x=this.buildClassSignature(l,u,a,p,m);s.push({id:`${e}:${a}:${o}`,name:a,type:"class",filePath:e,range:this.buildRange(o,h),signature:x,isExported:l,extends:p,implements:m,members:f,isAbstract:u})}return s}extractInterfaces(t,e,n){let s=[],i=new RegExp(W.INTERFACE.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=r[2]??"AnonymousInterface",l=!!r[1],u=r[3]??"",p=this.findClosingBrace(n,o),m=l?`export interface ${a}${u?` extends ${u.trim()}`:""}`:`interface ${a}${u?` extends ${u.trim()}`:""}`;s.push({id:`${e}:${a}:${o}`,name:a,type:"interface",filePath:e,range:this.buildRange(o,p),signature:m,isExported:l})}return s}extractTypeAliases(t,e,n){let s=[],i=new RegExp(W.TYPE_ALIAS.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=r[2]??"AnonymousType",l=!!r[1],u=(r[3]??"").trim().slice(0,100),p=l?`export type ${a} = ${u}`:`type ${a} = ${u}`;s.push({id:`${e}:${a}:${o}`,name:a,type:"type",filePath:e,range:this.buildRange(o,o),signature:p,isExported:l})}return s}extractVariables(t,e,n){let s=[],i=new RegExp(W.VARIABLE.source,"gm"),r,o=new Set,a=new RegExp(W.ARROW_FUNCTION.source,"gm"),l;for(;(l=a.exec(t))!==null;)l[3]&&o.add(l[3]);for(;(r=i.exec(t))!==null;){let u=r[3]??"anonymous";if(o.has(u))continue;let p=this.getLineNumber(t,r.index),m=!!r[1],h=r[2]??"const",g=r[4]?.trim()??null,f=h==="const",x=`${m?"export ":""}${h} ${u}${g?`: ${g}`:""}`;s.push({id:`${e}:${u}:${p}`,name:u,type:f?"constant":"variable",filePath:e,range:this.buildRange(p,p),signature:x,isExported:m,dataType:g,isConst:f})}return s}extractClassMethods(t,e,n){let s=[],i=new RegExp(W.METHOD.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=(r[1]??"").trim(),a=r[2];if(!a||a==="constructor"||a==="class"||a==="if"||a==="for"||a==="while")continue;let l=n+this.getLineNumber(t,r.index),u=r[3]??"",p=r[4]??null,m=`${o?o+" ":""}${a}(${u})${p?`: ${p}`:""}`;s.push({id:`${e}:${a}:${l}`,name:a,type:"method",filePath:e,range:this.buildRange(l,l),signature:m,isExported:!1})}return s}parseParameters(t){return t.trim()?t.split(",").map(e=>{let n=e.trim(),s=n.includes("?"),i=n.includes("="),r=n.split(/[?:=]/).map(u=>u.trim()).filter(Boolean),o=r[0]??"param",a=r[1]??null,l=i?r[2]??null:null;return{name:o,type:a,isOptional:s||i,defaultValue:l}}):[]}extractDocComments(t){let e=new Map,n=new RegExp(W.JSDOC.source,"g"),s;for(;(s=n.exec(t))!==null;){let i=this.getLineNumber(t,s.index+s[0].length),r=(s[1]??"").split(`
-`).map(o=>o.replace(/^\s*\*\s?/,"").trim()).filter(Boolean).join(" ");e.set(i+1,r)}return e}findDocComment(t,e){return t.get(e)??t.get(e-1)??null}buildFunctionSignature(t,e,n,s,i){let r=[];t&&r.push("export"),e&&r.push("async"),r.push("function"),r.push(n);let o=s.map(a=>`${a.name}${a.isOptional?"?":""}${a.type?`: ${a.type}`:""}`).join(", ");return`${r.join(" ")}(${o})${i?`: ${i}`:""}`}buildClassSignature(t,e,n,s,i){let r=[];return t&&r.push("export"),e&&r.push("abstract"),r.push("class"),r.push(n),s&&r.push(`extends ${s}`),i.length>0&&r.push(`implements ${i.join(", ")}`),r.join(" ")}};var Nt=class extends L{language="markdown";extensions=[".md",".mdx"];constructor(t){super(t)}extractSymbols(t,e){let n=t.split(`
-`),s=this.extractHeadings(n),i=[];for(let a of s)i.push(this.headingToSymbol(a,e));let r=this.extractCodeBlocks(n,e);i.push(...r);let o=this.extractTopLevelLists(n,s,e);return i.push(...o),i}extractImports(t){return[]}extractHeadings(t){let e=[],n=/^(#{1,6})\s+(.+)$/;for(let s=0;s<t.length;s++){let i=n.exec(t[s]);if(!i)continue;let r=i[1].length,o=i[2].trim();if(e.length>0){let a=e[e.length-1];this.fillHeadingContent(t,a,s)}e.push({level:r,text:o,line:s,endLine:s,children:[],codeBlocks:[],listItems:[],contentPreview:""})}if(e.length>0){let s=e[e.length-1];this.fillHeadingContent(t,s,t.length)}return e}fillHeadingContent(t,e,n){let s=[],i=!1;for(let r=e.line+1;r<n;r++){let o=t[r];if(o.startsWith("```")){i=!i,!i&&e.codeBlocks.length<3&&e.codeBlocks.push(o);continue}if(!i){if(/^[-*+]\s/.test(o.trim())){let a=o.trim().replace(/^[-*+]\s+/,"");e.listItems.length<10&&e.listItems.push(a)}o.trim().length>0&&!o.startsWith("#")&&s.push(o.trim())}}e.endLine=n-1,e.contentPreview=s.slice(0,3).join(" ").slice(0,200)}headingToSymbol(t,e){let n=this.headingLevelToType(t.level),s=this.buildHeadingSignature(t),i={id:`${e}:${t.text}:${t.line}`,name:t.text,type:n,filePath:e,range:{start:{line:t.line,column:0},end:{line:t.endLine,column:0}},signature:s,isExported:t.level<=2};return n==="class"||n==="interface"?{...i,members:[],extends:null,implements:[]}:i}headingLevelToType(t){switch(t){case 1:return"class";case 2:return"interface";case 3:return"function";default:return"method"}}buildHeadingSignature(t){let n=[`${"#".repeat(t.level)} ${t.text}`];if(t.contentPreview&&n.push(`// ${t.contentPreview}`),t.listItems.length>0){let s=t.listItems.slice(0,5);for(let i of s)n.push(`  - ${i}`);t.listItems.length>5&&n.push(`  ... +${t.listItems.length-5} items`)}return n.join(`
-`)}extractCodeBlocks(t,e){let n=[],s=!1,i=0,r="",o=[];for(let a=0;a<t.length;a++){let l=t[a];if(l.startsWith("```")&&!s){s=!0,i=a,r=l.slice(3).trim(),o=[];continue}if(l.startsWith("```")&&s){if(s=!1,o.length>0&&o.length<=50){let u=r?`code:${r}:L${i+1}`:`code:L${i+1}`,p=o.slice(0,5).join(`
-`);n.push({id:`${e}:${u}:${i}`,name:u,type:"constant",filePath:e,range:{start:{line:i,column:0},end:{line:a,column:0}},signature:`\`\`\`${r}
-${p}${o.length>5?`
-...`:""}
-\`\`\``,isExported:!1})}continue}s&&o.push(l)}return n}extractTopLevelLists(t,e,n){if(e.length===0)return[];let s=[],i=e[0].line,r=[];for(let o=0;o<i;o++){let a=t[o].trim();/^[-*+]\s/.test(a)&&r.push(a.replace(/^[-*+]\s+/,""))}return r.length>0&&s.push({id:`${n}:preamble-list:0`,name:"preamble",type:"property",filePath:n,range:{start:{line:0,column:0},end:{line:i-1,column:0}},signature:r.map(o=>`- ${o}`).join(`
-`),isExported:!1}),s}};var z={FUNCTION:/^([ \t]*)(async\s+)?def\s+(\w+)\s*\(([^)]*)\)(?:\s*->\s*([^\s:]+(?:\[[^\]]*\])?))?:\s*$/gm,CLASS:/^([ \t]*)class\s+(\w+)(?:\(([^)]*)\))?:\s*$/gm,IMPORT_FROM:/^[ \t]*from\s+([\w.]+)\s+import\s+(.+)$/gm,IMPORT:/^[ \t]*import\s+([\w.]+(?:\s*,\s*[\w.]+)*)$/gm,VARIABLE:/^([ \t]*)(\w+)\s*(?::\s*([^=\n]+))?\s*=\s*(.+)$/gm,DECORATOR:/^[ \t]*@(\w+(?:\.\w+)*(?:\([^)]*\))?)\s*$/gm,DOCSTRING:/^[ \t]*(?:"""([\s\S]*?)"""|'''([\s\S]*?)''')/},At=class extends L{language="python";extensions=[".py"];constructor(t){super(t)}extractSymbols(t,e){let n=t.split(`
-`),s=[];return s.push(...this.extractClasses(t,e,n)),s.push(...this.extractFunctions(t,e,n)),s.push(...this.extractModuleVariables(t,e,n)),s}extractImports(t){let e=[],n=new RegExp(z.IMPORT_FROM.source,"gm"),s;for(;(s=n.exec(t))!==null;)e.push(s[1]);let i=new RegExp(z.IMPORT.source,"gm");for(;(s=i.exec(t))!==null;){let r=s[1].split(",").map(o=>o.trim()).filter(Boolean);e.push(...r)}return e}extractFunctions(t,e,n){let s=[],i=new RegExp(z.FUNCTION.source,"gm"),r;for(;(r=i.exec(t))!==null;){if(r[1].length>0)continue;let a=this.getLineNumber(t,r.index),l=!!r[2],u=r[3]??"anonymous",p=r[4]??"",m=r[5]??null,h=this.findBlockEndByIndent(n,a),g=!u.startsWith("_"),f=this.parseParameters(p),x=this.extractDocstring(n,a+1),E=this.buildPythonFunctionSignature(l,u,f,m);s.push({id:`${e}:${u}:${a}`,name:u,type:"function",filePath:e,range:this.buildRange(a,h),signature:E,isExported:g,parameters:f,returnType:m,isAsync:l,isStatic:!1,docComment:x})}return s}extractClasses(t,e,n){let s=[],i=new RegExp(z.CLASS.source,"gm"),r;for(;(r=i.exec(t))!==null;){if(r[1].length>0)continue;let a=this.getLineNumber(t,r.index),l=r[2]??"AnonymousClass",u=r[3]??"",p=this.findBlockEndByIndent(n,a),m=!l.startsWith("_"),h=u?u.split(",").map(T=>T.trim()).filter(Boolean):[],g=h[0]??null,f=n.slice(a+1,p+1).join(`
-`),x=this.extractClassMethods(f,e,a+1),E=`class ${l}${h.length>0?`(${h.join(", ")})`:""}`;s.push({id:`${e}:${l}:${a}`,name:l,type:"class",filePath:e,range:this.buildRange(a,p),signature:E,isExported:m,extends:g,implements:[],members:x})}return s}extractClassMethods(t,e,n){let s=[],i=new RegExp(z.FUNCTION.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=r[3];if(!o)continue;let a=!!r[2],l=r[4]??"",u=r[5]??null,p=n+this.getLineNumber(t,r.index),m=this.parseParameters(l).filter(f=>f.name!=="self"&&f.name!=="cls"),h=o==="__init__"?!1:l.trim().startsWith("cls"),g=`${a?"async ":""}def ${o}(${m.map(f=>f.name+(f.type?`: ${f.type}`:"")).join(", ")})${u?` -> ${u}`:""}`;s.push({id:`${e}:${o}:${p}`,name:o,type:"method",filePath:e,range:this.buildRange(p,p),signature:g,isExported:!o.startsWith("_")||o.startsWith("__")&&o.endsWith("__"),isAsync:a,isStatic:h})}return s}extractModuleVariables(t,e,n){let s=[],i=new RegExp(z.VARIABLE.source,"gm"),r,o=new Set,a=new RegExp(z.FUNCTION.source,"gm");for(;(r=a.exec(t))!==null;)o.add(this.getLineNumber(t,r.index));let l=new RegExp(z.CLASS.source,"gm");for(;(r=l.exec(t))!==null;)o.add(this.getLineNumber(t,r.index));let u=new RegExp(z.VARIABLE.source,"gm");for(;(r=u.exec((u.source===t,t)))!==null;)break;let p=new RegExp(z.VARIABLE.source,"gm");for(;(r=p.exec(t))!==null;){if(r[1].length>0)continue;let h=this.getLineNumber(t,r.index);if(o.has(h))continue;let g=r[2];if(!g||g==="self"||g==="cls"||/^(import|from|def|class|return|if|else|elif|for|while|try|except|finally|with|raise|assert|yield|pass|break|continue)$/.test(g))continue;let f=r[3]?.trim()??null,x=g===g.toUpperCase()&&g.length>1,E=!g.startsWith("_"),T=`${g}${f?`: ${f}`:""}`;s.push({id:`${e}:${g}:${h}`,name:g,type:x?"constant":"variable",filePath:e,range:this.buildRange(h,h),signature:T,isExported:E,dataType:f,isConst:x})}return s}findBlockEndByIndent(t,e){let n=this.getIndentLevel(t[e]??""),s=e;for(let i=e+1;i<t.length;i++){let r=t[i];if(!r||r.trim().length===0)continue;if(this.getIndentLevel(r)<=n)return s;s=i}return s}getIndentLevel(t){let e=0;for(let n of t)if(n===" ")e++;else if(n==="	")e+=4;else break;return e}parseParameters(t){return t.trim()?t.split(",").map(e=>{let n=e.trim();if(!n||n==="self"||n==="cls"||n.startsWith("*")||n.startsWith("/"))return{name:n||"param",type:null,isOptional:!1,defaultValue:null};let s=n.includes("="),i=n.split("="),r=(i[0]??"").trim(),o=s?(i[1]??"").trim():null,a=r.indexOf(":"),l=a>=0?r.slice(0,a).trim():r,u=a>=0?r.slice(a+1).trim():null;return{name:l,type:u,isOptional:s,defaultValue:o}}).filter(e=>e.name!=="self"&&e.name!=="cls"&&!e.name.startsWith("*")&&e.name!=="/"):[]}extractDocstring(t,e){if(e>=t.length)return null;let n=(t[e]??"").trim(),s=n.startsWith('"""')?'"""':n.startsWith("'''")?"'''":null;if(!s)return null;if(n.endsWith(s)&&n.length>6)return n.slice(3,-3).trim();let i=[n.slice(3)];for(let r=e+1;r<t.length&&r<e+20;r++){let o=(t[r]??"").trim();if(o.includes(s)){i.push(o.replace(s,""));break}i.push(o)}return i.join(" ").trim()||null}buildPythonFunctionSignature(t,e,n,s){let i=n.map(r=>`${r.name}${r.type?`: ${r.type}`:""}`).join(", ");return`${t?"async ":""}def ${e}(${i})${s?` -> ${s}`:""}`}};var $n="(?:public|private|protected|internal|static|abstract|sealed|partial|virtual|override|readonly|async|new|extern|volatile|unsafe)",dt=`((?:${$n}\\s+)*)`,nt={CLASS:new RegExp(`^[ \\t]*${dt}(?:class|struct|record)\\s+(\\w+)(?:<[^>]*>)?(?:\\s*:\\s*([^{]+))?\\s*\\{`,"gm"),INTERFACE:new RegExp(`^[ \\t]*${dt}interface\\s+(\\w+)(?:<[^>]*>)?(?:\\s*:\\s*([^{]+))?\\s*\\{`,"gm"),ENUM:new RegExp(`^[ \\t]*${dt}enum\\s+(\\w+)(?:\\s*:\\s*(\\w+))?\\s*\\{`,"gm"),METHOD:new RegExp(`^[ \\t]*${dt}([\\w<>\\[\\],\\s?]+?)\\s+(\\w+)\\s*(?:<[^>]*>)?\\s*\\(([^)]*)\\)\\s*(?:where[^{]*)?\\{`,"gm"),PROPERTY:new RegExp(`^[ \\t]*${dt}([\\w<>\\[\\],\\s?]+?)\\s+(\\w+)\\s*\\{\\s*(?:get|set|init)`,"gm"),NAMESPACE:/^[ \t]*namespace\s+([\w.]+)\s*[{;]/gm,USING:/^[ \t]*using\s+(?:static\s+)?(?:[\w.]+=\s*)?([\w.]+)\s*;/gm,DOC_COMMENT:/\/\/\/\s*(?:<summary>)?\s*(.*?)(?:<\/summary>)?$/},Mt=class extends L{language="csharp";extensions=[".cs"];constructor(t){super(t)}extractSymbols(t,e){let n=t.split(`
-`),s=[];return s.push(...this.extractClasses(t,e,n)),s.push(...this.extractInterfaces(t,e,n)),s.push(...this.extractEnums(t,e,n)),s.push(...this.extractTopLevelMethods(t,e,n)),s}extractImports(t){let e=[],n=new RegExp(nt.USING.source,"gm"),s;for(;(s=n.exec(t))!==null;)e.push(s[1]);return e}extractClasses(t,e,n){let s=[],i=new RegExp(nt.CLASS.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=(r[1]??"").trim(),l=r[2]??"AnonymousClass",u=r[3]??"",p=this.findClosingBrace(n,o),m=this.isPublic(a),h=a.includes("abstract"),g=u?u.split(",").map(P=>P.trim()).filter(Boolean):[],f=g.find(P=>!P.startsWith("I")||P.length<=1)??null,x=g.filter(P=>P.startsWith("I")&&P.length>1),E=n.slice(o+1,p).join(`
-`),T=this.extractMembers(E,e,o+1),v=a.includes("struct")?"struct":a.includes("record")?"record":"class",ot=`${a?a+" ":""}${v} ${l}${g.length>0?` : ${g.join(", ")}`:""}`;s.push({id:`${e}:${l}:${o}`,name:l,type:"class",filePath:e,range:this.buildRange(o,p),signature:ot,isExported:m,extends:f,implements:x,members:T,isAbstract:h})}return s}extractInterfaces(t,e,n){let s=[],i=new RegExp(nt.INTERFACE.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=(r[1]??"").trim(),l=r[2]??"IAnonymous",u=r[3]??"",p=this.findClosingBrace(n,o),m=this.isPublic(a),h=u?u.split(",").map(f=>f.trim()).filter(Boolean):[],g=`${a?a+" ":""}interface ${l}${h.length>0?` : ${h.join(", ")}`:""}`;s.push({id:`${e}:${l}:${o}`,name:l,type:"interface",filePath:e,range:this.buildRange(o,p),signature:g,isExported:m,extends:h[0]??null,implements:[],members:[]})}return s}extractEnums(t,e,n){let s=[],i=new RegExp(nt.ENUM.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=(r[1]??"").trim(),l=r[2]??"AnonymousEnum",u=this.findClosingBrace(n,o),p=this.isPublic(a),m=`${a?a+" ":""}enum ${l}`;s.push({id:`${e}:${l}:${o}`,name:l,type:"type",filePath:e,range:this.buildRange(o,u),signature:m,isExported:p})}return s}extractTopLevelMethods(t,e,n){return[]}extractMembers(t,e,n){let s=[],i=new RegExp(nt.METHOD.source,"gm"),r;for(;(r=i.exec(t))!==null;){let a=(r[1]??"").trim(),l=(r[2]??"").trim(),u=r[3];if(!u||/^(if|for|while|switch|using|lock|catch|foreach)$/.test(u))continue;let p=r[4]??"",m=n+this.getLineNumber(t,r.index),h=a.includes("static"),g=a.includes("async"),f=`${a?a+" ":""}${l} ${u}(${p})`;s.push({id:`${e}:${u}:${m}`,name:u,type:"method",filePath:e,range:this.buildRange(m,m),signature:f,isExported:this.isPublic(a),isStatic:h,isAsync:g})}let o=new RegExp(nt.PROPERTY.source,"gm");for(;(r=o.exec(t))!==null;){let a=(r[1]??"").trim(),l=(r[2]??"").trim(),u=r[3];if(!u)continue;let p=n+this.getLineNumber(t,r.index),m=`${a?a+" ":""}${l} ${u} { get; set; }`;s.push({id:`${e}:${u}:${p}`,name:u,type:"property",filePath:e,range:this.buildRange(p,p),signature:m,isExported:this.isPublic(a)})}return s}extractTripleSlashDoc(t,e){let n=[];for(let s=e-1;s>=0&&s>=e-10;s--){let i=(t[s]??"").trim(),r=nt.DOC_COMMENT.exec(i);if(r)n.unshift(r[1].trim());else break}return n.length>0?n.join(" "):null}isPublic(t){return t.includes("public")||t.includes("internal")?!0:(t.includes("private")||t.includes("protected"),!1)}};var V={FUNCTION:/^func\s+(\w+)\s*(?:\[[^\]]*\])?\s*\(([^)]*)\)\s*(?:\(([^)]+)\)|(\S+))?\s*\{/gm,METHOD:/^func\s+\((\w+)\s+([*]?\w+(?:\[[^\]]*\])?)\)\s+(\w+)\s*\(([^)]*)\)\s*(?:\(([^)]+)\)|(\S+))?\s*\{/gm,STRUCT:/^type\s+(\w+)\s+struct\s*\{/gm,INTERFACE:/^type\s+(\w+)\s+interface\s*\{/gm,TYPE_ALIAS:/^type\s+(\w+)\s+(?!struct|interface)(\S+.*)/gm,CONST_BLOCK:/^const\s*\(/gm,CONST_SINGLE:/^const\s+(\w+)\s*(?:(\S+)\s*)?=\s*(.+)/gm,VAR_SINGLE:/^var\s+(\w+)\s+(\S+)/gm,IMPORT_SINGLE:/^import\s+"([^"]+)"/gm,IMPORT_BLOCK:/^import\s*\(([\s\S]*?)\)/gm},kt=class extends L{language="go";extensions=[".go"];constructor(t){super(t)}extractSymbols(t,e){let n=t.split(`
-`),s=[];return s.push(...this.extractFunctions(t,e,n)),s.push(...this.extractMethods(t,e,n)),s.push(...this.extractStructs(t,e,n)),s.push(...this.extractInterfaces(t,e,n)),s.push(...this.extractTypeAliases(t,e)),s.push(...this.extractConstants(t,e)),s.push(...this.extractVariables(t,e)),s}extractImports(t){let e=[],n=new RegExp(V.IMPORT_SINGLE.source,"gm"),s;for(;(s=n.exec(t))!==null;)e.push(s[1]);let i=new RegExp(V.IMPORT_BLOCK.source,"gm");for(;(s=i.exec(t))!==null;){let r=s[1],o=/["']([^"']+)["']/g,a;for(;(a=o.exec(r))!==null;)e.push(a[1])}return e}extractFunctions(t,e,n){let s=[],i=new RegExp(V.FUNCTION.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=r[1]??"anonymous",l=r[2]??"",u=r[3]??r[4]??null,p=this.findClosingBrace(n,o),m=this.isGoExported(a),h=this.parseGoParams(l),g=this.extractGoDoc(n,o),f=`func ${a}(${l.trim()})${u?` ${u}`:""}`;s.push({id:`${e}:${a}:${o}`,name:a,type:"function",filePath:e,range:this.buildRange(o,p),signature:f,isExported:m,parameters:h,returnType:u,isAsync:!1,isStatic:!1,docComment:g})}return s}extractMethods(t,e,n){let s=[],i=new RegExp(V.METHOD.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=r[1]??"r",l=r[2]??"",u=r[3]??"anonymous",p=r[4]??"",m=r[5]??r[6]??null,h=this.findClosingBrace(n,o),g=this.isGoExported(u),f=this.parseGoParams(p),x=`func (${a} ${l}) ${u}(${p.trim()})${m?` ${m}`:""}`;s.push({id:`${e}:${u}:${o}`,name:u,type:"method",filePath:e,range:this.buildRange(o,h),signature:x,isExported:g,parameters:f,returnType:m,isAsync:!1,isStatic:!1})}return s}extractStructs(t,e,n){let s=[],i=new RegExp(V.STRUCT.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=r[1]??"AnonymousStruct",l=this.findClosingBrace(n,o),u=this.isGoExported(a);s.push({id:`${e}:${a}:${o}`,name:a,type:"class",filePath:e,range:this.buildRange(o,l),signature:`type ${a} struct`,isExported:u,extends:null,implements:[],members:[]})}return s}extractInterfaces(t,e,n){let s=[],i=new RegExp(V.INTERFACE.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=r[1]??"AnonymousInterface",l=this.findClosingBrace(n,o),u=this.isGoExported(a);s.push({id:`${e}:${a}:${o}`,name:a,type:"interface",filePath:e,range:this.buildRange(o,l),signature:`type ${a} interface`,isExported:u,extends:null,implements:[],members:[]})}return s}extractTypeAliases(t,e){let n=[],s=new RegExp(V.TYPE_ALIAS.source,"gm"),i;for(;(i=s.exec(t))!==null;){let r=this.getLineNumber(t,i.index),o=i[1]??"AnonymousType",a=(i[2]??"").trim().slice(0,100),l=this.isGoExported(o);n.push({id:`${e}:${o}:${r}`,name:o,type:"type",filePath:e,range:this.buildRange(r,r),signature:`type ${o} ${a}`,isExported:l})}return n}extractConstants(t,e){let n=[],s=new RegExp(V.CONST_SINGLE.source,"gm"),i;for(;(i=s.exec(t))!==null;){let r=this.getLineNumber(t,i.index),o=i[1]??"anonymous",a=i[2]?.trim()??null,l=this.isGoExported(o);n.push({id:`${e}:${o}:${r}`,name:o,type:"constant",filePath:e,range:this.buildRange(r,r),signature:`const ${o}${a?` ${a}`:""}`,isExported:l,dataType:a,isConst:!0})}return n}extractVariables(t,e){let n=[],s=new RegExp(V.VAR_SINGLE.source,"gm"),i;for(;(i=s.exec(t))!==null;){let r=this.getLineNumber(t,i.index),o=i[1]??"anonymous",a=i[2]?.trim()??null,l=this.isGoExported(o);n.push({id:`${e}:${o}:${r}`,name:o,type:"variable",filePath:e,range:this.buildRange(r,r),signature:`var ${o} ${a??""}`.trim(),isExported:l,dataType:a,isConst:!1})}return n}isGoExported(t){return t.length>0&&t[0]===t[0].toUpperCase()&&t[0]!==t[0].toLowerCase()}parseGoParams(t){return t.trim()?t.split(",").map(e=>{let n=e.trim(),s=n.split(/\s+/);return s.length>=2?{name:s[0],type:s.slice(1).join(" "),isOptional:!1,defaultValue:null}:{name:n,type:null,isOptional:!1,defaultValue:null}}).filter(e=>e.name.length>0):[]}extractGoDoc(t,e){let n=[];for(let s=e-1;s>=0&&s>=e-15;s--){let i=(t[s]??"").trim();if(i.startsWith("//"))n.unshift(i.slice(2).trim());else break}return n.length>0?n.join(" "):null}};var En="(?:public|private|protected|static|abstract|final|synchronized|native|strictfp|default|transient|volatile)",ft=`((?:${En}\\s+)*)`,ut={CLASS:new RegExp(`^[ \\t]*${ft}class\\s+(\\w+)(?:<[^>]*>)?(?:\\s+extends\\s+(\\w+(?:<[^>]*>)?))?(?:\\s+implements\\s+([^{]+))?\\s*\\{`,"gm"),INTERFACE:new RegExp(`^[ \\t]*${ft}interface\\s+(\\w+)(?:<[^>]*>)?(?:\\s+extends\\s+([^{]+))?\\s*\\{`,"gm"),ENUM:new RegExp(`^[ \\t]*${ft}enum\\s+(\\w+)(?:\\s+implements\\s+([^{]+))?\\s*\\{`,"gm"),METHOD:new RegExp(`^[ \\t]*${ft}(?:<[^>]*>\\s+)?([\\w<>\\[\\],\\s?]+?)\\s+(\\w+)\\s*\\(([^)]*)\\)(?:\\s+throws\\s+[\\w\\s,]+)?\\s*\\{`,"gm"),FIELD:new RegExp(`^[ \\t]*${ft}(final\\s+)?(static\\s+)?([\\w<>\\[\\],?]+)\\s+(\\w+)\\s*[=;]`,"gm"),IMPORT:/^[ \t]*import\s+(?:static\s+)?([\w.*]+)\s*;/gm,ANNOTATION:/^[ \t]*@(\w+)(?:\([^)]*\))?/gm},jt=class extends L{language="java";extensions=[".java"];constructor(t){super(t)}extractSymbols(t,e){let n=t.split(`
-`),s=this.extractDocComments(t),i=[];return i.push(...this.extractClasses(t,e,n,s)),i.push(...this.extractInterfaces(t,e,n,s)),i.push(...this.extractEnums(t,e,n)),i}extractImports(t){let e=[],n=new RegExp(ut.IMPORT.source,"gm"),s;for(;(s=n.exec(t))!==null;)e.push(s[1]);return e}extractClasses(t,e,n,s){let i=[],r=new RegExp(ut.CLASS.source,"gm"),o;for(;(o=r.exec(t))!==null;){let a=this.getLineNumber(t,o.index),l=(o[1]??"").trim(),u=o[2]??"AnonymousClass",p=o[3]??null,m=o[4]??"",h=this.findClosingBrace(n,a),g=this.isPublic(l),f=l.includes("abstract"),x=m?m.split(",").map(ot=>ot.trim()).filter(Boolean):[],E=n.slice(a+1,h).join(`
-`),T=this.extractClassMembers(E,e,a+1),v=`${l?l+" ":""}class ${u}${p?` extends ${p}`:""}${x.length>0?` implements ${x.join(", ")}`:""}`;i.push({id:`${e}:${u}:${a}`,name:u,type:"class",filePath:e,range:this.buildRange(a,h),signature:v,isExported:g,extends:p,implements:x,members:T,isAbstract:f,docComment:this.findNearestDocComment(s,a)})}return i}extractInterfaces(t,e,n,s){let i=[],r=new RegExp(ut.INTERFACE.source,"gm"),o;for(;(o=r.exec(t))!==null;){let a=this.getLineNumber(t,o.index),l=(o[1]??"").trim(),u=o[2]??"AnonymousInterface",p=o[3]??"",m=this.findClosingBrace(n,a),h=this.isPublic(l),g=p?p.split(",").map(x=>x.trim()).filter(Boolean):[],f=`${l?l+" ":""}interface ${u}${g.length>0?` extends ${g.join(", ")}`:""}`;i.push({id:`${e}:${u}:${a}`,name:u,type:"interface",filePath:e,range:this.buildRange(a,m),signature:f,isExported:h,extends:g[0]??null,implements:[],members:[],docComment:this.findNearestDocComment(s,a)})}return i}extractEnums(t,e,n){let s=[],i=new RegExp(ut.ENUM.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=(r[1]??"").trim(),l=r[2]??"AnonymousEnum",u=this.findClosingBrace(n,o),p=this.isPublic(a);s.push({id:`${e}:${l}:${o}`,name:l,type:"type",filePath:e,range:this.buildRange(o,u),signature:`${a?a+" ":""}enum ${l}`,isExported:p})}return s}extractClassMembers(t,e,n){let s=[],i=new RegExp(ut.METHOD.source,"gm"),r;for(;(r=i.exec(t))!==null;){let a=(r[1]??"").trim(),l=(r[2]??"").trim(),u=r[3];if(!u||/^(if|for|while|switch|try|catch|synchronized)$/.test(u))continue;let p=r[4]??"",m=n+this.getLineNumber(t,r.index),h=a.includes("static"),g=`${a?a+" ":""}${l} ${u}(${p})`;s.push({id:`${e}:${u}:${m}`,name:u,type:"method",filePath:e,range:this.buildRange(m,m),signature:g,isExported:this.isPublic(a),isStatic:h})}let o=new RegExp(ut.FIELD.source,"gm");for(;(r=o.exec(t))!==null;){let a=(r[1]??"").trim(),l=!!r[2],u=!!r[3],p=(r[4]??"").trim(),m=r[5];if(!m||/^(return|throw|new|this|super|if|for|while)$/.test(m))continue;let h=n+this.getLineNumber(t,r.index),g=l&&u,f=`${a?a+" ":""}${p} ${m}`;s.push({id:`${e}:${m}:${h}`,name:m,type:g?"constant":"property",filePath:e,range:this.buildRange(h,h),signature:f,isExported:this.isPublic(a),isStatic:u})}return s}findNearestDocComment(t,e){return t.get(e+1)??t.get(e)??t.get(e-1)??null}isPublic(t){return t.includes("public")?!0:(t.includes("private")||t.includes("protected"),!1)}};var rt="(?:(pub(?:\\s*\\([^)]*\\))?)\\s+)?",K={FUNCTION:new RegExp(`^[ \\t]*${rt}(async\\s+)?(?:unsafe\\s+)?(?:const\\s+)?fn\\s+(\\w+)(?:<[^>]*>)?\\s*\\(([^)]*)\\)(?:\\s*->\\s*([^{]+?))?\\s*(?:where[^{]*)?\\{`,"gm"),STRUCT:new RegExp(`^[ \\t]*${rt}struct\\s+(\\w+)(?:<[^>]*>)?(?:\\s*\\([^)]*\\)\\s*;|\\s*(?:where[^{]*)?\\{)`,"gm"),ENUM:new RegExp(`^[ \\t]*${rt}enum\\s+(\\w+)(?:<[^>]*>)?\\s*(?:where[^{]*)?\\{`,"gm"),TRAIT:new RegExp(`^[ \\t]*${rt}(?:unsafe\\s+)?trait\\s+(\\w+)(?:<[^>]*>)?(?:\\s*:\\s*([^{]+?))?\\s*(?:where[^{]*)?\\{`,"gm"),IMPL:/^[ \t]*impl(?:<[^>]*>)?\s+(?:(\w+(?:<[^>]*>)?)\s+for\s+)?(\w+)(?:<[^>]*>)?\s*(?:where[^{]*)?\{/gm,TYPE_ALIAS:new RegExp(`^[ \\t]*${rt}type\\s+(\\w+)(?:<[^>]*>)?\\s*=\\s*(.+);`,"gm"),CONST:new RegExp(`^[ \\t]*${rt}(?:const|static)\\s+(\\w+)\\s*:\\s*([^=]+)\\s*=`,"gm"),USE:/^[ \t]*(?:pub\s+)?use\s+([\w:]+(?:::\{[^}]+\}|::\*)?)\s*;/gm,MOD:new RegExp(`^[ \\t]*${rt}mod\\s+(\\w+)\\s*[;{]`,"gm")},Ft=class extends L{language="rust";extensions=[".rs"];constructor(t){super(t)}extractSymbols(t,e){let n=t.split(`
-`),s=[];return s.push(...this.extractFunctions(t,e,n)),s.push(...this.extractStructs(t,e,n)),s.push(...this.extractEnums(t,e,n)),s.push(...this.extractTraits(t,e,n)),s.push(...this.extractImpls(t,e,n)),s.push(...this.extractTypeAliases(t,e)),s.push(...this.extractConstants(t,e)),s}extractImports(t){let e=[],n=new RegExp(K.USE.source,"gm"),s;for(;(s=n.exec(t))!==null;)e.push(s[1]);return e}extractFunctions(t,e,n){let s=[],i=new RegExp(K.FUNCTION.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=r[1]??"",l=!!r[2],u=r[3]??"anonymous",p=r[4]??"",m=r[5]?.trim()??null,h=this.findClosingBrace(n,o),g=a.startsWith("pub"),f=this.parseRustParams(p),x=this.extractRustDoc(n,o),E=p.trim().startsWith("&self")||p.trim().startsWith("self")||p.trim().startsWith("&mut self"),T=E?"method":"function",v=`${g?"pub ":""}${l?"async ":""}fn ${u}(${this.summarizeParams(f)})${m?` -> ${m}`:""}`;s.push({id:`${e}:${u}:${o}`,name:u,type:T,filePath:e,range:this.buildRange(o,h),signature:v,isExported:g,parameters:f,returnType:m,isAsync:l,isStatic:!E,docComment:x})}return s}extractStructs(t,e,n){let s=[],i=new RegExp(K.STRUCT.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=r[1]??"",l=r[2]??"AnonymousStruct",u=a.startsWith("pub"),h=(n[o]??"").includes("(")?o:this.findClosingBrace(n,o),g=`${u?"pub ":""}struct ${l}`;s.push({id:`${e}:${l}:${o}`,name:l,type:"class",filePath:e,range:this.buildRange(o,h),signature:g,isExported:u,extends:null,implements:[],members:[]})}return s}extractEnums(t,e,n){let s=[],i=new RegExp(K.ENUM.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=r[1]??"",l=r[2]??"AnonymousEnum",u=this.findClosingBrace(n,o),p=a.startsWith("pub");s.push({id:`${e}:${l}:${o}`,name:l,type:"type",filePath:e,range:this.buildRange(o,u),signature:`${p?"pub ":""}enum ${l}`,isExported:p})}return s}extractTraits(t,e,n){let s=[],i=new RegExp(K.TRAIT.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=r[1]??"",l=r[2]??"AnonymousTrait",u=r[3]?.trim()??"",p=this.findClosingBrace(n,o),m=a.startsWith("pub"),h=`${m?"pub ":""}trait ${l}${u?`: ${u}`:""}`;s.push({id:`${e}:${l}:${o}`,name:l,type:"interface",filePath:e,range:this.buildRange(o,p),signature:h,isExported:m,extends:u||null,implements:[],members:[]})}return s}extractImpls(t,e,n){let s=[],i=new RegExp(K.IMPL.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=this.getLineNumber(t,r.index),a=r[1]??null,l=r[2]??"Unknown",u=this.findClosingBrace(n,o),p=n.slice(o+1,u).join(`
-`),m=this.extractImplMethods(p,e,o+1),h=a?`impl ${a} for ${l}`:`impl ${l}`,g=h;s.push({id:`${e}:${h}:${o}`,name:h,type:"class",filePath:e,range:this.buildRange(o,u),signature:g,isExported:!0,extends:a,implements:a?[a]:[],members:m})}return s}extractImplMethods(t,e,n){let s=[],i=new RegExp(K.FUNCTION.source,"gm"),r;for(;(r=i.exec(t))!==null;){let o=r[1]??"",a=!!r[2],l=r[3];if(!l)continue;let u=r[4]??"",p=r[5]?.trim()??null,m=n+this.getLineNumber(t,r.index),h=o.startsWith("pub"),g=`${h?"pub ":""}${a?"async ":""}fn ${l}(${u.trim().slice(0,60)})${p?` -> ${p}`:""}`;s.push({id:`${e}:${l}:${m}`,name:l,type:"method",filePath:e,range:this.buildRange(m,m),signature:g,isExported:h,isAsync:a})}return s}extractTypeAliases(t,e){let n=[],s=new RegExp(K.TYPE_ALIAS.source,"gm"),i;for(;(i=s.exec(t))!==null;){let r=this.getLineNumber(t,i.index),o=i[1]??"",a=i[2]??"AnonymousType",l=(i[3]??"").trim().slice(0,100),u=o.startsWith("pub");n.push({id:`${e}:${a}:${r}`,name:a,type:"type",filePath:e,range:this.buildRange(r,r),signature:`${u?"pub ":""}type ${a} = ${l}`,isExported:u})}return n}extractConstants(t,e){let n=[],s=new RegExp(K.CONST.source,"gm"),i;for(;(i=s.exec(t))!==null;){let r=this.getLineNumber(t,i.index),o=i[1]??"",a=i[2]??"ANONYMOUS",l=(i[3]??"").trim(),u=o.startsWith("pub");n.push({id:`${e}:${a}:${r}`,name:a,type:"constant",filePath:e,range:this.buildRange(r,r),signature:`${u?"pub ":""}const ${a}: ${l}`,isExported:u,dataType:l,isConst:!0})}return n}parseRustParams(t){return t.trim()?t.split(",").map(e=>{let n=e.trim();if(!n||n==="&self"||n==="self"||n==="&mut self")return null;let s=n.indexOf(":");if(s>=0){let i=n.slice(0,s).trim().replace(/^mut\s+/,""),r=n.slice(s+1).trim();return{name:i,type:r,isOptional:!1,defaultValue:null}}return{name:n,type:null,isOptional:!1,defaultValue:null}}).filter(e=>e!==null):[]}summarizeParams(t){return t.map(e=>`${e.name}${e.type?`: ${e.type}`:""}`).join(", ")}extractRustDoc(t,e){let n=[];for(let s=e-1;s>=0&&s>=e-15;s--){let i=(t[s]??"").trim();if(i.startsWith("///"))n.unshift(i.slice(3).trim());else{if(i.startsWith("#[")||i.startsWith("//!"))continue;break}}return n.length>0?n.join(" "):null}};var Dt=class{level="L1";compactMode=!1;setCompactMode(t){this.compactMode=t}compress(t,e){let n=[];for(let o of t){let a=this.formatSymbol(o);a&&n.push(a)}let s=n.join(`
 
-`),i=this.estimateTokens(e),r=this.estimateTokens(s);return{level:"L1",content:s,originalTokens:i,compressedTokens:r,compressionRatio:i>0?1-r/i:0,symbols:t}}formatSymbol(t){switch(t.type){case"function":case"method":return this.formatFunction(t);case"class":return this.formatClass(t);case"interface":case"type":case"variable":case"constant":case"property":return t.signature;default:return t.signature}}formatFunction(t){let e=[];if(t.docComment){let n=this.compactMode?this.compactJSDoc(t.docComment):t.docComment;n&&e.push(`/** ${n} */`)}return e.push(`${t.signature};`),e.join(`
-`)}formatClass(t){let e=[];e.push(`${t.signature} {`);for(let n of t.members)e.push(`  ${n.signature};`);return e.push("}"),e.join(`
-`)}compactJSDoc(t){let e=t.split(`
-`),n=[];for(let i of e){let r=i.trim().replace(/^\*\s?/,"");if(r.startsWith("@"))break;r.length>0&&n.push(r)}return(n[0]??"").slice(0,120)}estimateTokens(t){return Math.ceil(t.length/3.3)}};var Bt=class{level="L2";compress(t,e){let n=[];for(let o of t){let a=this.formatSymbol(o);a&&n.push(a)}let s=n.join(`
-`),i=this.estimateTokens(e),r=this.estimateTokens(s);return{level:"L2",content:s,originalTokens:i,compressedTokens:r,compressionRatio:i>0?1-r/i:0,symbols:t}}formatSymbol(t){switch(t.type){case"function":case"method":return this.formatFunction(t);case"class":return this.formatClass(t);case"interface":return`interface ${t.name}`;case"type":return`type ${t.name}`;case"variable":case"constant":return`${t.type} ${t.name}`;case"property":return`  ${t.name}`;default:return null}}formatFunction(t){let e=t.parameters.map(s=>`${s.name}${s.type?`: ${s.type}`:""}`).join(", "),n=t.returnType?` \u2192 ${t.returnType}`:"";return`${t.name}(${e})${n}`}formatClass(t){let e=[],n=`class ${t.name}`;t.extends&&(n+=` extends ${t.extends}`),e.push(n);for(let s of t.members)e.push(`  ${s.name}`);return e.join(`
-`)}estimateTokens(t){return Math.ceil(t.length/3.3)}};var Ot=class{level="L3";compress(t,e){let n=this.groupByType(t),s=[];for(let[a,l]of n)s.push(`${a}: ${l.join(", ")}`);let i=s.join(`
-`),r=this.estimateTokens(e),o=this.estimateTokens(i);return{level:"L3",content:i,originalTokens:r,compressedTokens:o,compressionRatio:r>0?1-o/r:0,symbols:t}}groupByType(t){let e=new Map;for(let n of t){if(n.type==="class"){let r=n,o=r.members.map(u=>u.name),a=o.length>0?`${r.name} { ${o.join(", ")} }`:r.name,l=e.get("class")??[];l.push(a),e.set("class",l);continue}let s=this.getGroupKey(n.type),i=e.get(s)??[];i.push(n.name),e.set(s,i)}return e}getGroupKey(t){switch(t){case"function":case"method":return"fn";case"class":return"class";case"interface":return"iface";case"type":return"type";case"variable":case"constant":return"const";case"property":return"prop";default:return"other"}}estimateTokens(t){return Math.ceil(t.length/3.3)}};var Wt=class{level="L4";compress(t,e){let n=t.filter(m=>m.type==="function"||m.type==="method").length,s=t.filter(m=>m.type==="class").length,i=t.filter(m=>m.type==="interface").length,r=t.filter(m=>m.type==="type").length,o=t.filter(m=>m.isExported).slice(0,6).map(m=>{if(m.type==="class"){let g=m.members.filter(f=>f.type==="method").slice(0,3).map(f=>f.name);return g.length>0?`${m.name} { ${g.join(", ")} }`:m.name}return m.name}),a=[];n>0&&a.push(`${n} fn`),s>0&&a.push(`${s} class`),i>0&&a.push(`${i} iface`),r>0&&a.push(`${r} type`);let l=o.length>0?`${o.join(", ")} (${a.join(", ")})`:`(${a.join(", ")})`,u=this.estimateTokens(e),p=this.estimateTokens(l);return{level:"L4",content:l,originalTokens:u,compressedTokens:p,compressionRatio:u>0?1-p/u:0,symbols:t}}estimateTokens(t){return Math.ceil(t.length/3.3)}};var zt=class{level="L5";compress(t,e){let n=new Map;for(let a of t){let l=this.extractDir(a.filePath),u=n.get(l)??[];u.push(a.name),n.set(l,u)}let s=[];for(let[a,l]of n){let u=[...new Set(l)].slice(0,8);s.push(`[${a}] (${l.length}): ${u.join(", ")}`)}let i=s.length>0?s.join(`
-`):"(empty)",r=this.estimateTokens(e),o=this.estimateTokens(i);return{level:"L5",content:i,originalTokens:r,compressedTokens:o,compressionRatio:r>0?1-o/r:0,symbols:t}}extractDir(t){let e=t.replace(/\\/g,"/").split("/");return e.length<=1?".":e.slice(0,-1).join("/")}estimateTokens(t){return Math.ceil(t.length/3.3)}};var Ht=class{level="L6";compress(t,e){let n=t.filter(m=>m.isExported),s=n.filter(m=>m.type==="class"),i=n.filter(m=>m.type==="function"),r=n.filter(m=>m.type==="interface"),o=n.filter(m=>m.type==="type"),a=[];if(s.length>0)for(let m of s.slice(0,2)){let h=m,g=h.members.filter(f=>f.type==="method").map(f=>f.name);a.push(`Class ${h.name}`+(g.length>0?` with ${g.slice(0,4).join(", ")}`:""))}if(i.length>0){let m=i.slice(0,4).map(h=>h.name);a.push(`Functions: ${m.join(", ")}`)}r.length>0&&a.push(`Interfaces: ${r.slice(0,3).map(m=>m.name).join(", ")}`),o.length>0&&a.push(`Types: ${o.slice(0,3).map(m=>m.name).join(", ")}`);let l=a.length>0?`Module exports ${n.length} symbols. ${a.join(". ")}.`:`Module with ${t.length} internal symbols.`,u=this.estimateTokens(e),p=this.estimateTokens(l);return{level:"L6",content:l,originalTokens:u,compressedTokens:p,compressionRatio:u>0?1-p/u:0,symbols:t}}estimateTokens(t){return Math.ceil(t.length/3.3)}};var Ut=class{parserRegistry;strategies;logger;constructor(t){this.logger=t,this.parserRegistry=new Lt,this.parserRegistry.register(new Pt(t)),this.parserRegistry.register(new Nt(t)),this.parserRegistry.register(new At(t)),this.parserRegistry.register(new Mt(t)),this.parserRegistry.register(new kt(t)),this.parserRegistry.register(new jt(t)),this.parserRegistry.register(new Ft(t)),this.strategies=new Map([["L1",new Dt],["L2",new Bt],["L3",new Ot],["L4",new Wt],["L5",new zt],["L6",new Ht]])}compressFile(t,e="L1",n){let s=qe(t,"utf-8");return this.compressCode(s,t,e)}compressCode(t,e,n="L1",s){if(n==="L0")return this.buildL0Result(t);let i=this.parserRegistry.getByFilePath(e);if(!i)return this.logger.warn(`\u041F\u0430\u0440\u0441\u0435\u0440 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D \u0434\u043B\u044F \u0444\u0430\u0439\u043B\u0430: ${e}. \u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u043C L0.`),this.buildL0Result(t);let r=i.parse(t,e);if(r.errors.length>0)return this.logger.warn(`\u041E\u0448\u0438\u0431\u043A\u0438 \u043F\u0430\u0440\u0441\u0438\u043D\u0433\u0430 ${e}: ${r.errors.length}. \u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u043C L0.`),this.buildL0Result(t);let o=this.strategies.get(n);if(!o){this.logger.warn(`\u0421\u0442\u0440\u0430\u0442\u0435\u0433\u0438\u044F \u0441\u0436\u0430\u0442\u0438\u044F ${n} \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430. \u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u043C L1.`);let l=this.strategies.get("L1");return l?l.compress(r.symbols,t):this.buildL0Result(t)}let a=o.compress(r.symbols,t);return this.logger.debug(`\u0421\u0436\u0430\u0442\u0438\u0435 ${e} [${n}]: ${a.originalTokens} \u2192 ${a.compressedTokens} (${(a.compressionRatio*100).toFixed(1)}% \u044D\u043A\u043E\u043D\u043E\u043C\u0438\u044F)`),a}extractSymbols(t){let e=qe(t,"utf-8");return this.extractSymbolsFromCode(e,t)}extractSymbolsFromCode(t,e){let n=this.parserRegistry.getByFilePath(e);return n?n.parse(t,e).symbols:[]}findSymbolInFile(t,e){return this.extractSymbols(t).find(s=>s.name===e)??null}isFileSupported(t){return this.parserRegistry.isSupported(t)}getSupportedExtensions(){return this.parserRegistry.getSupportedExtensions()}getParser(t){return this.parserRegistry.getByFilePath(t)}setCompactJSDoc(t){let e=this.strategies.get("L1");e&&"setCompactMode"in e&&e.setCompactMode(t)}setStripImports(t){}buildL0Result(t){let e=Math.ceil(t.length/3.3);return{level:"L0",content:t,originalTokens:e,compressedTokens:e,compressionRatio:0,symbols:[]}}};import{gzipSync as Sn}from"node:zlib";var In={maxRetries:3,baseDelayMs:500,maxDelayMs:5e3,timeoutMs:3e4},Gt=class{serverUrl;authToken;projectId;onRetry;onSplit;constructor(t){this.serverUrl=t.serverUrl.replace(/\/$/,""),this.authToken=t.authToken,this.projectId=t.projectId,this.onRetry=t.onRetry,this.onSplit=t.onSplit}async healthCheck(){try{return(await fetch(`${this.serverUrl}/health`,{signal:AbortSignal.timeout(5e3)})).ok}catch{return!1}}async sendHeartbeat(t){try{return(await fetch(`${this.serverUrl}/api/heartbeat`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${this.authToken}`,Connection:"close"},body:JSON.stringify({project_id:this.projectId,files_count:t,timestamp:Date.now()}),signal:AbortSignal.timeout(5e3)})).ok}catch{return!1}}async pushBatch(t){let e=JSON.stringify({project_id:this.projectId,files:t.map(s=>({path:s.path,hash:s.hash,sizeBytes:s.sizeBytes,language:s.language,lineCount:s.lineCount,l1Summary:s.l1Summary,l3Summary:s.l3Summary,imports:s.imports,symbols:s.symbols,rawSnippet:s.rawSnippet}))}),n=Sn(Buffer.from(e,"utf-8"));await this.fetchWithRetry(`${this.serverUrl}/api/push_indexed`,{method:"POST",headers:{"Content-Type":"application/json","Content-Encoding":"gzip",Authorization:`Bearer ${this.authToken}`,Connection:"close"},body:n},In)}async pushBatchAdaptive(t,e=0){if(t.length===0)return{uploaded:[],failed:[]};try{return await this.pushBatch(t),{uploaded:t,failed:[]}}catch{if(t.length===1)return{uploaded:[],failed:t};let n=Math.ceil(t.length/2),s=t.slice(0,n),i=t.slice(n);this.onSplit?.(t.length,n,e+1);let r=await this.pushBatchAdaptive(s,e+1);await new Promise(a=>setTimeout(a,200));let o=await this.pushBatchAdaptive(i,e+1);return{uploaded:[...r.uploaded,...o.uploaded],failed:[...r.failed,...o.failed]}}}async fetchWithRetry(t,e,n){let s=null;for(let i=0;i<=n.maxRetries;i++)try{let r=await fetch(t,{...e,signal:AbortSignal.timeout(n.timeoutMs)});if(r.status>=400&&r.status<500){let o=await r.text().catch(()=>"Unknown error");throw new Error(`HTTP ${r.status}: ${o}`)}if(r.status>=500){let o=await r.text().catch(()=>"Server error");if(s=new Error(`HTTP ${r.status}: ${o}`),i<n.maxRetries){await this.backoff(i,n);continue}throw s}return r}catch(r){let o=r instanceof Error?r:new Error(String(r));if(o.message.startsWith("HTTP 4")||(s=o,i>=n.maxRetries))throw o;this.onRetry?.(i+1,n.maxRetries,o.message),await this.backoff(i,n)}throw s??new Error("fetchWithRetry: unexpected end")}backoff(t,e){let n=e.baseDelayMs*Math.pow(2,t),s=Math.random()*500,i=Math.min(n+s,e.maxDelayMs);return new Promise(r=>setTimeout(r,i))}};var Rn="\x1B[0m",j="\x1B[1m",_n="\x1B[2m",Yt="\x1B[33m",vn="\x1B[34m",yt="\x1B[36m",Cn="\x1B[37m",H="\x1B[31m",b="\x1B[90m",C="\x1B[92m",mt="\x1B[93m",Qe="\x1B[94m",B="\x1B[96m",U="\x1B[97m",Jt=process.stdout.isTTY!==!1;function d(c,t){return Jt?`${c}${t}${Rn}`:t}function M(c){return c<1024?`${c} B`:c<1024*1024?`${(c/1024).toFixed(1)} KB`:`${(c/1024/1024).toFixed(2)} MB`}function qt(c){return c<1e3?`${c}ms`:`${(c/1e3).toFixed(1)}s`}function q(){return d(b,new Date().toLocaleTimeString("ru-RU",{hour12:!1}))}function Ze(c,t,e=28){if(t===0)return d(b,"\u2591".repeat(e));let n=Math.min(c/t,1),s=Math.round(n*e),i=e-s,r=d(C,"\u2588".repeat(s))+d(b,"\u2591".repeat(i)),o=d(U,`${Math.round(n*100)}%`).padStart(4);return`${r} ${o}`}function ts(c,t,e="0.7.0"){let s="\u2500".repeat(62);console.log(""),console.log(d(B,`  \u250C${s}\u2510`)),console.log(d(B,"  \u2502")+d(j+U,"  \u{1F9E0} Project Brain Smart Watcher")+d(b,`  v${e}`)+" ".repeat(26-e.length)+d(B,"\u2502")),console.log(d(B,"  \u2502")+d(yt,"  \u25CF ")+d(U,c.padEnd(24))+d(b,"\u2192  ")+d(vn,t.slice(0,30).padEnd(30))+d(B,"\u2502")),console.log(d(B,`  \u2514${s}\u2518`)),console.log("")}function Xt(c,t,e){let n=d(Qe+j,` ${c}/${t} `),s=d(j+U,` ${e} `),i=d(b,"\u2500".repeat(46));console.log(`
-  ${n}${s}${i}`)}function tt(c){console.log(`  ${q()}  ${d(yt,"\xB7")}  ${c}`)}function J(c){console.log(`  ${q()}  ${d(C,"\u2713")}  ${c}`)}function G(c){console.log(`  ${q()}  ${d(mt,"\u26A0")}  ${d(Yt,c)}`)}function F(c){console.log(`  ${q()}  ${d(H,"\u2717")}  ${d(H,c)}`)}function es(c){console.log(`  ${q()}  ${d(b,"\u25CB")}  ${d(_n+b,c)}`)}var Je=0;function ss(c,t,e){if(c===1&&(Je=Date.now()),!Jt){(c%10===0||c===t)&&console.log(`  [${c}/${t}] ${e}`);return}let n=Ze(c,t),s=d(b,`${c}/${t}`),i=Date.now()-Je,r=c>0?i/c:0,o=Math.round(r*(t-c)/1e3),a=o>0?d(b,`~${o}\u0441 \u043E\u0441\u0442\u0430\u043B\u043E\u0441\u044C`):d(C,"\u0433\u043E\u0442\u043E\u0432\u043E");process.stdout.write(`\r\x1B[2K  ${n}  ${s}  ${a}  ${d(b,e.slice(0,28))}  `),c===t&&process.stdout.write(`
-`)}var Vt=0;function ns(c,t,e,n,s){c===1&&Vt===0&&(Vt=Date.now());let i=s?d(C,"\u2713"):d(H,"\u2717"),r=Ze(c,t,20),o=d(U,`${e} files`),a=d(b,`~${n}`),l=Date.now()-Vt,u=c>0?l/c:0,p=Math.round(u*(t-c)/1e3),m=c<t?d(b,`~${p}\u0441`):d(C,"\u0433\u043E\u0442\u043E\u0432\u043E");Jt?(process.stdout.write(`\r\x1B[2K  ${r}  ${i} ${o} ${a}  ${m}`),c===t&&process.stdout.write(`
-`)):console.log(`  Batch ${c}/${t}  ${s?"OK":"FAIL"}  ${e} files  ~${n}`)}function rs(){Vt=0}var Xe=["\u280B","\u2819","\u2839","\u2838","\u283C","\u2834","\u2826","\u2827","\u2807","\u280F"],Kt=null,de=0;function fe(c){Jt&&(de=0,Kt=setInterval(()=>{let t=d(B,Xe[de%Xe.length]);process.stdout.write(`\r\x1B[2K  ${t}  ${d(b,c)}`),de++},80))}function ye(){Kt&&(clearInterval(Kt),Kt=null,process.stdout.write("\r\x1B[2K"))}function is(c){let t=c.originalKb>0?(c.originalKb/Math.max(c.summaryKb,1)).toFixed(1):"\u2014",e=c.originalKb>0?Math.round((1-c.summaryKb/c.originalKb)*100):0,n=62,s="\u2500".repeat(n);console.log(""),console.log(d(C,`  \u250C${s}\u2510`));let i=c.errors===0?`  \u2705  \u041F\u0440\u043E\u0438\u043D\u0434\u0435\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043E ${c.files} \u0444\u0430\u0439\u043B\u043E\u0432 \u0437\u0430 ${qt(c.elapsedMs)}`:`  \u26A0\uFE0F   \u041F\u0440\u043E\u0438\u043D\u0434\u0435\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043E ${c.files} \u0444\u0430\u0439\u043B\u043E\u0432 (${c.errors} \u043E\u0448\u0438\u0431\u043E\u043A) \u0437\u0430 ${qt(c.elapsedMs)}`;console.log(d(C,"  \u2502")+d(j+U,i).padEnd(n+8)+d(C,"\u2502"));let r=`  \u{1F4BE}  \u041E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E ${M(c.summaryKb*1024)}  (\u0438\u0437 ~${M(c.originalKb*1024)} \u0438\u0441\u0445\u043E\u0434\u043D\u044B\u0445)  \xD7${t} \u0441\u0436\u0430\u0442\u0438\u0435  (${e}%)`;console.log(d(C,"  \u2502")+d(yt,r).padEnd(n+9)+d(C,"\u2502")),console.log(d(C,`  \u2514${s}\u2518`)),console.log("")}function os(c,t,e){if(e===0)return;let n=4,s=Math.round(c/n),i=Math.round(t/n),r=s-i,o=s>0?Math.round(r/s*100):0,a=s>0?(s/Math.max(i,1)).toFixed(0):"\u2014",l=Math.round(c/e),u=Math.round(t/e),p=E=>E>=1e6?`${(E/1e6).toFixed(2)}M`:E>=1e3?`${(E/1e3).toFixed(1)}K`:String(E),m=62,h="\u2500".repeat(m),g="\u2500".repeat(m-2),f=Qe,x=(E,T)=>d(f,"  \u2502")+d(T,E).padEnd(m+9)+d(f,"\u2502");console.log(d(f,`  \u250C${h}\u2510`)),console.log(d(f,"  \u2502")+d(j+U,"  \u{1F9EE}  \u042D\u041A\u041E\u041D\u041E\u041C\u0418\u042F \u0422\u041E\u041A\u0415\u041D\u041E\u0412").padEnd(m+8)+d(f,"\u2502")),console.log(d(f,"  \u2502")+d(b,`  ${g}`).padEnd(m+8)+d(f,"\u2502")),console.log(x(`  \u{1F4C4}  \u0418\u0441\u0445\u043E\u0434\u043D\u044B\u0439 \u043A\u043E\u0434:   ~${p(s)} \u0442\u043E\u043A\u0435\u043D\u043E\u0432  (${M(c)})`,H)),console.log(x(`  \u{1F9E0}  L1+L3 \u0441\u0443\u043C\u043C\u0430\u0440\u0438:  ~${p(i)} \u0442\u043E\u043A\u0435\u043D\u043E\u0432  (${M(t)})`,C)),console.log(d(f,"  \u2502")+d(b,`  ${g}`).padEnd(m+8)+d(f,"\u2502")),console.log(x(`  \u{1F4B0}  \u042D\u043A\u043E\u043D\u043E\u043C\u0438\u044F:       ~${p(r)} \u0442\u043E\u043A\u0435\u043D\u043E\u0432  (${o}%)`,j+mt)),console.log(x(`  \u{1F4CA}  \u0421\u0442\u0435\u043F\u0435\u043D\u044C \u0441\u0436\u0430\u0442\u0438\u044F: \xD7${a}  (${e} \u0444\u0430\u0439\u043B\u043E\u0432)`,B)),console.log(d(f,"  \u2502")+d(b,`  ${g}`).padEnd(m+8)+d(f,"\u2502")),console.log(x(`  \u{1F4D0}  \u0421\u0440\u0435\u0434\u043D\u0438\u0439 \u0444\u0430\u0439\u043B:   ${M(l)} \u2192 ${M(u)}`,b)),console.log(x("  \u26A1  \u041D\u0430 \u043F\u0440\u043E\u0432\u043E\u0434\u0435:     gzip \u0435\u0449\u0451 ~70% \u043C\u0435\u043D\u044C\u0448\u0435",b)),console.log(d(f,`  \u2514${h}\u2518`)),console.log("")}function as(c){let t=[];if(c.added>0&&t.push(d(C,`+${c.added} \u043D\u043E\u0432\u044B\u0445`)),c.changed>0&&t.push(d(mt,`~${c.changed} \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u043E`)),c.removed>0&&t.push(d(H,`-${c.removed} \u0443\u0434\u0430\u043B\u0435\u043D\u043E`)),t.length===0){console.log(`  ${q()}  ${d(b,"\u25CB")}  ${d(b,`Rescan: \u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0439 (${c.unchanged} \u0444\u0430\u0439\u043B\u043E\u0432)  \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0447\u0435\u0440\u0435\u0437 ${c.nextInMin} \u043C\u0438\u043D`)}`);return}let e=t.join(d(b,", ")),n=d(b,qt(c.elapsedMs)),s=d(b,`\u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0447\u0435\u0440\u0435\u0437 ${c.nextInMin} \u043C\u0438\u043D`);console.log(`  ${q()}  ${d(B,"\u21BB")}  Rescan: ${e}  ${d(b,"|")}  \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043E ${c.uploaded}  ${n}  ${s}`)}function cs(c){let e="\u2500".repeat(62),n="\u2500".repeat(60),s=B,i=(h,g)=>d(s,"  \u2502")+d(g,h).padEnd(71)+d(s,"\u2502");console.log(d(s,`  \u250C${e}\u2510`)),console.log(d(s,"  \u2502")+d(j+U,"  \u{1F4CB}  \u0412\u0415\u0420\u0418\u0424\u0418\u041A\u0410\u0426\u0418\u042F \u0421\u041A\u0410\u041D\u0418\u0420\u041E\u0412\u0410\u041D\u0418\u042F").padEnd(70)+d(s,"\u2502")),console.log(d(s,"  \u2502")+d(b,`  ${n}`).padEnd(70)+d(s,"\u2502"));let r=Object.entries(c.byExt).sort((h,g)=>g[1]-h[1]);console.log(i("  \u{1F4C2}  \u041E\u0431\u0440\u0430\u0431\u043E\u0442\u0430\u043D\u043E \u043F\u043E \u0442\u0438\u043F\u0430\u043C \u0444\u0430\u0439\u043B\u043E\u0432:",j+U));for(let[h,g]of r){let f=c.compressed>0?Math.round(g/c.compressed*100):0,x="\u2588".repeat(Math.max(1,Math.round(f/5)));console.log(i(`       ${h.padEnd(8)} ${String(g).padStart(4)} \u0444\u0430\u0439\u043B(\u043E\u0432)  ${f}%  ${x}`,yt))}console.log(d(s,"  \u2502")+d(b,`  ${n}`).padEnd(70)+d(s,"\u2502"));let o=Object.entries(c.skippedByExt).sort((h,g)=>g[1]-h[1]);if(o.length>0){console.log(i("  \u{1F6AB}  \u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043D\u044B\u0435 \u0440\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u0438\u044F (\u043D\u0435 \u0432 \u0441\u043F\u0438\u0441\u043A\u0435 --exts):",j+mt));let h=o.slice(0,10);for(let[g,f]of h)console.log(i(`       ${g.padEnd(8)} ${String(f).padStart(4)} \u0444\u0430\u0439\u043B(\u043E\u0432)`,Yt));if(o.length>10){let g=o.slice(10).reduce((f,[,x])=>f+x,0);console.log(i(`       ...\u0438 \u0435\u0449\u0451 ${o.length-10} \u0442\u0438\u043F\u043E\u0432 (${g} \u0444\u0430\u0439\u043B\u043E\u0432)`,b))}console.log(d(s,"  \u2502")+d(b,`  ${n}`).padEnd(70)+d(s,"\u2502"))}let{tooLarge:a,readError:l,compressError:u}=c.skipInfo,p=a.length+l.length+u.length;if(p>0){if(console.log(i(`  \u26A0\uFE0F   \u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B: ${p}`,j+mt)),a.length>0){console.log(i(`       \u{1F5C4}\uFE0F  \u0421\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u0438\u0435 (>500KB): ${a.length}`,Yt));for(let h of a.slice(0,5))console.log(i(`          ${h}`,b));a.length>5&&console.log(i(`          ...\u0438 \u0435\u0449\u0451 ${a.length-5}`,b))}if(l.length>0){console.log(i(`       \u{1F4DB}  \u041E\u0448\u0438\u0431\u043A\u0438 \u0447\u0442\u0435\u043D\u0438\u044F: ${l.length}`,H));for(let h of l.slice(0,5))console.log(i(`          ${h}`,b));l.length>5&&console.log(i(`          ...\u0438 \u0435\u0449\u0451 ${l.length-5}`,b))}if(u.length>0){console.log(i(`       \u{1F527}  AST \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D (raw fallback): ${u.length}`,Yt));for(let h of u.slice(0,5))console.log(i(`          ${h}`,b));u.length>5&&console.log(i(`          ...\u0438 \u0435\u0449\u0451 ${u.length-5}`,b))}console.log(d(s,"  \u2502")+d(b,`  ${n}`).padEnd(70)+d(s,"\u2502"))}let m=c.total>0?Math.round(c.compressed/c.total*100):0;if(console.log(i(`  \u2705  \u041F\u043E\u043A\u0440\u044B\u0442\u0438\u0435: ${c.compressed}/${c.total} \u0444\u0430\u0439\u043B\u043E\u0432 (${m}%)`,j+C)),o.length>0){let h=o.reduce((g,[,f])=>g+f,0);console.log(i(`  \u{1F4A1}  +${h} \u0444\u0430\u0439\u043B\u043E\u0432 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E \u0441 \u0440\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u043D\u044B\u043C --exts`,b))}console.log(d(s,`  \u2514${e}\u2518`)),console.log("")}function ls(c){console.log(""),console.log(`  ${d(B+j,"  \u{1F441}  WATCH MODE  ")}  ${d(b,c)}`),console.log(d(b,`  ${"\u2500".repeat(60)}`)),console.log(d(b,`  Ctrl+C \u0434\u043B\u044F \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0438
-`))}function Qt(c,t,e=void 0){let n={modified:d(mt,"\u270E"),added:d(C,"+"),deleted:d(H,"\u2212"),error:d(H,"\u2717")},s={modified:U,added:C,deleted:b,error:H},i=n[c]??"\xB7",r=d(s[c]??Cn,t.padEnd(40)),o=e?d(b,e):"";console.log(`  ${q()}  ${i}  ${r}  ${o}`)}function us(c,t,e){let n=t?d(C,"\u2713 \u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D"):d(H,"\u2717 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D");console.log(`  ${q()}  ${d(yt,"\u21D7")}  ${d(b,c)}  ${n}  ${d(b,qt(e))}`)}var bs=".brain",ws="config.json";function Ln(c){let t=it(c,bs,ws);if(!pt(t))return null;try{let e=se(t,"utf-8");return JSON.parse(e)}catch{return null}}function Pn(c,t){let e=it(c,bs);try{pt(e)||xs(e,{recursive:!0});let n=it(e,ws);we(n,JSON.stringify(t,null,2),"utf-8");let s=it(e,".gitignore");pt(s)||we(s,`*
-`,"utf-8")}catch{}}function Nn(c,t,e,n){let s=it(c,".cursor"),i=it(s,"mcp.json");try{pt(s)||xs(s,{recursive:!0});let r={mcpServers:{}};if(pt(i))try{r=JSON.parse(se(i,"utf-8")),r.mcpServers||(r.mcpServers={})}catch{r={mcpServers:{}}}r.mcpServers["project-brain"]={url:`${t.replace(/\/$/,"")}/mcp`,headers:{Authorization:`Bearer ${e}`,"X-Default-Project":n}},we(i,JSON.stringify(r,null,2),"utf-8"),J(`.cursor/mcp.json \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D (project: ${n})`)}catch{G(".cursor/mcp.json \u043D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0437\u0434\u0430\u0442\u044C (\u043D\u0435 \u043A\u0440\u0438\u0442\u0438\u0447\u043D\u043E)")}}function ms(c){return new Promise(t=>setTimeout(t,c))}function An(c,t,e){let n=`  \u21BB \u043F\u043E\u043F\u044B\u0442\u043A\u0430 ${c}/${t}: ${e}`;process.stdout.write(`\x1B[33m${n}\x1B[0m
-`)}var Mn=".ts,.tsx,.js,.jsx,.mjs,.cjs,.py,.cs,.go,.rs,.java,.kt,.swift,.rb,.php,.c,.cpp,.h,.hpp,.cc,.vue,.svelte,.html,.htm,.css,.scss,.sass,.less,.json,.yaml,.yml,.xml,.sql,.sh,.md,.graphql,.gql,.dart,.scala,.lua,.r,.ex,.exs,.proto",kn="node_modules,dist,.git,build,out,coverage,__pycache__,.venv,venv,env,.next,.nuxt,vendor,target,.cache,bin,obj,.idea,.vscode,.DS_Store,package-lock.json,yarn.lock,pnpm-lock.yaml";function jn(c){let t=m=>{let h=c.indexOf(m);return h!==-1?c[h+1]:void 0},e=t("--path")??process.cwd(),n=Ln(e),s=t("--server")??n?.server??"",i=t("--token")??n?.token??"",r=t("--project")??n?.project_id??e.split(/[/\\]/).pop()??"default",o=c.includes("--watch"),a=t("--exts")??n?.extensions??Mn,l=t("--ignore")??n?.ignore??kn,u=parseInt(t("--batch")??String(n?.batch_size??10),10),p=parseInt(t("--interval")??String(n?.interval_min??3),10);return{path:e,server:s.replace(/\/$/,""),token:i,project:r,watch:o,exts:a.split(",").map(m=>m.trim()),ignore:l.split(",").map(m=>m.trim()),batchSize:u,intervalMin:p,brainConfigLoaded:n!==null}}function ps(c,t,e){let n=[],s={},i=e.map(l=>l.toLowerCase()),r=new Set(t.filter(l=>l.includes("."))),o=new Set(t.filter(l=>!l.includes(".")));function a(l){let u;try{u=Tn(l,{withFileTypes:!0})}catch{return}for(let p of u){let m=String(p.name);if(m.startsWith("."))continue;let h=it(l,m);if(p.isDirectory()){if(o.has(m))continue;a(h)}else if(p.isFile()){if(r.has(m))continue;let g=ee(m).toLowerCase();i.includes(g)?n.push(h):g&&(s[g]=(s[g]||0)+1)}}}return a(c),{files:n,skippedByExt:s}}var Fn=/import\s+(?:type\s+)?(?:\{[^}]*\}|[^;{]*)\s+from\s+['"]([^'"]+)['"]/g,Dn=/require\s*\(\s*['"]([^'"]+)['"]\s*\)/g,Bn=/import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;function On(c){let t=new Set;for(let e of[Fn,Dn,Bn]){e.lastIndex=0;let n;for(;(n=e.exec(c))!==null;)t.add(n[1])}return[...t]}var Wn=[{regex:/export\s+(?:default\s+)?(?:async\s+)?function\s+(\w+)/g,type:"function",exported:!0},{regex:/export\s+(?:default\s+)?class\s+(\w+)/g,type:"class",exported:!0},{regex:/export\s+(?:default\s+)?(?:const|let|var)\s+(\w+)/g,type:"variable",exported:!0},{regex:/export\s+(?:default\s+)?(?:type|interface)\s+(\w+)/g,type:"type",exported:!0},{regex:/(?:^|\n)\s*(?:async\s+)?function\s+(\w+)/g,type:"function",exported:!1},{regex:/(?:^|\n)\s*class\s+(\w+)/g,type:"class",exported:!1}];function zn(c){let t=new Set,e=[];for(let{regex:n,type:s,exported:i}of Wn){n.lastIndex=0;let r;for(;(r=n.exec(c))!==null;){let o=r[1];t.has(o)||(t.add(o),e.push({name:o,type:s,isExported:i}))}}return e}var xe=3e3,Hn=15e3,Un=2e3;function hs(c){if(c.length<=xe)return c;let t=c.lastIndexOf(`
-`,xe);return c.slice(0,t>0?t:xe)}function gs(c,t,e){if(c.length<=t)return c;let n=c.lastIndexOf(`
-`,t),s=c.slice(0,n>0?n:t);return`${s}
-// ... ${e}: \u043E\u0431\u0440\u0435\u0437\u0430\u043D\u043E (${c.length} \u2192 ${s.length} \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432)`}var ds={".ts":"typescript",".tsx":"typescript",".js":"javascript",".jsx":"javascript",".mjs":"javascript",".cjs":"javascript",".py":"python",".cs":"csharp",".go":"go",".rs":"rust",".java":"java",".kt":"kotlin",".kts":"kotlin",".swift":"swift",".rb":"ruby",".php":"php",".c":"c",".cpp":"cpp",".cc":"cpp",".h":"c-header",".hpp":"cpp-header",".vue":"vue",".svelte":"svelte",".html":"html",".htm":"html",".css":"css",".scss":"scss",".sass":"sass",".less":"less",".json":"json",".yaml":"yaml",".yml":"yaml",".xml":"xml",".svg":"xml",".sql":"sql",".sh":"shell",".bash":"shell",".md":"markdown",".graphql":"graphql",".gql":"graphql",".proto":"protobuf",".dart":"dart",".scala":"scala",".lua":"lua",".r":"r",".ex":"elixir",".exs":"elixir"};function be(c,t,e,n){let s=te(t,c).replace(/\\/g,"/"),i;try{i=Zt(c)}catch{return n?.readError.push(s),null}if(i.size>500*1024)return n?.tooLarge.push(`${s} (${M(i.size)})`),null;let r;try{r=se(c,"utf-8")}catch{return n?.readError.push(s),null}let o=ys("md5").update(r).digest("hex"),a=r.split(`
-`).length,l=ee(c).toLowerCase(),u,p;try{let f=e.compressCode(r,s,"L1"),x=e.compressCode(r,s,"L3");u=f.content,p=x.content}catch{u=hs(r),p=`// ${s} (${a} lines, ${ds[l]??l})`,n?.compressError.push(s)}u=gs(u,Hn,"L1"),p=gs(p,Un,"L3");let m=On(r),h=zn(r),g=hs(r);return{path:s,hash:o,sizeBytes:i.size,language:ds[l]??null,lineCount:a,l1Summary:u,l3Summary:p,imports:m,symbols:h,rawSnippet:g}}var $e=30*1024;function xt(c){let t=c.l1Summary?.length??0,e=c.l3Summary?.length??0,n=c.rawSnippet?.length??0,s=c.path?.length??0,i=c.imports?c.imports.reduce((o,a)=>o+a.length+4,20):0,r=c.symbols?c.symbols.reduce((o,a)=>o+a.name.length+a.type.length+30,20):0;return t+e+n+s+i+r+200}function fs(c,t=$e){if(c.length===0)return[];let e=[...c].sort((r,o)=>xt(r)-xt(o)),n=[],s=[],i=0;for(let r of e){let o=xt(r);if(o>t){s.length>0&&(n.push({batchIndex:n.length+1,files:s}),s=[],i=0),n.push({batchIndex:n.length+1,files:[r]});continue}i+o>t&&s.length>0&&(n.push({batchIndex:n.length+1,files:s}),s=[],i=0),s.push(r),i+=o}return s.length>0&&n.push({batchIndex:n.length+1,files:s}),n}async function Gn(){let c=jn(process.argv.slice(2));c.server||(F("--server \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u0435\u043D  (\u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440: https://your-mcp.com)"),process.exit(1)),c.token||(F("--token \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u0435\u043D"),process.exit(1)),pt(c.path)||(F(`\u041F\u0443\u0442\u044C \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D: ${c.path}`),process.exit(1)),ts(c.project,c.server,"0.11.0"),c.brainConfigLoaded&&tt("\u{1F4C2} .brain/config.json \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D (CLI-\u0444\u043B\u0430\u0433\u0438 \u0438\u043C\u0435\u044E\u0442 \u043F\u0440\u0438\u043E\u0440\u0438\u0442\u0435\u0442)"),Xt(1,3,"\u041F\u041E\u0414\u041A\u041B\u042E\u0427\u0415\u041D\u0418\u0415");let t=Date.now(),e=new Gt({serverUrl:c.server,authToken:c.token,projectId:c.project,batchSize:c.batchSize,onRetry:An,onSplit:(y,w,R)=>{let N="  ".repeat(R);G(`${N}\u26A1 \u0414\u0440\u043E\u0431\u043B\u0435\u043D\u0438\u0435 \u0431\u0430\u0442\u0447\u0430: ${y} \u2192 ${w} + ${y-w} \u0444\u0430\u0439\u043B\u043E\u0432 (\u0433\u043B\u0443\u0431\u0438\u043D\u0430 ${R})`)}});fe(`\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435 \u043A ${c.server}...`);let n=await e.healthCheck();ye(),us(c.server,n,Date.now()-t),n||(F(`\u0421\u0435\u0440\u0432\u0435\u0440 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D: ${c.server}`),process.exit(1)),Xt(2,3,"\u0421\u041A\u0410\u041D\u0418\u0420\u041E\u0412\u0410\u041D\u0418\u0415 \u0418 \u0421\u0416\u0410\u0422\u0418\u0415"),tt(`\u041F\u0443\u0442\u044C:  ${c.path}`),tt(`\u0420\u0430\u0441\u0448:  ${c.exts.join(", ")}   Smart Batch: \u2264${Math.round($e/1024)} \u041A\u0411`);let s=c.ignore.length>6?c.ignore.slice(0,6).join(", ")+`, +${c.ignore.length-6} \u0435\u0449\u0451`:c.ignore.join(", ");tt(`\u0418\u0433\u043D\u043E\u0440: ${s}  (--ignore \u0434\u043B\u044F \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438)`);let i=Date.now(),r=ps(c.path,c.ignore,c.exts),o=r.files;J(`\u041D\u0430\u0439\u0434\u0435\u043D\u043E ${o.length} \u0444\u0430\u0439\u043B\u043E\u0432  (${M(o.reduce((y,w)=>{try{return y+Zt(w).size}catch{return y}},0))} \u0438\u0441\u0445\u043E\u0434\u043D\u044B\u0445)`);let a=Object.values(r.skippedByExt).reduce((y,w)=>y+w,0);if(a>0){let y=Object.entries(r.skippedByExt).sort((w,R)=>R[1]-w[1]).slice(0,5).map(([w,R])=>`${w}(${R})`).join(", ");G(`${a} \u0444\u0430\u0439\u043B\u043E\u0432 \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E (\u0440\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u0438\u0435 \u043D\u0435 \u0432 --exts): ${y}`)}let l={info:()=>{},warn:()=>{},error:()=>{},debug:()=>{},trace:()=>{},fatal:()=>{}},u=new Ut(l),p=[],m={tooLarge:[],readError:[],compressError:[]};for(let y=0;y<o.length;y++){let w=o[y];ss(y+1,o.length,te(c.path,w).replace(/\\/g,"/"));let R=be(w,c.path,u,m);R&&p.push(R)}let h=m.tooLarge.length+m.readError.length,g=Date.now()-i,f=Math.round(o.reduce((y,w)=>{try{return y+Zt(w).size}catch{return y}},0)/1024),x=Math.round(p.reduce((y,w)=>y+w.l1Summary.length,0)/1024),E=f>0?(f/Math.max(x,1)).toFixed(1):"\u2014";J(`\u0421\u0436\u0430\u0442\u043E ${p.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u0437\u0430 ${(g/1e3).toFixed(1)}\u0441  \u2192  ${M(x*1024)}  (\xD7${E})`),h>0&&G(`${h} \u0444\u0430\u0439\u043B\u043E\u0432 \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E (\u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u0438\u0435 \u0438\u043B\u0438 \u043D\u0435\u0447\u0438\u0442\u0430\u0435\u043C\u044B\u0435)`),m.compressError.length>0&&tt(`${m.compressError.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u0431\u0435\u0437 AST (raw fallback)`),Xt(3,3,"\u0417\u0410\u0413\u0420\u0423\u0417\u041A\u0410");let T=fs(p),v=T.length;tt(`${v} \u0431\u0430\u0442\u0447\u0435\u0439 (smart: \u2264${Math.round($e/1024)} \u041A\u0411/\u0431\u0430\u0442\u0447)`),rs();let ot=Date.now(),P=0,X=[],Ee=new Set;for(let y=0;y<T.length;y++){let w=T[y],N=(w.files.reduce((et,wt)=>et+xt(wt),0)/1024).toFixed(1);fe(`\u0411\u0430\u0442\u0447 ${w.batchIndex}/${v} (${w.files.length} \u0444\u0430\u0439\u043B\u043E\u0432, ~${N} \u041A\u0411)...`);let S=await e.pushBatchAdaptive(w.files);ye(),P+=S.uploaded.length;for(let et of S.uploaded)Ee.add(et.path);X.push(...S.failed);let at=Date.now()-ot,Q=v>1?` ~${((v-y-1)*(at/(y+1))/1e3).toFixed(0)}\u0441`:"";S.failed.length===0?J(`  \u0411\u0430\u0442\u0447 ${w.batchIndex}/${v}: ${w.files.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u2713${Q}`):S.uploaded.length>0?G(`  \u0411\u0430\u0442\u0447 ${w.batchIndex}/${v}: ${S.uploaded.length} \u2713 / ${S.failed.length} \u2717${Q}`):F(`  \u0411\u0430\u0442\u0447 ${w.batchIndex}/${v}: \u0432\u0441\u0435 ${w.files.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u2717${Q}`),y<T.length-1&&await ms(150)}let $s=Date.now()-ot;if(ns(v,v,P,M(x*1024),X.length===0),J(`\u0417\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043E: ${P} \u0444\u0430\u0439\u043B\u043E\u0432 \u0437\u0430 ${($s/1e3).toFixed(1)}\u0441 (${v} \u0431\u0430\u0442\u0447\u0435\u0439)`),X.length>0){G(`  ${X.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u043D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C:`);for(let y of X.slice(0,10))F(`    \u2717 ${y.path} (~${(xt(y)/1024).toFixed(1)} \u041A\u0411)`);X.length>10&&F(`    ... \u0438 \u0435\u0449\u0451 ${X.length-10}`)}!c.brainConfigLoaded&&P>0&&(Pn(c.path,{project_id:c.project,server:c.server,token:c.token,extensions:c.exts.join(","),ignore:c.ignore.join(","),batch_size:c.batchSize,interval_min:c.intervalMin}),J(".brain/config.json \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D (\u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0437\u0430\u043F\u0443\u0441\u043A \u0431\u0435\u0437 --server --token --project)"),Nn(c.path,c.server,c.token,c.project)),is({files:P,batches:v,originalKb:f,summaryKb:x,elapsedMs:Date.now()-i,errors:X.length+h});let Es=o.reduce((y,w)=>{try{return y+Zt(w).size}catch{return y}},0),Ss=p.reduce((y,w)=>y+w.l1Summary.length+w.l3Summary.length,0);os(Es,Ss,P);let ne={};for(let y of p){let w=ee(y.path).toLowerCase()||"(\u0431\u0435\u0437 \u0440\u0430\u0441\u0448.)";ne[w]=(ne[w]||0)+1}cs({byExt:ne,skipInfo:m,total:o.length+a,compressed:p.length,skippedByExt:r.skippedByExt});let O=new Map;for(let y of p)Ee.has(y.path)&&O.set(y.path,y.hash);let Is=c.intervalMin*60*1e3,bt=!1,Y=0,Se=5,Rs=async()=>{if(bt)return;bt=!0;let y=Date.now();try{if(!await e.healthCheck()){Y++;let k=Math.min(30,Math.pow(2,Y));G(`\u0421\u0435\u0440\u0432\u0435\u0440 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D (\u043F\u043E\u043F\u044B\u0442\u043A\u0430 ${Y}/${Se}), \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0430\u044F \u0447\u0435\u0440\u0435\u0437 ${k}\u0441`),Y>=Se&&F("\u0421\u0435\u0440\u0432\u0435\u0440 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u0434\u043B\u0438\u0442\u0435\u043B\u044C\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F. \u0412\u043E\u0442\u0447\u0435\u0440 \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0430\u0435\u0442 \u0440\u0430\u0431\u043E\u0442\u0430\u0442\u044C \u0432 offline-\u0440\u0435\u0436\u0438\u043C\u0435."),bt=!1;return}Y>0&&(J(`\u0421\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u0438\u0435 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u043F\u043E\u0441\u043B\u0435 ${Y} \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u044B\u0445 \u043F\u043E\u043F\u044B\u0442\u043E\u043A`),Y=0);let{files:R}=ps(c.path,c.ignore,c.exts),N=new Set,S=[],at=0,Q=0;for(let k of R){let $t=(()=>{try{return se(k,"utf-8")}catch{return null}})();if(!$t)continue;let Z=te(c.path,k).replace(/\\/g,"/");N.add(Z);let ct=ys("md5").update($t).digest("hex"),_e=O.get(Z);if(_e===ct)continue;let ve=be(k,c.path,u);ve&&(S.push(ve),_e===void 0?at++:Q++)}let et=[];for(let[k]of O)N.has(k)||et.push(k);for(let k of et)O.delete(k);let wt=0;if(S.length>0){let k=fs(S);for(let $t of k){let Z=await e.pushBatchAdaptive($t.files);wt+=Z.uploaded.length;for(let ct of Z.uploaded)O.set(ct.path,ct.hash);for(let ct of Z.failed)O.delete(ct.path);Z.failed.length>0&&F(`  Rescan: ${Z.failed.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u043D\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043E`),await ms(150)}}as({changed:Q,added:at,removed:et.length,unchanged:N.size-S.length,uploaded:wt,elapsedMs:Date.now()-y,nextInMin:c.intervalMin})}catch(w){Y++,F(`Rescan \u043E\u0448\u0438\u0431\u043A\u0430 (${Y}): ${String(w)}`)}finally{bt=!1}},Ie=setInterval(()=>void Rs(),Is);J(`Periodic rescan \u043A\u0430\u0436\u0434\u044B\u0435 ${c.intervalMin} \u043C\u0438\u043D (${O.size} \u0444\u0430\u0439\u043B\u043E\u0432 \u043E\u0442\u0441\u043B\u0435\u0436\u0438\u0432\u0430\u044E\u0442\u0441\u044F)`);let Re=setInterval(()=>{e.sendHeartbeat(O.size)},6e4);if(c.watch){ls(c.path);let y=Ke.watch(c.path,{ignored:R=>R.split(/[/\\]/).some(S=>c.ignore.includes(S)||S.startsWith(".")),ignoreInitial:!0,persistent:!0}),w=async(R,N)=>{if(!c.exts.includes(ee(R)))return;let S=be(R,c.path,u);if(!S)return;O.set(S.path,S.hash);let at=`${M(S.sizeBytes)} \u2192 ${M(S.l1Summary.length)} \u0441\u0443\u043C\u043C\u0430\u0440\u0438`;try{await e.pushBatch([S]),Qt(N,S.path,at)}catch(Q){Qt("error",S.path,String(Q))}};y.on("change",R=>void w(R,"modified")),y.on("add",R=>void w(R,"added")),y.on("unlink",R=>{let N=te(c.path,R).replace(/\\/g,"/");O.delete(N),Qt("deleted",N,"\u0443\u0434\u0430\u043B\u0451\u043D \u0438\u0437 \u0438\u043D\u0434\u0435\u043A\u0441\u0430")}),process.on("SIGINT",async()=>{console.log(""),G("\u041E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0430 \u0432\u043E\u0442\u0447\u0435\u0440\u0430..."),clearInterval(Ie),clearInterval(Re),await y.close(),process.exit(0)})}else es("\u0421\u043E\u0432\u0435\u0442: \u0434\u043E\u0431\u0430\u0432\u044C --watch \u0434\u043B\u044F \u043C\u0433\u043D\u043E\u0432\u0435\u043D\u043D\u043E\u0439 \u0440\u0435\u0430\u043A\u0446\u0438\u0438 \u043D\u0430 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0444\u0430\u0439\u043B\u043E\u0432"),tt("\u041F\u0440\u043E\u0446\u0435\u0441\u0441 \u043E\u0441\u0442\u0430\u0451\u0442\u0441\u044F \u0437\u0430\u043F\u0443\u0449\u0435\u043D\u043D\u044B\u043C \u0434\u043B\u044F periodic rescan. Ctrl+C \u0434\u043B\u044F \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0438."),process.on("SIGINT",()=>{console.log(""),G("\u041E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0430..."),clearInterval(Ie),clearInterval(Re),process.exit(0)})}Gn().catch(c=>{F(`\u041A\u0440\u0438\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043E\u0448\u0438\u0431\u043A\u0430: ${String(c)}`),process.exit(1)});
-/*! Bundled license information:
+// cli/watch.ts
+import { createHash as createHash2 } from "node:crypto";
+import { readFileSync as readFileSync2, writeFileSync, mkdirSync, statSync, readdirSync, existsSync } from "node:fs";
+import { join, relative, extname } from "node:path";
+import chokidar from "chokidar";
 
-chokidar/esm/index.js:
-  (*! chokidar - MIT License (c) 2012 Paul Miller (paulmillr.com) *)
-*/
+// src/ast-compressor/ast-compressor.ts
+import { readFileSync } from "node:fs";
+
+// src/ast-compressor/parsers/parser-registry.ts
+var ParserRegistry = class {
+  parsersByExtension = /* @__PURE__ */ new Map();
+  parsersByLanguage = /* @__PURE__ */ new Map();
+  /**
+   * Регистрирует парсер для его расширений
+   */
+  register(parser) {
+    this.parsersByLanguage.set(parser.language, parser);
+    for (const ext of parser.extensions) {
+      this.parsersByExtension.set(ext.toLowerCase(), parser);
+    }
+  }
+  /**
+   * Находит парсер по расширению файла
+   */
+  getByExtension(extension) {
+    return this.parsersByExtension.get(extension.toLowerCase()) ?? null;
+  }
+  /**
+   * Находит парсер по языку
+   */
+  getByLanguage(language) {
+    return this.parsersByLanguage.get(language) ?? null;
+  }
+  /**
+   * Находит парсер по пути к файлу (извлекает расширение)
+   */
+  getByFilePath(filePath) {
+    const dotIndex = filePath.lastIndexOf(".");
+    if (dotIndex === -1) {
+      return null;
+    }
+    const extension = filePath.slice(dotIndex).toLowerCase();
+    return this.getByExtension(extension);
+  }
+  /**
+   * Возвращает все зарегистрированные расширения
+   */
+  getSupportedExtensions() {
+    return [...this.parsersByExtension.keys()];
+  }
+  /**
+   * Проверяет, поддерживается ли файл
+   */
+  isSupported(filePath) {
+    return this.getByFilePath(filePath) !== null;
+  }
+};
+
+// src/ast-compressor/parsers/base-parser.ts
+import { createHash } from "node:crypto";
+var BaseParser = class {
+  logger;
+  constructor(logger) {
+    this.logger = logger;
+  }
+  /**
+   * Основной метод парсинга: код → результат
+   */
+  parse(code, filePath) {
+    const buildMetadata = (code2, symbols) => ({
+      path: filePath,
+      language: this.language,
+      hash: createHash("md5").update(code2).digest("hex"),
+      sizeBytes: Buffer.byteLength(code2, "utf-8"),
+      lineCount: code2.split("\n").length,
+      symbolCount: symbols.length,
+      lastModified: Date.now(),
+      isIndexed: false
+    });
+    try {
+      const symbols = this.extractSymbols(code, filePath);
+      return {
+        metadata: buildMetadata(code, symbols),
+        symbols,
+        imports: this.extractImports(code),
+        exports: symbols.filter((s) => s.isExported).map((s) => s.name),
+        errors: []
+      };
+    } catch (err) {
+      this.logger.warn(`Parse error in ${filePath}: ${err}`);
+      return {
+        metadata: buildMetadata(code, []),
+        symbols: [],
+        imports: [],
+        exports: [],
+        errors: [{ message: String(err) }]
+      };
+    }
+  }
+  /**
+   * Извлекает импорты (может быть переопределён)
+   */
+  extractImports(code) {
+    const imports = [];
+    const importRegex = /^[ \t]*import\s+(?:type\s+)?(?:\{[^}]*\}|[\w*]+(?:\s*,\s*\{[^}]*\})?)\s+from\s+['"]([^'"]+)['"]/gm;
+    let match;
+    while ((match = importRegex.exec(code)) !== null) {
+      imports.push(match[1]);
+    }
+    return imports;
+  }
+  /**
+   * Извлекает JSDoc-комментарии с их позициями
+   */
+  extractDocComments(code) {
+    const comments = /* @__PURE__ */ new Map();
+    const regex = /\/\*\*\s*([\s\S]*?)\s*\*\//g;
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const line = code.substring(0, match.index).split("\n").length;
+      comments.set(line, match[1].replace(/^\s*\*\s?/gm, "").trim());
+    }
+    return comments;
+  }
+  /**
+   * Вычисляет номер строки (0-based) по смещению символа в коде
+   */
+  getLineNumber(code, index) {
+    let line = 0;
+    for (let i = 0; i < index && i < code.length; i++) {
+      if (code[i] === "\n") {
+        line++;
+      }
+    }
+    return line;
+  }
+  /**
+   * Конструирует Range из номеров строк
+   */
+  buildRange(startLine, endLine) {
+    return {
+      start: { line: startLine, column: 0 },
+      end: { line: endLine, column: 0 }
+    };
+  }
+  /**
+   * Ищет закрывающую скобку `}`, корректно пропуская строки, шаблонные литералы и комментарии.
+   * Используется всеми brace-based парсерами (TS, C#, Go, Java, Rust).
+   */
+  findClosingBrace(lines, startLine) {
+    let depth = 0;
+    let foundOpening = false;
+    let inMultiLineComment = false;
+    let inString = null;
+    for (let i = startLine; i < lines.length; i++) {
+      const line = lines[i] ?? "";
+      for (let j = 0; j < line.length; j++) {
+        const ch = line[j];
+        const next = line[j + 1] ?? "";
+        if (inMultiLineComment) {
+          if (ch === "*" && next === "/") {
+            inMultiLineComment = false;
+            j++;
+          }
+          continue;
+        }
+        if (inString !== null) {
+          if (ch === "\\") {
+            j++;
+            continue;
+          }
+          if (ch === inString) {
+            inString = null;
+          }
+          continue;
+        }
+        if (ch === "/" && next === "/") {
+          break;
+        }
+        if (ch === "/" && next === "*") {
+          inMultiLineComment = true;
+          j++;
+          continue;
+        }
+        if (ch === "'" || ch === '"' || ch === "`") {
+          inString = ch;
+          continue;
+        }
+        if (ch === "{") {
+          depth++;
+          foundOpening = true;
+        } else if (ch === "}") {
+          depth--;
+        }
+        if (foundOpening && depth === 0) {
+          return i;
+        }
+      }
+    }
+    return Math.min(startLine + 50, lines.length - 1);
+  }
+};
+
+// src/ast-compressor/parsers/typescript-parser.ts
+var PATTERNS = {
+  // Функции: export async function name(params): ReturnType { 
+  FUNCTION: /^[ \t]*(export\s+)?(default\s+)?(async\s+)?function\s+(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)(?:\s*:\s*([^\s{]+(?:\s*\|\s*[^\s{]+)*))?\s*\{/gm,
+  // Стрелочные функции: export const name = (async) (params): ReturnType =>
+  // Также ловит: export const name = async (params) => и export const name = param =>
+  ARROW_FUNCTION: /^[ \t]*(export\s+)?(const|let)\s+(\w+)\s*(?::\s*[^=]+)?\s*=\s*(async\s+)?(?:\(([^)]*)\)|(\w+))(?:\s*:\s*([^\s=]+(?:\s*\|\s*[^\s=]+)*))?\s*=>/gm,
+  // Классы: export class Name extends Base implements I1, I2 {
+  CLASS: /^[ \t]*(export\s+)?(default\s+)?(abstract\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([\w\s,]+))?\s*\{/gm,
+  // Интерфейсы: export interface Name extends Base {
+  INTERFACE: /^[ \t]*(export\s+)?interface\s+(\w+)(?:\s+extends\s+([\w\s,]+))?\s*\{/gm,
+  // Типы: export type Name = ...
+  TYPE_ALIAS: /^[ \t]*(export\s+)?type\s+(\w+)(?:<[^>]*>)?\s*=\s*(.+)/gm,
+  // Переменные/константы: export const/let NAME = value
+  VARIABLE: /^[ \t]*(export\s+)?(const|let|var)\s+(\w+)(?:\s*:\s*([^=]+))?\s*=/gm,
+  // Методы класса: async methodName(params): ReturnType {
+  METHOD: /^[ \t]*(public|private|protected|static|abstract|async|readonly|\s)*(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)(?:\s*:\s*([^\s{]+(?:\s*\|\s*[^\s{]+)*))?\s*\{/gm,
+  // Импорты
+  IMPORT: /^[ \t]*import\s+(?:type\s+)?(?:\{[^}]*\}|[\w*]+(?:\s*,\s*\{[^}]*\})?)\s+from\s+['"]([^'"]+)['"]/gm,
+  // JSDoc комментарий перед символом
+  JSDOC: /\/\*\*\s*([\s\S]*?)\s*\*\//g
+};
+var TypeScriptParser = class extends BaseParser {
+  language = "typescript";
+  extensions = [".ts", ".tsx", ".js", ".jsx"];
+  constructor(logger) {
+    super(logger);
+  }
+  extractSymbols(code, filePath) {
+    const symbols = [];
+    const lines = code.split("\n");
+    const docComments = this.extractDocComments(code);
+    symbols.push(...this.extractFunctions(code, filePath, lines, docComments));
+    symbols.push(...this.extractArrowFunctions(code, filePath, lines, docComments));
+    symbols.push(...this.extractClasses(code, filePath, lines));
+    symbols.push(...this.extractInterfaces(code, filePath, lines));
+    symbols.push(...this.extractTypeAliases(code, filePath, lines));
+    symbols.push(...this.extractVariables(code, filePath, lines));
+    return symbols;
+  }
+  extractImports(code) {
+    const imports = [];
+    const regex = new RegExp(PATTERNS.IMPORT.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      if (match[1]) {
+        imports.push(match[1]);
+      }
+    }
+    return imports;
+  }
+  extractExports(_code, symbols) {
+    return symbols.filter((s) => s.isExported).map((s) => s.name);
+  }
+  // === ПРИВАТНЫЕ МЕТОДЫ ИЗВЛЕЧЕНИЯ ===
+  extractFunctions(code, filePath, lines, docComments) {
+    const results = [];
+    const regex = new RegExp(PATTERNS.FUNCTION.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[4] ?? "anonymous";
+      const isExported = Boolean(match[1]);
+      const isAsync = Boolean(match[3]);
+      const paramsStr = match[5] ?? "";
+      const returnType = match[6] ?? null;
+      const parameters = this.parseParameters(paramsStr);
+      const docComment = this.findDocComment(docComments, lineNum);
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const signature = this.buildFunctionSignature(isExported, isAsync, name, parameters, returnType);
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "function",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported,
+        parameters,
+        returnType,
+        isAsync,
+        isStatic: false,
+        docComment
+      });
+    }
+    return results;
+  }
+  extractArrowFunctions(code, filePath, _lines, docComments) {
+    const results = [];
+    const regex = new RegExp(PATTERNS.ARROW_FUNCTION.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[3] ?? "anonymous";
+      const isExported = Boolean(match[1]);
+      const isAsync = Boolean(match[4]);
+      const paramsStr = match[5] ?? match[6] ?? "";
+      const returnType = match[7] ?? null;
+      const parameters = this.parseParameters(paramsStr);
+      const docComment = this.findDocComment(docComments, lineNum);
+      const signature = this.buildFunctionSignature(isExported, isAsync, name, parameters, returnType);
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "function",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature,
+        isExported,
+        parameters,
+        returnType,
+        isAsync,
+        isStatic: false,
+        docComment
+      });
+    }
+    return results;
+  }
+  extractClasses(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS.CLASS.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[4] ?? "AnonymousClass";
+      const isExported = Boolean(match[1]);
+      const isAbstract = Boolean(match[3]);
+      const extendsClass = match[5] ?? null;
+      const implementsList = match[6] ? match[6].split(",").map((s) => s.trim()).filter(Boolean) : [];
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const classBody = lines.slice(lineNum, endLine + 1).join("\n");
+      const members = this.extractClassMethods(classBody, filePath, lineNum);
+      const signature = this.buildClassSignature(isExported, isAbstract, name, extendsClass, implementsList);
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "class",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported,
+        extends: extendsClass,
+        implements: implementsList,
+        members,
+        isAbstract
+      });
+    }
+    return results;
+  }
+  extractInterfaces(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS.INTERFACE.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[2] ?? "AnonymousInterface";
+      const isExported = Boolean(match[1]);
+      const extendsStr = match[3] ?? "";
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const signature = isExported ? `export interface ${name}${extendsStr ? ` extends ${extendsStr.trim()}` : ""}` : `interface ${name}${extendsStr ? ` extends ${extendsStr.trim()}` : ""}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "interface",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported
+      });
+    }
+    return results;
+  }
+  extractTypeAliases(code, filePath, _lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS.TYPE_ALIAS.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[2] ?? "AnonymousType";
+      const isExported = Boolean(match[1]);
+      const value = (match[3] ?? "").trim().slice(0, 100);
+      const signature = isExported ? `export type ${name} = ${value}` : `type ${name} = ${value}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "type",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature,
+        isExported
+      });
+    }
+    return results;
+  }
+  extractVariables(code, filePath, _lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS.VARIABLE.source, "gm");
+    let match;
+    const arrowFnNames = /* @__PURE__ */ new Set();
+    const arrowRegex = new RegExp(PATTERNS.ARROW_FUNCTION.source, "gm");
+    let arrowMatch;
+    while ((arrowMatch = arrowRegex.exec(code)) !== null) {
+      if (arrowMatch[3]) {
+        arrowFnNames.add(arrowMatch[3]);
+      }
+    }
+    while ((match = regex.exec(code)) !== null) {
+      const name = match[3] ?? "anonymous";
+      if (arrowFnNames.has(name)) {
+        continue;
+      }
+      const lineNum = this.getLineNumber(code, match.index);
+      const isExported = Boolean(match[1]);
+      const kind = match[2] ?? "const";
+      const dataType = match[4]?.trim() ?? null;
+      const isConst = kind === "const";
+      const signature = `${isExported ? "export " : ""}${kind} ${name}${dataType ? `: ${dataType}` : ""}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: isConst ? "constant" : "variable",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature,
+        isExported,
+        dataType,
+        isConst
+      });
+    }
+    return results;
+  }
+  // === УТИЛИТАРНЫЕ МЕТОДЫ ===
+  extractClassMethods(classBody, filePath, classStartLine) {
+    const methods = [];
+    const regex = new RegExp(PATTERNS.METHOD.source, "gm");
+    let match;
+    while ((match = regex.exec(classBody)) !== null) {
+      const modifiers = (match[1] ?? "").trim();
+      const name = match[2];
+      if (!name || name === "constructor" || name === "class" || name === "if" || name === "for" || name === "while") {
+        continue;
+      }
+      const lineNum = classStartLine + this.getLineNumber(classBody, match.index);
+      const paramsStr = match[3] ?? "";
+      const returnType = match[4] ?? null;
+      const signature = `${modifiers ? modifiers + " " : ""}${name}(${paramsStr})${returnType ? `: ${returnType}` : ""}`;
+      methods.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "method",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature,
+        isExported: false
+      });
+    }
+    return methods;
+  }
+  parseParameters(paramsStr) {
+    if (!paramsStr.trim()) {
+      return [];
+    }
+    return paramsStr.split(",").map((param) => {
+      const trimmed = param.trim();
+      const isOptional = trimmed.includes("?");
+      const hasDefault = trimmed.includes("=");
+      const parts = trimmed.split(/[?:=]/).map((p) => p.trim()).filter(Boolean);
+      const name = parts[0] ?? "param";
+      const type = parts[1] ?? null;
+      const defaultValue = hasDefault ? parts[2] ?? null : null;
+      return { name, type, isOptional: isOptional || hasDefault, defaultValue };
+    });
+  }
+  extractDocComments(code) {
+    const comments = /* @__PURE__ */ new Map();
+    const regex = new RegExp(PATTERNS.JSDOC.source, "g");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const endLine = this.getLineNumber(code, match.index + match[0].length);
+      const content = (match[1] ?? "").split("\n").map((line) => line.replace(/^\s*\*\s?/, "").trim()).filter(Boolean).join(" ");
+      comments.set(endLine + 1, content);
+    }
+    return comments;
+  }
+  findDocComment(docComments, symbolLine) {
+    return docComments.get(symbolLine) ?? docComments.get(symbolLine - 1) ?? null;
+  }
+  buildFunctionSignature(isExported, isAsync, name, parameters, returnType) {
+    const parts = [];
+    if (isExported)
+      parts.push("export");
+    if (isAsync)
+      parts.push("async");
+    parts.push("function");
+    parts.push(name);
+    const paramsStr = parameters.map((p) => `${p.name}${p.isOptional ? "?" : ""}${p.type ? `: ${p.type}` : ""}`).join(", ");
+    return `${parts.join(" ")}(${paramsStr})${returnType ? `: ${returnType}` : ""}`;
+  }
+  buildClassSignature(isExported, isAbstract, name, extendsClass, implementsList) {
+    const parts = [];
+    if (isExported)
+      parts.push("export");
+    if (isAbstract)
+      parts.push("abstract");
+    parts.push("class");
+    parts.push(name);
+    if (extendsClass)
+      parts.push(`extends ${extendsClass}`);
+    if (implementsList.length > 0)
+      parts.push(`implements ${implementsList.join(", ")}`);
+    return parts.join(" ");
+  }
+};
+
+// src/ast-compressor/parsers/markdown-parser.ts
+var MarkdownParser = class extends BaseParser {
+  language = "markdown";
+  extensions = [".md", ".mdx"];
+  constructor(logger) {
+    super(logger);
+  }
+  extractSymbols(code, filePath) {
+    const lines = code.split("\n");
+    const headings = this.extractHeadings(lines);
+    const symbols = [];
+    for (const heading of headings) {
+      symbols.push(this.headingToSymbol(heading, filePath));
+    }
+    const codeBlocks = this.extractCodeBlocks(lines, filePath);
+    symbols.push(...codeBlocks);
+    const topLevelLists = this.extractTopLevelLists(lines, headings, filePath);
+    symbols.push(...topLevelLists);
+    return symbols;
+  }
+  extractImports(_code) {
+    return [];
+  }
+  extractHeadings(lines) {
+    const headings = [];
+    const headingRegex = /^(#{1,6})\s+(.+)$/;
+    for (let i = 0; i < lines.length; i++) {
+      const match = headingRegex.exec(lines[i]);
+      if (!match) continue;
+      const level = match[1].length;
+      const text = match[2].trim();
+      if (headings.length > 0) {
+        const prev = headings[headings.length - 1];
+        this.fillHeadingContent(lines, prev, i);
+      }
+      headings.push({
+        level,
+        text,
+        line: i,
+        endLine: i,
+        children: [],
+        codeBlocks: [],
+        listItems: [],
+        contentPreview: ""
+      });
+    }
+    if (headings.length > 0) {
+      const last = headings[headings.length - 1];
+      this.fillHeadingContent(lines, last, lines.length);
+    }
+    return headings;
+  }
+  fillHeadingContent(lines, heading, nextHeadingLine) {
+    const contentLines = [];
+    let inCodeBlock = false;
+    for (let i = heading.line + 1; i < nextHeadingLine; i++) {
+      const line = lines[i];
+      if (line.startsWith("```")) {
+        inCodeBlock = !inCodeBlock;
+        if (!inCodeBlock && heading.codeBlocks.length < 3) {
+          heading.codeBlocks.push(line);
+        }
+        continue;
+      }
+      if (inCodeBlock) continue;
+      if (/^[-*+]\s/.test(line.trim())) {
+        const item = line.trim().replace(/^[-*+]\s+/, "");
+        if (heading.listItems.length < 10) {
+          heading.listItems.push(item);
+        }
+      }
+      if (line.trim().length > 0 && !line.startsWith("#")) {
+        contentLines.push(line.trim());
+      }
+    }
+    heading.endLine = nextHeadingLine - 1;
+    heading.contentPreview = contentLines.slice(0, 3).join(" ").slice(0, 200);
+  }
+  headingToSymbol(heading, filePath) {
+    const symbolType = this.headingLevelToType(heading.level);
+    const signature = this.buildHeadingSignature(heading);
+    const base = {
+      id: `${filePath}:${heading.text}:${heading.line}`,
+      name: heading.text,
+      type: symbolType,
+      filePath,
+      range: {
+        start: { line: heading.line, column: 0 },
+        end: { line: heading.endLine, column: 0 }
+      },
+      signature,
+      isExported: heading.level <= 2
+    };
+    if (symbolType === "class" || symbolType === "interface") {
+      return { ...base, members: [], extends: null, implements: [] };
+    }
+    return base;
+  }
+  headingLevelToType(level) {
+    switch (level) {
+      case 1:
+        return "class";
+      case 2:
+        return "interface";
+      case 3:
+        return "function";
+      default:
+        return "method";
+    }
+  }
+  buildHeadingSignature(heading) {
+    const prefix = "#".repeat(heading.level);
+    const parts = [`${prefix} ${heading.text}`];
+    if (heading.contentPreview) {
+      parts.push(`// ${heading.contentPreview}`);
+    }
+    if (heading.listItems.length > 0) {
+      const shown = heading.listItems.slice(0, 5);
+      for (const item of shown) {
+        parts.push(`  - ${item}`);
+      }
+      if (heading.listItems.length > 5) {
+        parts.push(`  ... +${heading.listItems.length - 5} items`);
+      }
+    }
+    return parts.join("\n");
+  }
+  extractCodeBlocks(lines, filePath) {
+    const blocks = [];
+    let inBlock = false;
+    let blockStart = 0;
+    let blockLang = "";
+    let blockContent = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.startsWith("```") && !inBlock) {
+        inBlock = true;
+        blockStart = i;
+        blockLang = line.slice(3).trim();
+        blockContent = [];
+        continue;
+      }
+      if (line.startsWith("```") && inBlock) {
+        inBlock = false;
+        if (blockContent.length > 0 && blockContent.length <= 50) {
+          const name = blockLang ? `code:${blockLang}:L${blockStart + 1}` : `code:L${blockStart + 1}`;
+          const preview = blockContent.slice(0, 5).join("\n");
+          blocks.push({
+            id: `${filePath}:${name}:${blockStart}`,
+            name,
+            type: "constant",
+            filePath,
+            range: {
+              start: { line: blockStart, column: 0 },
+              end: { line: i, column: 0 }
+            },
+            signature: `\`\`\`${blockLang}
+${preview}${blockContent.length > 5 ? "\n..." : ""}
+\`\`\``,
+            isExported: false
+          });
+        }
+        continue;
+      }
+      if (inBlock) {
+        blockContent.push(line);
+      }
+    }
+    return blocks;
+  }
+  extractTopLevelLists(lines, headings, filePath) {
+    if (headings.length === 0) return [];
+    const symbols = [];
+    const firstHeadingLine = headings[0].line;
+    const preambleItems = [];
+    for (let i = 0; i < firstHeadingLine; i++) {
+      const trimmed = lines[i].trim();
+      if (/^[-*+]\s/.test(trimmed)) {
+        preambleItems.push(trimmed.replace(/^[-*+]\s+/, ""));
+      }
+    }
+    if (preambleItems.length > 0) {
+      symbols.push({
+        id: `${filePath}:preamble-list:0`,
+        name: "preamble",
+        type: "property",
+        filePath,
+        range: {
+          start: { line: 0, column: 0 },
+          end: { line: firstHeadingLine - 1, column: 0 }
+        },
+        signature: preambleItems.map((item) => `- ${item}`).join("\n"),
+        isExported: false
+      });
+    }
+    return symbols;
+  }
+};
+
+// src/ast-compressor/parsers/python-parser.ts
+var PATTERNS2 = {
+  FUNCTION: /^([ \t]*)(async\s+)?def\s+(\w+)\s*\(([^)]*)\)(?:\s*->\s*([^\s:]+(?:\[[^\]]*\])?))?:\s*$/gm,
+  CLASS: /^([ \t]*)class\s+(\w+)(?:\(([^)]*)\))?:\s*$/gm,
+  IMPORT_FROM: /^[ \t]*from\s+([\w.]+)\s+import\s+(.+)$/gm,
+  IMPORT: /^[ \t]*import\s+([\w.]+(?:\s*,\s*[\w.]+)*)$/gm,
+  VARIABLE: /^([ \t]*)(\w+)\s*(?::\s*([^=\n]+))?\s*=\s*(.+)$/gm,
+  DECORATOR: /^[ \t]*@(\w+(?:\.\w+)*(?:\([^)]*\))?)\s*$/gm,
+  DOCSTRING: /^[ \t]*(?:"""([\s\S]*?)"""|'''([\s\S]*?)''')/
+};
+var PythonParser = class extends BaseParser {
+  language = "python";
+  extensions = [".py"];
+  constructor(logger) {
+    super(logger);
+  }
+  extractSymbols(code, filePath) {
+    const lines = code.split("\n");
+    const symbols = [];
+    symbols.push(...this.extractClasses(code, filePath, lines));
+    symbols.push(...this.extractFunctions(code, filePath, lines));
+    symbols.push(...this.extractModuleVariables(code, filePath, lines));
+    return symbols;
+  }
+  extractImports(code) {
+    const imports = [];
+    const fromRegex = new RegExp(PATTERNS2.IMPORT_FROM.source, "gm");
+    let match;
+    while ((match = fromRegex.exec(code)) !== null) {
+      imports.push(match[1]);
+    }
+    const importRegex = new RegExp(PATTERNS2.IMPORT.source, "gm");
+    while ((match = importRegex.exec(code)) !== null) {
+      const modules = match[1].split(",").map((m) => m.trim()).filter(Boolean);
+      imports.push(...modules);
+    }
+    return imports;
+  }
+  extractFunctions(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS2.FUNCTION.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const indent = match[1];
+      if (indent.length > 0) continue;
+      const lineNum = this.getLineNumber(code, match.index);
+      const isAsync = Boolean(match[2]);
+      const name = match[3] ?? "anonymous";
+      const paramsStr = match[4] ?? "";
+      const returnType = match[5] ?? null;
+      const endLine = this.findBlockEndByIndent(lines, lineNum);
+      const isExported = !name.startsWith("_");
+      const parameters = this.parseParameters(paramsStr);
+      const docComment = this.extractDocstring(lines, lineNum + 1);
+      const signature = this.buildPythonFunctionSignature(isAsync, name, parameters, returnType);
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "function",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported,
+        parameters,
+        returnType,
+        isAsync,
+        isStatic: false,
+        docComment
+      });
+    }
+    return results;
+  }
+  extractClasses(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS2.CLASS.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const indent = match[1];
+      if (indent.length > 0) continue;
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[2] ?? "AnonymousClass";
+      const basesStr = match[3] ?? "";
+      const endLine = this.findBlockEndByIndent(lines, lineNum);
+      const isExported = !name.startsWith("_");
+      const bases = basesStr ? basesStr.split(",").map((b) => b.trim()).filter(Boolean) : [];
+      const extendsClass = bases[0] ?? null;
+      const classBody = lines.slice(lineNum + 1, endLine + 1).join("\n");
+      const members = this.extractClassMethods(classBody, filePath, lineNum + 1);
+      const signature = `class ${name}${bases.length > 0 ? `(${bases.join(", ")})` : ""}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "class",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported,
+        extends: extendsClass,
+        implements: [],
+        members
+      });
+    }
+    return results;
+  }
+  extractClassMethods(classBody, filePath, classStartLine) {
+    const methods = [];
+    const regex = new RegExp(PATTERNS2.FUNCTION.source, "gm");
+    let match;
+    while ((match = regex.exec(classBody)) !== null) {
+      const name = match[3];
+      if (!name) continue;
+      const isAsync = Boolean(match[2]);
+      const paramsStr = match[4] ?? "";
+      const returnType = match[5] ?? null;
+      const lineNum = classStartLine + this.getLineNumber(classBody, match.index);
+      const parameters = this.parseParameters(paramsStr).filter((p) => p.name !== "self" && p.name !== "cls");
+      const isStatic = name === "__init__" ? false : paramsStr.trim().startsWith("cls");
+      const signature = `${isAsync ? "async " : ""}def ${name}(${parameters.map((p) => p.name + (p.type ? `: ${p.type}` : "")).join(", ")})${returnType ? ` -> ${returnType}` : ""}`;
+      methods.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "method",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature,
+        isExported: !name.startsWith("_") || name.startsWith("__") && name.endsWith("__"),
+        isAsync,
+        isStatic
+      });
+    }
+    return methods;
+  }
+  extractModuleVariables(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS2.VARIABLE.source, "gm");
+    let match;
+    const functionAndClassLines = /* @__PURE__ */ new Set();
+    const fnRegex = new RegExp(PATTERNS2.FUNCTION.source, "gm");
+    while ((match = fnRegex.exec(code)) !== null) {
+      functionAndClassLines.add(this.getLineNumber(code, match.index));
+    }
+    const clsRegex = new RegExp(PATTERNS2.CLASS.source, "gm");
+    while ((match = clsRegex.exec(code)) !== null) {
+      functionAndClassLines.add(this.getLineNumber(code, match.index));
+    }
+    const varRegex = new RegExp(PATTERNS2.VARIABLE.source, "gm");
+    while ((match = varRegex.exec(varRegex.source === code ? code : code)) !== null) {
+      break;
+    }
+    const varRegex2 = new RegExp(PATTERNS2.VARIABLE.source, "gm");
+    while ((match = varRegex2.exec(code)) !== null) {
+      const indent = match[1];
+      if (indent.length > 0) continue;
+      const lineNum = this.getLineNumber(code, match.index);
+      if (functionAndClassLines.has(lineNum)) continue;
+      const name = match[2];
+      if (!name || name === "self" || name === "cls") continue;
+      if (/^(import|from|def|class|return|if|else|elif|for|while|try|except|finally|with|raise|assert|yield|pass|break|continue)$/.test(name)) continue;
+      const dataType = match[3]?.trim() ?? null;
+      const isConst = name === name.toUpperCase() && name.length > 1;
+      const isExported = !name.startsWith("_");
+      const signature = `${name}${dataType ? `: ${dataType}` : ""}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: isConst ? "constant" : "variable",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature,
+        isExported,
+        dataType,
+        isConst
+      });
+    }
+    return results;
+  }
+  /**
+   * Определяет конец блока по отступам (Python-specific).
+   * Блок заканчивается когда встречается непустая строка с indent <= indent стартовой строки.
+   */
+  findBlockEndByIndent(lines, startLine) {
+    const startIndent = this.getIndentLevel(lines[startLine] ?? "");
+    let lastContentLine = startLine;
+    for (let i = startLine + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line || line.trim().length === 0) continue;
+      const currentIndent = this.getIndentLevel(line);
+      if (currentIndent <= startIndent) {
+        return lastContentLine;
+      }
+      lastContentLine = i;
+    }
+    return lastContentLine;
+  }
+  getIndentLevel(line) {
+    let indent = 0;
+    for (const ch of line) {
+      if (ch === " ") indent++;
+      else if (ch === "	") indent += 4;
+      else break;
+    }
+    return indent;
+  }
+  parseParameters(paramsStr) {
+    if (!paramsStr.trim()) return [];
+    return paramsStr.split(",").map((param) => {
+      const trimmed = param.trim();
+      if (!trimmed || trimmed === "self" || trimmed === "cls" || trimmed.startsWith("*") || trimmed.startsWith("/")) {
+        return { name: trimmed || "param", type: null, isOptional: false, defaultValue: null };
+      }
+      const hasDefault = trimmed.includes("=");
+      const parts = trimmed.split("=");
+      const nameType = (parts[0] ?? "").trim();
+      const defaultValue = hasDefault ? (parts[1] ?? "").trim() : null;
+      const colonIdx = nameType.indexOf(":");
+      const name = colonIdx >= 0 ? nameType.slice(0, colonIdx).trim() : nameType;
+      const type = colonIdx >= 0 ? nameType.slice(colonIdx + 1).trim() : null;
+      return { name, type, isOptional: hasDefault, defaultValue };
+    }).filter((p) => p.name !== "self" && p.name !== "cls" && !p.name.startsWith("*") && p.name !== "/");
+  }
+  extractDocstring(lines, startLine) {
+    if (startLine >= lines.length) return null;
+    const line = (lines[startLine] ?? "").trim();
+    const tripleQuote = line.startsWith('"""') ? '"""' : line.startsWith("'''") ? "'''" : null;
+    if (!tripleQuote) return null;
+    if (line.endsWith(tripleQuote) && line.length > 6) {
+      return line.slice(3, -3).trim();
+    }
+    const docLines = [line.slice(3)];
+    for (let i = startLine + 1; i < lines.length && i < startLine + 20; i++) {
+      const l = (lines[i] ?? "").trim();
+      if (l.includes(tripleQuote)) {
+        docLines.push(l.replace(tripleQuote, ""));
+        break;
+      }
+      docLines.push(l);
+    }
+    return docLines.join(" ").trim() || null;
+  }
+  buildPythonFunctionSignature(isAsync, name, parameters, returnType) {
+    const paramsStr = parameters.map((p) => `${p.name}${p.type ? `: ${p.type}` : ""}`).join(", ");
+    return `${isAsync ? "async " : ""}def ${name}(${paramsStr})${returnType ? ` -> ${returnType}` : ""}`;
+  }
+};
+
+// src/ast-compressor/parsers/csharp-parser.ts
+var ACCESS = "(?:public|private|protected|internal|static|abstract|sealed|partial|virtual|override|readonly|async|new|extern|volatile|unsafe)";
+var ACCESS_GROUP = `((?:${ACCESS}\\s+)*)`;
+var PATTERNS3 = {
+  CLASS: new RegExp(`^[ \\t]*${ACCESS_GROUP}(?:class|struct|record)\\s+(\\w+)(?:<[^>]*>)?(?:\\s*:\\s*([^{]+))?\\s*\\{`, "gm"),
+  INTERFACE: new RegExp(`^[ \\t]*${ACCESS_GROUP}interface\\s+(\\w+)(?:<[^>]*>)?(?:\\s*:\\s*([^{]+))?\\s*\\{`, "gm"),
+  ENUM: new RegExp(`^[ \\t]*${ACCESS_GROUP}enum\\s+(\\w+)(?:\\s*:\\s*(\\w+))?\\s*\\{`, "gm"),
+  METHOD: new RegExp(`^[ \\t]*${ACCESS_GROUP}([\\w<>\\[\\],\\s?]+?)\\s+(\\w+)\\s*(?:<[^>]*>)?\\s*\\(([^)]*)\\)\\s*(?:where[^{]*)?\\{`, "gm"),
+  PROPERTY: new RegExp(`^[ \\t]*${ACCESS_GROUP}([\\w<>\\[\\],\\s?]+?)\\s+(\\w+)\\s*\\{\\s*(?:get|set|init)`, "gm"),
+  NAMESPACE: /^[ \t]*namespace\s+([\w.]+)\s*[{;]/gm,
+  USING: /^[ \t]*using\s+(?:static\s+)?(?:[\w.]+=\s*)?([\w.]+)\s*;/gm,
+  DOC_COMMENT: /\/\/\/\s*(?:<summary>)?\s*(.*?)(?:<\/summary>)?$/
+};
+var CSharpParser = class extends BaseParser {
+  language = "csharp";
+  extensions = [".cs"];
+  constructor(logger) {
+    super(logger);
+  }
+  extractSymbols(code, filePath) {
+    const lines = code.split("\n");
+    const symbols = [];
+    symbols.push(...this.extractClasses(code, filePath, lines));
+    symbols.push(...this.extractInterfaces(code, filePath, lines));
+    symbols.push(...this.extractEnums(code, filePath, lines));
+    symbols.push(...this.extractTopLevelMethods(code, filePath, lines));
+    return symbols;
+  }
+  extractImports(code) {
+    const imports = [];
+    const regex = new RegExp(PATTERNS3.USING.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      imports.push(match[1]);
+    }
+    return imports;
+  }
+  extractClasses(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS3.CLASS.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const modifiers = (match[1] ?? "").trim();
+      const name = match[2] ?? "AnonymousClass";
+      const basesStr = match[3] ?? "";
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const isExported = this.isPublic(modifiers);
+      const isAbstract = modifiers.includes("abstract");
+      const bases = basesStr ? basesStr.split(",").map((b) => b.trim()).filter(Boolean) : [];
+      const extendsClass = bases.find((b) => !b.startsWith("I") || b.length <= 1) ?? null;
+      const implementsList = bases.filter((b) => b.startsWith("I") && b.length > 1);
+      const classBody = lines.slice(lineNum + 1, endLine).join("\n");
+      const members = this.extractMembers(classBody, filePath, lineNum + 1);
+      const keyword = modifiers.includes("struct") ? "struct" : modifiers.includes("record") ? "record" : "class";
+      const signature = `${modifiers ? modifiers + " " : ""}${keyword} ${name}${bases.length > 0 ? ` : ${bases.join(", ")}` : ""}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "class",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported,
+        extends: extendsClass,
+        implements: implementsList,
+        members,
+        isAbstract
+      });
+    }
+    return results;
+  }
+  extractInterfaces(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS3.INTERFACE.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const modifiers = (match[1] ?? "").trim();
+      const name = match[2] ?? "IAnonymous";
+      const basesStr = match[3] ?? "";
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const isExported = this.isPublic(modifiers);
+      const bases = basesStr ? basesStr.split(",").map((b) => b.trim()).filter(Boolean) : [];
+      const signature = `${modifiers ? modifiers + " " : ""}interface ${name}${bases.length > 0 ? ` : ${bases.join(", ")}` : ""}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "interface",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported,
+        extends: bases[0] ?? null,
+        implements: [],
+        members: []
+      });
+    }
+    return results;
+  }
+  extractEnums(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS3.ENUM.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const modifiers = (match[1] ?? "").trim();
+      const name = match[2] ?? "AnonymousEnum";
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const isExported = this.isPublic(modifiers);
+      const signature = `${modifiers ? modifiers + " " : ""}enum ${name}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "type",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported
+      });
+    }
+    return results;
+  }
+  extractTopLevelMethods(code, filePath, lines) {
+    return [];
+  }
+  extractMembers(classBody, filePath, classStartLine) {
+    const members = [];
+    const methodRegex = new RegExp(PATTERNS3.METHOD.source, "gm");
+    let match;
+    while ((match = methodRegex.exec(classBody)) !== null) {
+      const modifiers = (match[1] ?? "").trim();
+      const returnType = (match[2] ?? "").trim();
+      const name = match[3];
+      if (!name || /^(if|for|while|switch|using|lock|catch|foreach)$/.test(name)) continue;
+      const paramsStr = match[4] ?? "";
+      const lineNum = classStartLine + this.getLineNumber(classBody, match.index);
+      const isStatic = modifiers.includes("static");
+      const isAsync = modifiers.includes("async");
+      const signature = `${modifiers ? modifiers + " " : ""}${returnType} ${name}(${paramsStr})`;
+      members.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "method",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature,
+        isExported: this.isPublic(modifiers),
+        isStatic,
+        isAsync
+      });
+    }
+    const propRegex = new RegExp(PATTERNS3.PROPERTY.source, "gm");
+    while ((match = propRegex.exec(classBody)) !== null) {
+      const modifiers = (match[1] ?? "").trim();
+      const dataType = (match[2] ?? "").trim();
+      const name = match[3];
+      if (!name) continue;
+      const lineNum = classStartLine + this.getLineNumber(classBody, match.index);
+      const signature = `${modifiers ? modifiers + " " : ""}${dataType} ${name} { get; set; }`;
+      members.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "property",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature,
+        isExported: this.isPublic(modifiers)
+      });
+    }
+    return members;
+  }
+  extractTripleSlashDoc(lines, symbolLine) {
+    const docLines = [];
+    for (let i = symbolLine - 1; i >= 0 && i >= symbolLine - 10; i--) {
+      const line = (lines[i] ?? "").trim();
+      const docMatch = PATTERNS3.DOC_COMMENT.exec(line);
+      if (docMatch) {
+        docLines.unshift(docMatch[1].trim());
+      } else {
+        break;
+      }
+    }
+    return docLines.length > 0 ? docLines.join(" ") : null;
+  }
+  isPublic(modifiers) {
+    if (modifiers.includes("public") || modifiers.includes("internal")) return true;
+    if (modifiers.includes("private") || modifiers.includes("protected")) return false;
+    return false;
+  }
+};
+
+// src/ast-compressor/parsers/go-parser.ts
+var PATTERNS4 = {
+  FUNCTION: /^func\s+(\w+)\s*(?:\[[^\]]*\])?\s*\(([^)]*)\)\s*(?:\(([^)]+)\)|(\S+))?\s*\{/gm,
+  METHOD: /^func\s+\((\w+)\s+([*]?\w+(?:\[[^\]]*\])?)\)\s+(\w+)\s*\(([^)]*)\)\s*(?:\(([^)]+)\)|(\S+))?\s*\{/gm,
+  STRUCT: /^type\s+(\w+)\s+struct\s*\{/gm,
+  INTERFACE: /^type\s+(\w+)\s+interface\s*\{/gm,
+  TYPE_ALIAS: /^type\s+(\w+)\s+(?!struct|interface)(\S+.*)/gm,
+  CONST_BLOCK: /^const\s*\(/gm,
+  CONST_SINGLE: /^const\s+(\w+)\s*(?:(\S+)\s*)?=\s*(.+)/gm,
+  VAR_SINGLE: /^var\s+(\w+)\s+(\S+)/gm,
+  IMPORT_SINGLE: /^import\s+"([^"]+)"/gm,
+  IMPORT_BLOCK: /^import\s*\(([\s\S]*?)\)/gm
+};
+var GoParser = class extends BaseParser {
+  language = "go";
+  extensions = [".go"];
+  constructor(logger) {
+    super(logger);
+  }
+  extractSymbols(code, filePath) {
+    const lines = code.split("\n");
+    const symbols = [];
+    symbols.push(...this.extractFunctions(code, filePath, lines));
+    symbols.push(...this.extractMethods(code, filePath, lines));
+    symbols.push(...this.extractStructs(code, filePath, lines));
+    symbols.push(...this.extractInterfaces(code, filePath, lines));
+    symbols.push(...this.extractTypeAliases(code, filePath));
+    symbols.push(...this.extractConstants(code, filePath));
+    symbols.push(...this.extractVariables(code, filePath));
+    return symbols;
+  }
+  extractImports(code) {
+    const imports = [];
+    const singleRegex = new RegExp(PATTERNS4.IMPORT_SINGLE.source, "gm");
+    let match;
+    while ((match = singleRegex.exec(code)) !== null) {
+      imports.push(match[1]);
+    }
+    const blockRegex = new RegExp(PATTERNS4.IMPORT_BLOCK.source, "gm");
+    while ((match = blockRegex.exec(code)) !== null) {
+      const block = match[1];
+      const lineRegex = /["']([^"']+)["']/g;
+      let lineMatch;
+      while ((lineMatch = lineRegex.exec(block)) !== null) {
+        imports.push(lineMatch[1]);
+      }
+    }
+    return imports;
+  }
+  extractFunctions(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS4.FUNCTION.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[1] ?? "anonymous";
+      const paramsStr = match[2] ?? "";
+      const returnType = match[3] ?? match[4] ?? null;
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const isExported = this.isGoExported(name);
+      const parameters = this.parseGoParams(paramsStr);
+      const docComment = this.extractGoDoc(lines, lineNum);
+      const signature = `func ${name}(${paramsStr.trim()})${returnType ? ` ${returnType}` : ""}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "function",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported,
+        parameters,
+        returnType,
+        isAsync: false,
+        isStatic: false,
+        docComment
+      });
+    }
+    return results;
+  }
+  extractMethods(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS4.METHOD.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const receiverName = match[1] ?? "r";
+      const receiverType = match[2] ?? "";
+      const name = match[3] ?? "anonymous";
+      const paramsStr = match[4] ?? "";
+      const returnType = match[5] ?? match[6] ?? null;
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const isExported = this.isGoExported(name);
+      const parameters = this.parseGoParams(paramsStr);
+      const signature = `func (${receiverName} ${receiverType}) ${name}(${paramsStr.trim()})${returnType ? ` ${returnType}` : ""}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "method",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported,
+        parameters,
+        returnType,
+        isAsync: false,
+        isStatic: false
+      });
+    }
+    return results;
+  }
+  extractStructs(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS4.STRUCT.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[1] ?? "AnonymousStruct";
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const isExported = this.isGoExported(name);
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "class",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature: `type ${name} struct`,
+        isExported,
+        extends: null,
+        implements: [],
+        members: []
+      });
+    }
+    return results;
+  }
+  extractInterfaces(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS4.INTERFACE.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[1] ?? "AnonymousInterface";
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const isExported = this.isGoExported(name);
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "interface",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature: `type ${name} interface`,
+        isExported,
+        extends: null,
+        implements: [],
+        members: []
+      });
+    }
+    return results;
+  }
+  extractTypeAliases(code, filePath) {
+    const results = [];
+    const regex = new RegExp(PATTERNS4.TYPE_ALIAS.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[1] ?? "AnonymousType";
+      const value = (match[2] ?? "").trim().slice(0, 100);
+      const isExported = this.isGoExported(name);
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "type",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature: `type ${name} ${value}`,
+        isExported
+      });
+    }
+    return results;
+  }
+  extractConstants(code, filePath) {
+    const results = [];
+    const regex = new RegExp(PATTERNS4.CONST_SINGLE.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[1] ?? "anonymous";
+      const dataType = match[2]?.trim() ?? null;
+      const isExported = this.isGoExported(name);
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "constant",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature: `const ${name}${dataType ? ` ${dataType}` : ""}`,
+        isExported,
+        dataType,
+        isConst: true
+      });
+    }
+    return results;
+  }
+  extractVariables(code, filePath) {
+    const results = [];
+    const regex = new RegExp(PATTERNS4.VAR_SINGLE.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const name = match[1] ?? "anonymous";
+      const dataType = match[2]?.trim() ?? null;
+      const isExported = this.isGoExported(name);
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "variable",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature: `var ${name} ${dataType ?? ""}`.trim(),
+        isExported,
+        dataType,
+        isConst: false
+      });
+    }
+    return results;
+  }
+  isGoExported(name) {
+    return name.length > 0 && name[0] === name[0].toUpperCase() && name[0] !== name[0].toLowerCase();
+  }
+  parseGoParams(paramsStr) {
+    if (!paramsStr.trim()) return [];
+    return paramsStr.split(",").map((param) => {
+      const trimmed = param.trim();
+      const parts = trimmed.split(/\s+/);
+      if (parts.length >= 2) {
+        return { name: parts[0], type: parts.slice(1).join(" "), isOptional: false, defaultValue: null };
+      }
+      return { name: trimmed, type: null, isOptional: false, defaultValue: null };
+    }).filter((p) => p.name.length > 0);
+  }
+  extractGoDoc(lines, symbolLine) {
+    const docLines = [];
+    for (let i = symbolLine - 1; i >= 0 && i >= symbolLine - 15; i--) {
+      const line = (lines[i] ?? "").trim();
+      if (line.startsWith("//")) {
+        docLines.unshift(line.slice(2).trim());
+      } else {
+        break;
+      }
+    }
+    return docLines.length > 0 ? docLines.join(" ") : null;
+  }
+};
+
+// src/ast-compressor/parsers/java-parser.ts
+var ACCESS2 = "(?:public|private|protected|static|abstract|final|synchronized|native|strictfp|default|transient|volatile)";
+var ACCESS_GROUP2 = `((?:${ACCESS2}\\s+)*)`;
+var PATTERNS5 = {
+  CLASS: new RegExp(`^[ \\t]*${ACCESS_GROUP2}class\\s+(\\w+)(?:<[^>]*>)?(?:\\s+extends\\s+(\\w+(?:<[^>]*>)?))?(?:\\s+implements\\s+([^{]+))?\\s*\\{`, "gm"),
+  INTERFACE: new RegExp(`^[ \\t]*${ACCESS_GROUP2}interface\\s+(\\w+)(?:<[^>]*>)?(?:\\s+extends\\s+([^{]+))?\\s*\\{`, "gm"),
+  ENUM: new RegExp(`^[ \\t]*${ACCESS_GROUP2}enum\\s+(\\w+)(?:\\s+implements\\s+([^{]+))?\\s*\\{`, "gm"),
+  METHOD: new RegExp(`^[ \\t]*${ACCESS_GROUP2}(?:<[^>]*>\\s+)?([\\w<>\\[\\],\\s?]+?)\\s+(\\w+)\\s*\\(([^)]*)\\)(?:\\s+throws\\s+[\\w\\s,]+)?\\s*\\{`, "gm"),
+  FIELD: new RegExp(`^[ \\t]*${ACCESS_GROUP2}(final\\s+)?(static\\s+)?([\\w<>\\[\\],?]+)\\s+(\\w+)\\s*[=;]`, "gm"),
+  IMPORT: /^[ \t]*import\s+(?:static\s+)?([\w.*]+)\s*;/gm,
+  ANNOTATION: /^[ \t]*@(\w+)(?:\([^)]*\))?/gm
+};
+var JavaParser = class extends BaseParser {
+  language = "java";
+  extensions = [".java"];
+  constructor(logger) {
+    super(logger);
+  }
+  extractSymbols(code, filePath) {
+    const lines = code.split("\n");
+    const docComments = this.extractDocComments(code);
+    const symbols = [];
+    symbols.push(...this.extractClasses(code, filePath, lines, docComments));
+    symbols.push(...this.extractInterfaces(code, filePath, lines, docComments));
+    symbols.push(...this.extractEnums(code, filePath, lines));
+    return symbols;
+  }
+  extractImports(code) {
+    const imports = [];
+    const regex = new RegExp(PATTERNS5.IMPORT.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      imports.push(match[1]);
+    }
+    return imports;
+  }
+  extractClasses(code, filePath, lines, docComments) {
+    const results = [];
+    const regex = new RegExp(PATTERNS5.CLASS.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const modifiers = (match[1] ?? "").trim();
+      const name = match[2] ?? "AnonymousClass";
+      const extendsClass = match[3] ?? null;
+      const implementsStr = match[4] ?? "";
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const isExported = this.isPublic(modifiers);
+      const isAbstract = modifiers.includes("abstract");
+      const implementsList = implementsStr ? implementsStr.split(",").map((i) => i.trim()).filter(Boolean) : [];
+      const classBody = lines.slice(lineNum + 1, endLine).join("\n");
+      const members = this.extractClassMembers(classBody, filePath, lineNum + 1);
+      const signature = `${modifiers ? modifiers + " " : ""}class ${name}${extendsClass ? ` extends ${extendsClass}` : ""}${implementsList.length > 0 ? ` implements ${implementsList.join(", ")}` : ""}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "class",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported,
+        extends: extendsClass,
+        implements: implementsList,
+        members,
+        isAbstract,
+        docComment: this.findNearestDocComment(docComments, lineNum)
+      });
+    }
+    return results;
+  }
+  extractInterfaces(code, filePath, lines, docComments) {
+    const results = [];
+    const regex = new RegExp(PATTERNS5.INTERFACE.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const modifiers = (match[1] ?? "").trim();
+      const name = match[2] ?? "AnonymousInterface";
+      const extendsStr = match[3] ?? "";
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const isExported = this.isPublic(modifiers);
+      const extendsList = extendsStr ? extendsStr.split(",").map((e) => e.trim()).filter(Boolean) : [];
+      const signature = `${modifiers ? modifiers + " " : ""}interface ${name}${extendsList.length > 0 ? ` extends ${extendsList.join(", ")}` : ""}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "interface",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported,
+        extends: extendsList[0] ?? null,
+        implements: [],
+        members: [],
+        docComment: this.findNearestDocComment(docComments, lineNum)
+      });
+    }
+    return results;
+  }
+  extractEnums(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS5.ENUM.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const modifiers = (match[1] ?? "").trim();
+      const name = match[2] ?? "AnonymousEnum";
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const isExported = this.isPublic(modifiers);
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "type",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature: `${modifiers ? modifiers + " " : ""}enum ${name}`,
+        isExported
+      });
+    }
+    return results;
+  }
+  extractClassMembers(classBody, filePath, classStartLine) {
+    const members = [];
+    const methodRegex = new RegExp(PATTERNS5.METHOD.source, "gm");
+    let match;
+    while ((match = methodRegex.exec(classBody)) !== null) {
+      const modifiers = (match[1] ?? "").trim();
+      const returnType = (match[2] ?? "").trim();
+      const name = match[3];
+      if (!name || /^(if|for|while|switch|try|catch|synchronized)$/.test(name)) continue;
+      const paramsStr = match[4] ?? "";
+      const lineNum = classStartLine + this.getLineNumber(classBody, match.index);
+      const isStatic = modifiers.includes("static");
+      const signature = `${modifiers ? modifiers + " " : ""}${returnType} ${name}(${paramsStr})`;
+      members.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "method",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature,
+        isExported: this.isPublic(modifiers),
+        isStatic
+      });
+    }
+    const fieldRegex = new RegExp(PATTERNS5.FIELD.source, "gm");
+    while ((match = fieldRegex.exec(classBody)) !== null) {
+      const modifiers = (match[1] ?? "").trim();
+      const isFinal = Boolean(match[2]);
+      const isStatic = Boolean(match[3]);
+      const dataType = (match[4] ?? "").trim();
+      const name = match[5];
+      if (!name || /^(return|throw|new|this|super|if|for|while)$/.test(name)) continue;
+      const lineNum = classStartLine + this.getLineNumber(classBody, match.index);
+      const isConst = isFinal && isStatic;
+      const signature = `${modifiers ? modifiers + " " : ""}${dataType} ${name}`;
+      members.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: isConst ? "constant" : "property",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature,
+        isExported: this.isPublic(modifiers),
+        isStatic
+      });
+    }
+    return members;
+  }
+  findNearestDocComment(docComments, symbolLine) {
+    return docComments.get(symbolLine + 1) ?? docComments.get(symbolLine) ?? docComments.get(symbolLine - 1) ?? null;
+  }
+  isPublic(modifiers) {
+    if (modifiers.includes("public")) return true;
+    if (modifiers.includes("private") || modifiers.includes("protected")) return false;
+    return false;
+  }
+};
+
+// src/ast-compressor/parsers/rust-parser.ts
+var PUB = "(?:(pub(?:\\s*\\([^)]*\\))?)\\s+)?";
+var PATTERNS6 = {
+  FUNCTION: new RegExp(`^[ \\t]*${PUB}(async\\s+)?(?:unsafe\\s+)?(?:const\\s+)?fn\\s+(\\w+)(?:<[^>]*>)?\\s*\\(([^)]*)\\)(?:\\s*->\\s*([^{]+?))?\\s*(?:where[^{]*)?\\{`, "gm"),
+  STRUCT: new RegExp(`^[ \\t]*${PUB}struct\\s+(\\w+)(?:<[^>]*>)?(?:\\s*\\([^)]*\\)\\s*;|\\s*(?:where[^{]*)?\\{)`, "gm"),
+  ENUM: new RegExp(`^[ \\t]*${PUB}enum\\s+(\\w+)(?:<[^>]*>)?\\s*(?:where[^{]*)?\\{`, "gm"),
+  TRAIT: new RegExp(`^[ \\t]*${PUB}(?:unsafe\\s+)?trait\\s+(\\w+)(?:<[^>]*>)?(?:\\s*:\\s*([^{]+?))?\\s*(?:where[^{]*)?\\{`, "gm"),
+  IMPL: /^[ \t]*impl(?:<[^>]*>)?\s+(?:(\w+(?:<[^>]*>)?)\s+for\s+)?(\w+)(?:<[^>]*>)?\s*(?:where[^{]*)?\{/gm,
+  TYPE_ALIAS: new RegExp(`^[ \\t]*${PUB}type\\s+(\\w+)(?:<[^>]*>)?\\s*=\\s*(.+);`, "gm"),
+  CONST: new RegExp(`^[ \\t]*${PUB}(?:const|static)\\s+(\\w+)\\s*:\\s*([^=]+)\\s*=`, "gm"),
+  USE: /^[ \t]*(?:pub\s+)?use\s+([\w:]+(?:::\{[^}]+\}|::\*)?)\s*;/gm,
+  MOD: new RegExp(`^[ \\t]*${PUB}mod\\s+(\\w+)\\s*[;{]`, "gm")
+};
+var RustParser = class extends BaseParser {
+  language = "rust";
+  extensions = [".rs"];
+  constructor(logger) {
+    super(logger);
+  }
+  extractSymbols(code, filePath) {
+    const lines = code.split("\n");
+    const symbols = [];
+    symbols.push(...this.extractFunctions(code, filePath, lines));
+    symbols.push(...this.extractStructs(code, filePath, lines));
+    symbols.push(...this.extractEnums(code, filePath, lines));
+    symbols.push(...this.extractTraits(code, filePath, lines));
+    symbols.push(...this.extractImpls(code, filePath, lines));
+    symbols.push(...this.extractTypeAliases(code, filePath));
+    symbols.push(...this.extractConstants(code, filePath));
+    return symbols;
+  }
+  extractImports(code) {
+    const imports = [];
+    const regex = new RegExp(PATTERNS6.USE.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      imports.push(match[1]);
+    }
+    return imports;
+  }
+  extractFunctions(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS6.FUNCTION.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const pubMod = match[1] ?? "";
+      const isAsync = Boolean(match[2]);
+      const name = match[3] ?? "anonymous";
+      const paramsStr = match[4] ?? "";
+      const returnType = match[5]?.trim() ?? null;
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const isExported = pubMod.startsWith("pub");
+      const parameters = this.parseRustParams(paramsStr);
+      const docComment = this.extractRustDoc(lines, lineNum);
+      const isSelfMethod = paramsStr.trim().startsWith("&self") || paramsStr.trim().startsWith("self") || paramsStr.trim().startsWith("&mut self");
+      const type = isSelfMethod ? "method" : "function";
+      const signature = `${isExported ? "pub " : ""}${isAsync ? "async " : ""}fn ${name}(${this.summarizeParams(parameters)})${returnType ? ` -> ${returnType}` : ""}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type,
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported,
+        parameters,
+        returnType,
+        isAsync,
+        isStatic: !isSelfMethod,
+        docComment
+      });
+    }
+    return results;
+  }
+  extractStructs(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS6.STRUCT.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const pubMod = match[1] ?? "";
+      const name = match[2] ?? "AnonymousStruct";
+      const isExported = pubMod.startsWith("pub");
+      const lineText = lines[lineNum] ?? "";
+      const isTupleStruct = lineText.includes("(");
+      const endLine = isTupleStruct ? lineNum : this.findClosingBrace(lines, lineNum);
+      const signature = `${isExported ? "pub " : ""}struct ${name}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "class",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported,
+        extends: null,
+        implements: [],
+        members: []
+      });
+    }
+    return results;
+  }
+  extractEnums(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS6.ENUM.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const pubMod = match[1] ?? "";
+      const name = match[2] ?? "AnonymousEnum";
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const isExported = pubMod.startsWith("pub");
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "type",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature: `${isExported ? "pub " : ""}enum ${name}`,
+        isExported
+      });
+    }
+    return results;
+  }
+  extractTraits(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS6.TRAIT.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const pubMod = match[1] ?? "";
+      const name = match[2] ?? "AnonymousTrait";
+      const superTraits = match[3]?.trim() ?? "";
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const isExported = pubMod.startsWith("pub");
+      const signature = `${isExported ? "pub " : ""}trait ${name}${superTraits ? `: ${superTraits}` : ""}`;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "interface",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported,
+        extends: superTraits || null,
+        implements: [],
+        members: []
+      });
+    }
+    return results;
+  }
+  extractImpls(code, filePath, lines) {
+    const results = [];
+    const regex = new RegExp(PATTERNS6.IMPL.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const traitName = match[1] ?? null;
+      const typeName = match[2] ?? "Unknown";
+      const endLine = this.findClosingBrace(lines, lineNum);
+      const implBody = lines.slice(lineNum + 1, endLine).join("\n");
+      const methods = this.extractImplMethods(implBody, filePath, lineNum + 1);
+      const name = traitName ? `impl ${traitName} for ${typeName}` : `impl ${typeName}`;
+      const signature = name;
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "class",
+        filePath,
+        range: this.buildRange(lineNum, endLine),
+        signature,
+        isExported: true,
+        extends: traitName,
+        implements: traitName ? [traitName] : [],
+        members: methods
+      });
+    }
+    return results;
+  }
+  extractImplMethods(implBody, filePath, implStartLine) {
+    const methods = [];
+    const regex = new RegExp(PATTERNS6.FUNCTION.source, "gm");
+    let match;
+    while ((match = regex.exec(implBody)) !== null) {
+      const pubMod = match[1] ?? "";
+      const isAsync = Boolean(match[2]);
+      const name = match[3];
+      if (!name) continue;
+      const paramsStr = match[4] ?? "";
+      const returnType = match[5]?.trim() ?? null;
+      const lineNum = implStartLine + this.getLineNumber(implBody, match.index);
+      const isExported = pubMod.startsWith("pub");
+      const signature = `${isExported ? "pub " : ""}${isAsync ? "async " : ""}fn ${name}(${paramsStr.trim().slice(0, 60)})${returnType ? ` -> ${returnType}` : ""}`;
+      methods.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "method",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature,
+        isExported,
+        isAsync
+      });
+    }
+    return methods;
+  }
+  extractTypeAliases(code, filePath) {
+    const results = [];
+    const regex = new RegExp(PATTERNS6.TYPE_ALIAS.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const pubMod = match[1] ?? "";
+      const name = match[2] ?? "AnonymousType";
+      const value = (match[3] ?? "").trim().slice(0, 100);
+      const isExported = pubMod.startsWith("pub");
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "type",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature: `${isExported ? "pub " : ""}type ${name} = ${value}`,
+        isExported
+      });
+    }
+    return results;
+  }
+  extractConstants(code, filePath) {
+    const results = [];
+    const regex = new RegExp(PATTERNS6.CONST.source, "gm");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+      const lineNum = this.getLineNumber(code, match.index);
+      const pubMod = match[1] ?? "";
+      const name = match[2] ?? "ANONYMOUS";
+      const dataType = (match[3] ?? "").trim();
+      const isExported = pubMod.startsWith("pub");
+      results.push({
+        id: `${filePath}:${name}:${lineNum}`,
+        name,
+        type: "constant",
+        filePath,
+        range: this.buildRange(lineNum, lineNum),
+        signature: `${isExported ? "pub " : ""}const ${name}: ${dataType}`,
+        isExported,
+        dataType,
+        isConst: true
+      });
+    }
+    return results;
+  }
+  parseRustParams(paramsStr) {
+    if (!paramsStr.trim()) return [];
+    return paramsStr.split(",").map((param) => {
+      const trimmed = param.trim();
+      if (!trimmed || trimmed === "&self" || trimmed === "self" || trimmed === "&mut self") {
+        return null;
+      }
+      const colonIdx = trimmed.indexOf(":");
+      if (colonIdx >= 0) {
+        const name = trimmed.slice(0, colonIdx).trim().replace(/^mut\s+/, "");
+        const type = trimmed.slice(colonIdx + 1).trim();
+        return { name, type, isOptional: false, defaultValue: null };
+      }
+      return { name: trimmed, type: null, isOptional: false, defaultValue: null };
+    }).filter((p) => p !== null);
+  }
+  summarizeParams(params) {
+    return params.map((p) => `${p.name}${p.type ? `: ${p.type}` : ""}`).join(", ");
+  }
+  extractRustDoc(lines, symbolLine) {
+    const docLines = [];
+    for (let i = symbolLine - 1; i >= 0 && i >= symbolLine - 15; i--) {
+      const line = (lines[i] ?? "").trim();
+      if (line.startsWith("///")) {
+        docLines.unshift(line.slice(3).trim());
+      } else if (line.startsWith("#[") || line.startsWith("//!")) {
+        continue;
+      } else {
+        break;
+      }
+    }
+    return docLines.length > 0 ? docLines.join(" ") : null;
+  }
+};
+
+// src/ast-compressor/formatters/signature-formatter.ts
+var SignatureFormatter = class {
+  level = "L1";
+  /** Compact-режим: сокращает JSDoc до первой строки */
+  compactMode = false;
+  /**
+   * Активирует compact-режим (сокращённый JSDoc)
+   */
+  setCompactMode(enabled) {
+    this.compactMode = enabled;
+  }
+  compress(symbols, originalCode) {
+    const lines = [];
+    for (const symbol of symbols) {
+      const formatted = this.formatSymbol(symbol);
+      if (formatted) {
+        lines.push(formatted);
+      }
+    }
+    const content = lines.join("\n\n");
+    const originalTokens = this.estimateTokens(originalCode);
+    const compressedTokens = this.estimateTokens(content);
+    return {
+      level: "L1",
+      content,
+      originalTokens,
+      compressedTokens,
+      compressionRatio: originalTokens > 0 ? 1 - compressedTokens / originalTokens : 0,
+      symbols
+    };
+  }
+  formatSymbol(symbol) {
+    switch (symbol.type) {
+      case "function":
+      case "method":
+        return this.formatFunction(symbol);
+      case "class":
+        return this.formatClass(symbol);
+      case "interface":
+      case "type":
+      case "variable":
+      case "constant":
+      case "property":
+        return symbol.signature;
+      default:
+        return symbol.signature;
+    }
+  }
+  formatFunction(fn) {
+    const parts = [];
+    if (fn.docComment) {
+      const jsdoc = this.compactMode ? this.compactJSDoc(fn.docComment) : fn.docComment;
+      if (jsdoc) {
+        parts.push(`/** ${jsdoc} */`);
+      }
+    }
+    parts.push(`${fn.signature};`);
+    return parts.join("\n");
+  }
+  formatClass(cls) {
+    const parts = [];
+    parts.push(`${cls.signature} {`);
+    for (const member of cls.members) {
+      parts.push(`  ${member.signature};`);
+    }
+    parts.push("}");
+    return parts.join("\n");
+  }
+  /**
+   * Сокращает JSDoc до первой строки описания.
+   * Удаляет @param, @returns, @throws, @example, @see и другие теги.
+   *
+   * Пример:
+   *   Вход: "Вычисляет centroid-вектор.\n@param vectors — массив\n@returns number[]"
+   *   Выход: "Вычисляет centroid-вектор."
+   */
+  compactJSDoc(docComment) {
+    const lines = docComment.split("\n");
+    const descriptionLines = [];
+    for (const line of lines) {
+      const trimmed = line.trim().replace(/^\*\s?/, "");
+      if (trimmed.startsWith("@"))
+        break;
+      if (trimmed.length > 0) {
+        descriptionLines.push(trimmed);
+      }
+    }
+    const firstLine = descriptionLines[0] ?? "";
+    return firstLine.slice(0, 120);
+  }
+  /**
+   * Оценка токенов для кода (~3.3 символа = 1 токен для cl100k_base)
+   */
+  estimateTokens(text) {
+    return Math.ceil(text.length / 3.3);
+  }
+};
+
+// src/ast-compressor/formatters/skeleton-formatter.ts
+var SkeletonFormatter = class {
+  level = "L2";
+  compress(symbols, originalCode) {
+    const lines = [];
+    for (const symbol of symbols) {
+      const formatted = this.formatSymbol(symbol);
+      if (formatted) {
+        lines.push(formatted);
+      }
+    }
+    const content = lines.join("\n");
+    const originalTokens = this.estimateTokens(originalCode);
+    const compressedTokens = this.estimateTokens(content);
+    return {
+      level: "L2",
+      content,
+      originalTokens,
+      compressedTokens,
+      compressionRatio: originalTokens > 0 ? 1 - compressedTokens / originalTokens : 0,
+      symbols
+    };
+  }
+  formatSymbol(symbol) {
+    switch (symbol.type) {
+      case "function":
+      case "method":
+        return this.formatFunction(symbol);
+      case "class":
+        return this.formatClass(symbol);
+      case "interface":
+        return `interface ${symbol.name}`;
+      case "type":
+        return `type ${symbol.name}`;
+      case "variable":
+      case "constant":
+        return `${symbol.type} ${symbol.name}`;
+      case "property":
+        return `  ${symbol.name}`;
+      default:
+        return null;
+    }
+  }
+  formatFunction(fn) {
+    const params = fn.parameters.map((p) => `${p.name}${p.type ? `: ${p.type}` : ""}`).join(", ");
+    const ret = fn.returnType ? ` \u2192 ${fn.returnType}` : "";
+    return `${fn.name}(${params})${ret}`;
+  }
+  formatClass(cls) {
+    const parts = [];
+    let header = `class ${cls.name}`;
+    if (cls.extends)
+      header += ` extends ${cls.extends}`;
+    parts.push(header);
+    for (const member of cls.members) {
+      parts.push(`  ${member.name}`);
+    }
+    return parts.join("\n");
+  }
+  /**
+   * Оценка токенов для кода (~3.3 символа = 1 токен для cl100k_base)
+   */
+  estimateTokens(text) {
+    return Math.ceil(text.length / 3.3);
+  }
+};
+
+// src/ast-compressor/formatters/map-formatter.ts
+var MapFormatter = class {
+  level = "L3";
+  compress(symbols, originalCode) {
+    const groups = this.groupByType(symbols);
+    const lines = [];
+    for (const [type, names] of groups) {
+      lines.push(`${type}: ${names.join(", ")}`);
+    }
+    const content = lines.join("\n");
+    const originalTokens = this.estimateTokens(originalCode);
+    const compressedTokens = this.estimateTokens(content);
+    return {
+      level: "L3",
+      content,
+      originalTokens,
+      compressedTokens,
+      compressionRatio: originalTokens > 0 ? 1 - compressedTokens / originalTokens : 0,
+      symbols
+    };
+  }
+  /**
+   * Группирует символы по типу для компактного представления
+   */
+  groupByType(symbols) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const symbol of symbols) {
+      if (symbol.type === "class") {
+        const cls = symbol;
+        const memberNames = cls.members.map((m) => m.name);
+        const value = memberNames.length > 0 ? `${cls.name} { ${memberNames.join(", ")} }` : cls.name;
+        const list2 = groups.get("class") ?? [];
+        list2.push(value);
+        groups.set("class", list2);
+        continue;
+      }
+      const key = this.getGroupKey(symbol.type);
+      const list = groups.get(key) ?? [];
+      list.push(symbol.name);
+      groups.set(key, list);
+    }
+    return groups;
+  }
+  getGroupKey(type) {
+    switch (type) {
+      case "function":
+      case "method":
+        return "fn";
+      case "class":
+        return "class";
+      case "interface":
+        return "iface";
+      case "type":
+        return "type";
+      case "variable":
+      case "constant":
+        return "const";
+      case "property":
+        return "prop";
+      default:
+        return "other";
+    }
+  }
+  /**
+   * Оценка токенов для кода (~3.3 символа = 1 токен для cl100k_base)
+   */
+  estimateTokens(text) {
+    return Math.ceil(text.length / 3.3);
+  }
+};
+
+// src/ast-compressor/formatters/module-map-formatter.ts
+var ModuleMapFormatter = class {
+  level = "L4";
+  compress(symbols, originalCode) {
+    const fnCount = symbols.filter((s) => s.type === "function" || s.type === "method").length;
+    const classCount = symbols.filter((s) => s.type === "class").length;
+    const ifaceCount = symbols.filter((s) => s.type === "interface").length;
+    const typeCount = symbols.filter((s) => s.type === "type").length;
+    const exportedNames = symbols.filter((s) => s.isExported).slice(0, 6).map((s) => {
+      if (s.type === "class") {
+        const cls = s;
+        const methodNames = cls.members.filter((m) => m.type === "method").slice(0, 3).map((m) => m.name);
+        return methodNames.length > 0 ? `${s.name} { ${methodNames.join(", ")} }` : s.name;
+      }
+      return s.name;
+    });
+    const stats = [];
+    if (fnCount > 0) stats.push(`${fnCount} fn`);
+    if (classCount > 0) stats.push(`${classCount} class`);
+    if (ifaceCount > 0) stats.push(`${ifaceCount} iface`);
+    if (typeCount > 0) stats.push(`${typeCount} type`);
+    const content = exportedNames.length > 0 ? `${exportedNames.join(", ")} (${stats.join(", ")})` : `(${stats.join(", ")})`;
+    const originalTokens = this.estimateTokens(originalCode);
+    const compressedTokens = this.estimateTokens(content);
+    return {
+      level: "L4",
+      content,
+      originalTokens,
+      compressedTokens,
+      compressionRatio: originalTokens > 0 ? 1 - compressedTokens / originalTokens : 0,
+      symbols
+    };
+  }
+  estimateTokens(text) {
+    return Math.ceil(text.length / 3.3);
+  }
+};
+
+// src/ast-compressor/formatters/cluster-formatter.ts
+var ClusterFormatter = class {
+  level = "L5";
+  compress(symbols, originalCode) {
+    const byDir = /* @__PURE__ */ new Map();
+    for (const s of symbols) {
+      const dir = this.extractDir(s.filePath);
+      const list = byDir.get(dir) ?? [];
+      list.push(s.name);
+      byDir.set(dir, list);
+    }
+    const lines = [];
+    for (const [dir, names] of byDir) {
+      const uniqueNames = [...new Set(names)].slice(0, 8);
+      lines.push(`[${dir}] (${names.length}): ${uniqueNames.join(", ")}`);
+    }
+    const content = lines.length > 0 ? lines.join("\n") : "(empty)";
+    const originalTokens = this.estimateTokens(originalCode);
+    const compressedTokens = this.estimateTokens(content);
+    return {
+      level: "L5",
+      content,
+      originalTokens,
+      compressedTokens,
+      compressionRatio: originalTokens > 0 ? 1 - compressedTokens / originalTokens : 0,
+      symbols
+    };
+  }
+  extractDir(filePath) {
+    const parts = filePath.replace(/\\/g, "/").split("/");
+    if (parts.length <= 1) return ".";
+    return parts.slice(0, -1).join("/");
+  }
+  estimateTokens(text) {
+    return Math.ceil(text.length / 3.3);
+  }
+};
+
+// src/ast-compressor/formatters/abstractive-formatter.ts
+var AbstractiveFormatter = class {
+  level = "L6";
+  compress(symbols, originalCode) {
+    const exported = symbols.filter((s) => s.isExported);
+    const classes = exported.filter((s) => s.type === "class");
+    const functions = exported.filter((s) => s.type === "function");
+    const interfaces = exported.filter((s) => s.type === "interface");
+    const types = exported.filter((s) => s.type === "type");
+    const parts = [];
+    if (classes.length > 0) {
+      for (const cls of classes.slice(0, 2)) {
+        const c2 = cls;
+        const methods = c2.members.filter((m) => m.type === "method").map((m) => m.name);
+        parts.push(
+          `Class ${c2.name}` + (methods.length > 0 ? ` with ${methods.slice(0, 4).join(", ")}` : "")
+        );
+      }
+    }
+    if (functions.length > 0) {
+      const fNames = functions.slice(0, 4).map((f) => f.name);
+      parts.push(`Functions: ${fNames.join(", ")}`);
+    }
+    if (interfaces.length > 0) {
+      parts.push(`Interfaces: ${interfaces.slice(0, 3).map((i) => i.name).join(", ")}`);
+    }
+    if (types.length > 0) {
+      parts.push(`Types: ${types.slice(0, 3).map((t) => t.name).join(", ")}`);
+    }
+    const summary = parts.length > 0 ? `Module exports ${exported.length} symbols. ${parts.join(". ")}.` : `Module with ${symbols.length} internal symbols.`;
+    const originalTokens = this.estimateTokens(originalCode);
+    const compressedTokens = this.estimateTokens(summary);
+    return {
+      level: "L6",
+      content: summary,
+      originalTokens,
+      compressedTokens,
+      compressionRatio: originalTokens > 0 ? 1 - compressedTokens / originalTokens : 0,
+      symbols
+    };
+  }
+  estimateTokens(text) {
+    return Math.ceil(text.length / 3.3);
+  }
+};
+
+// src/ast-compressor/ast-compressor.ts
+var AstCompressor = class {
+  parserRegistry;
+  strategies;
+  logger;
+  constructor(logger) {
+    this.logger = logger;
+    this.parserRegistry = new ParserRegistry();
+    this.parserRegistry.register(new TypeScriptParser(logger));
+    this.parserRegistry.register(new MarkdownParser(logger));
+    this.parserRegistry.register(new PythonParser(logger));
+    this.parserRegistry.register(new CSharpParser(logger));
+    this.parserRegistry.register(new GoParser(logger));
+    this.parserRegistry.register(new JavaParser(logger));
+    this.parserRegistry.register(new RustParser(logger));
+    this.strategies = /* @__PURE__ */ new Map([
+      ["L1", new SignatureFormatter()],
+      ["L2", new SkeletonFormatter()],
+      ["L3", new MapFormatter()],
+      ["L4", new ModuleMapFormatter()],
+      ["L5", new ClusterFormatter()],
+      ["L6", new AbstractiveFormatter()]
+    ]);
+  }
+  /**
+   * Сжимает файл до указанного уровня
+   *
+   * L0 — полный код (без сжатия)
+   * L1 — сигнатуры + JSDoc
+   * L2 — скелет (имена + типы)
+   * L3 — карта (список символов)
+   */
+  compressFile(filePath, level = "L1", _projectId) {
+    const code = readFileSync(filePath, "utf-8");
+    return this.compressCode(code, filePath, level);
+  }
+  /**
+   * Сжимает код (строку) до указанного уровня
+   */
+  compressCode(code, filePath, level = "L1", _projectId) {
+    if (level === "L0") {
+      return this.buildL0Result(code);
+    }
+    const parser = this.parserRegistry.getByFilePath(filePath);
+    if (!parser) {
+      this.logger.warn(`\u041F\u0430\u0440\u0441\u0435\u0440 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D \u0434\u043B\u044F \u0444\u0430\u0439\u043B\u0430: ${filePath}. \u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u043C L0.`);
+      return this.buildL0Result(code);
+    }
+    const parseResult = parser.parse(code, filePath);
+    if (parseResult.errors.length > 0) {
+      this.logger.warn(`\u041E\u0448\u0438\u0431\u043A\u0438 \u043F\u0430\u0440\u0441\u0438\u043D\u0433\u0430 ${filePath}: ${parseResult.errors.length}. \u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u043C L0.`);
+      return this.buildL0Result(code);
+    }
+    const strategy = this.strategies.get(level);
+    if (!strategy) {
+      this.logger.warn(`\u0421\u0442\u0440\u0430\u0442\u0435\u0433\u0438\u044F \u0441\u0436\u0430\u0442\u0438\u044F ${level} \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430. \u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u043C L1.`);
+      const fallbackStrategy = this.strategies.get("L1");
+      if (!fallbackStrategy) {
+        return this.buildL0Result(code);
+      }
+      return fallbackStrategy.compress(parseResult.symbols, code);
+    }
+    const result = strategy.compress(parseResult.symbols, code);
+    this.logger.debug(`\u0421\u0436\u0430\u0442\u0438\u0435 ${filePath} [${level}]: ${result.originalTokens} \u2192 ${result.compressedTokens} (${(result.compressionRatio * 100).toFixed(1)}% \u044D\u043A\u043E\u043D\u043E\u043C\u0438\u044F)`);
+    return result;
+  }
+  /**
+   * Извлекает символы из файла (без сжатия)
+   */
+  extractSymbols(filePath) {
+    const code = readFileSync(filePath, "utf-8");
+    return this.extractSymbolsFromCode(code, filePath);
+  }
+  /**
+   * Извлекает символы из кода
+   */
+  extractSymbolsFromCode(code, filePath) {
+    const parser = this.parserRegistry.getByFilePath(filePath);
+    if (!parser) {
+      return [];
+    }
+    const result = parser.parse(code, filePath);
+    return result.symbols;
+  }
+  /**
+   * Ищет конкретный символ по имени в файле
+   */
+  findSymbolInFile(filePath, symbolName) {
+    const symbols = this.extractSymbols(filePath);
+    return symbols.find((s) => s.name === symbolName) ?? null;
+  }
+  /**
+   * Проверяет, поддерживается ли файл
+   */
+  isFileSupported(filePath) {
+    return this.parserRegistry.isSupported(filePath);
+  }
+  /**
+   * Возвращает список поддерживаемых расширений
+   */
+  getSupportedExtensions() {
+    return this.parserRegistry.getSupportedExtensions();
+  }
+  /**
+   * Получает парсер по пути к файлу
+   */
+  getParser(filePath) {
+    return this.parserRegistry.getByFilePath(filePath);
+  }
+  /**
+   * HVC v2: включает/выключает compact JSDoc в L1 (сокращение до первой строки).
+   * Делегирует в SignatureFormatter.setCompactMode()
+   */
+  setCompactJSDoc(enabled) {
+    const l1Strategy = this.strategies.get("L1");
+    if (l1Strategy && "setCompactMode" in l1Strategy) {
+      l1Strategy.setCompactMode(enabled);
+    }
+  }
+  /**
+   * HVC v2: no-op для AstCompressor (import stripping реализован в CachedCompressor).
+   * Метод необходим для соответствия ICodeCompressor интерфейсу.
+   */
+  setStripImports(_enabled) {
+  }
+  /**
+   * L0 — полный код без сжатия
+   */
+  buildL0Result(code) {
+    const tokens = Math.ceil(code.length / 3.3);
+    return {
+      level: "L0",
+      content: code,
+      originalTokens: tokens,
+      compressedTokens: tokens,
+      compressionRatio: 0,
+      symbols: []
+    };
+  }
+};
+
+// cli/watcher-client.ts
+import { gzipSync } from "node:zlib";
+var DEFAULT_RETRY = {
+  maxRetries: 3,
+  baseDelayMs: 500,
+  maxDelayMs: 5e3,
+  timeoutMs: 3e4
+};
+var WatcherClient = class {
+  serverUrl;
+  authToken;
+  projectId;
+  onRetry;
+  onSplit;
+  constructor(options) {
+    this.serverUrl = options.serverUrl.replace(/\/$/, "");
+    this.authToken = options.authToken;
+    this.projectId = options.projectId;
+    this.onRetry = options.onRetry;
+    this.onSplit = options.onSplit;
+  }
+  /**
+   * Проверяет доступность сервера
+   */
+  async healthCheck() {
+    try {
+      const res = await fetch(`${this.serverUrl}/health`, {
+        signal: AbortSignal.timeout(5e3)
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+  /**
+   * Отправляет heartbeat на сервер для отслеживания активности вотчера.
+   * Сервер обновляет lastPushAt — MCP tools видят "watcher active".
+   */
+  async sendHeartbeat(filesCount) {
+    try {
+      const res = await fetch(`${this.serverUrl}/api/heartbeat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.authToken}`,
+          "Connection": "close"
+        },
+        body: JSON.stringify({
+          project_id: this.projectId,
+          files_count: filesCount,
+          timestamp: Date.now()
+        }),
+        signal: AbortSignal.timeout(5e3)
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+  /**
+   * Отправляет батч сжатых файлов на сервер с retry-логикой.
+   *
+   * Оптимизации:
+   *   - gzip-сжатие тела (экономия ~70-80% трафика)
+   *   - Connection: close (избегаем ECONNRESET на VPS)
+   */
+  async pushBatch(files) {
+    const jsonBody = JSON.stringify({
+      project_id: this.projectId,
+      files: files.map((f) => ({
+        path: f.path,
+        hash: f.hash,
+        sizeBytes: f.sizeBytes,
+        language: f.language,
+        lineCount: f.lineCount,
+        l1Summary: f.l1Summary,
+        l3Summary: f.l3Summary,
+        imports: f.imports,
+        symbols: f.symbols,
+        rawSnippet: f.rawSnippet
+      }))
+    });
+    const gzipped = gzipSync(Buffer.from(jsonBody, "utf-8"));
+    await this.fetchWithRetry(
+      `${this.serverUrl}/api/push_indexed`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Encoding": "gzip",
+          "Authorization": `Bearer ${this.authToken}`,
+          // Новое TCP-соединение на каждый запрос —
+          // исключает ECONNRESET от stale keep-alive
+          "Connection": "close"
+        },
+        body: gzipped
+      },
+      DEFAULT_RETRY
+    );
+  }
+  /**
+   * Адаптивная отправка батча с рекурсивным дроблением.
+   *
+   * Стратегия:
+   *   1. Попытка отправить весь батч целиком (pushBatch + retry)
+   *   2. При неудаче — делим пополам, последовательно отправляем каждую половину
+   *   3. Рекурсия до одного файла; если единичный файл не проходит — failed
+   *
+   * Решает проблему "толстого батча": payload > 40KB может не пройти
+   * через нестабильный VPS-канал. Дробление гарантирует, что мелкие файлы
+   * всегда доставляются, а гиганты изолируются.
+   *
+   * @param files — массив файлов для отправки
+   * @param depth — текущая глубина рекурсии (для логирования)
+   * @returns Результат: какие файлы загружены, какие нет
+   */
+  async pushBatchAdaptive(files, depth = 0) {
+    if (files.length === 0) {
+      return { uploaded: [], failed: [] };
+    }
+    try {
+      await this.pushBatch(files);
+      return { uploaded: files, failed: [] };
+    } catch {
+      if (files.length === 1) {
+        return { uploaded: [], failed: files };
+      }
+      const mid = Math.ceil(files.length / 2);
+      const leftHalf = files.slice(0, mid);
+      const rightHalf = files.slice(mid);
+      this.onSplit?.(files.length, mid, depth + 1);
+      const leftResult = await this.pushBatchAdaptive(leftHalf, depth + 1);
+      await new Promise((r) => setTimeout(r, 200));
+      const rightResult = await this.pushBatchAdaptive(rightHalf, depth + 1);
+      return {
+        uploaded: [...leftResult.uploaded, ...rightResult.uploaded],
+        failed: [...leftResult.failed, ...rightResult.failed]
+      };
+    }
+  }
+  /**
+   * fetch с экспоненциальным backoff + jitter
+   *
+   * Обрабатывает:
+   * - TypeError: fetch failed (сетевой сброс, DNS)
+   * - TimeoutError (AbortSignal.timeout)
+   * - HTTP 5xx (серверные ошибки)
+   *
+   * Не ретраит:
+   * - HTTP 4xx (клиентские ошибки — проблема в данных)
+   */
+  async fetchWithRetry(url, init, config) {
+    let lastError = null;
+    for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+      try {
+        const res = await fetch(url, {
+          ...init,
+          signal: AbortSignal.timeout(config.timeoutMs)
+        });
+        if (res.status >= 400 && res.status < 500) {
+          const text = await res.text().catch(() => "Unknown error");
+          throw new Error(`HTTP ${res.status}: ${text}`);
+        }
+        if (res.status >= 500) {
+          const text = await res.text().catch(() => "Server error");
+          lastError = new Error(`HTTP ${res.status}: ${text}`);
+          if (attempt < config.maxRetries) {
+            await this.backoff(attempt, config);
+            continue;
+          }
+          throw lastError;
+        }
+        return res;
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        if (error.message.startsWith("HTTP 4")) {
+          throw error;
+        }
+        lastError = error;
+        if (attempt >= config.maxRetries) {
+          throw error;
+        }
+        this.onRetry?.(attempt + 1, config.maxRetries, error.message);
+        await this.backoff(attempt, config);
+      }
+    }
+    throw lastError ?? new Error("fetchWithRetry: unexpected end");
+  }
+  /**
+   * Экспоненциальная задержка с jitter
+   * delay = min(baseDelay × 2^attempt + jitter, maxDelay)
+   */
+  backoff(attempt, config) {
+    const exponential = config.baseDelayMs * Math.pow(2, attempt);
+    const jitter = Math.random() * 500;
+    const delay = Math.min(exponential + jitter, config.maxDelayMs);
+    return new Promise((resolve) => setTimeout(resolve, delay));
+  }
+};
+
+// cli/pretty-logger.ts
+var R = "\x1B[0m";
+var B = "\x1B[1m";
+var D = "\x1B[2m";
+var cYellow = "\x1B[33m";
+var cBlue = "\x1B[34m";
+var cCyan = "\x1B[36m";
+var cWhite = "\x1B[37m";
+var cRed = "\x1B[31m";
+var cGray = "\x1B[90m";
+var cBGreen = "\x1B[92m";
+var cBYellow = "\x1B[93m";
+var cBBlue = "\x1B[94m";
+var cBCyan = "\x1B[96m";
+var cBWhite = "\x1B[97m";
+var supportsColor = process.stdout.isTTY !== false;
+function c(code, text) {
+  return supportsColor ? `${code}${text}${R}` : text;
+}
+function formatBytes(bytes) {
+  if (bytes < 1024)
+    return `${bytes} B`;
+  if (bytes < 1024 * 1024)
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+function formatMs(ms) {
+  if (ms < 1e3)
+    return `${ms}ms`;
+  return `${(ms / 1e3).toFixed(1)}s`;
+}
+function ts() {
+  return c(cGray, (/* @__PURE__ */ new Date()).toLocaleTimeString("ru-RU", { hour12: false }));
+}
+function progressBar(current, total, width = 28) {
+  if (total === 0)
+    return c(cGray, "\u2591".repeat(width));
+  const pct = Math.min(current / total, 1);
+  const filled = Math.round(pct * width);
+  const empty = width - filled;
+  const bar = c(cBGreen, "\u2588".repeat(filled)) + c(cGray, "\u2591".repeat(empty));
+  const pctStr = c(cBWhite, `${Math.round(pct * 100)}%`).padStart(4);
+  return `${bar} ${pctStr}`;
+}
+function printHeader(project, server, version = "0.7.0") {
+  const w = 62;
+  const line = "\u2500".repeat(w);
+  console.log("");
+  console.log(c(cBCyan, `  \u250C${line}\u2510`));
+  console.log(c(cBCyan, "  \u2502") + c(B + cBWhite, `  \u{1F9E0} Project Brain Smart Watcher`) + c(cGray, `  v${version}`) + " ".repeat(w - 36 - version.length) + c(cBCyan, "\u2502"));
+  console.log(c(cBCyan, "  \u2502") + c(cCyan, `  \u25CF `) + c(cBWhite, project.padEnd(24)) + c(cGray, `\u2192  `) + c(cBlue, server.slice(0, 30).padEnd(30)) + c(cBCyan, "\u2502"));
+  console.log(c(cBCyan, `  \u2514${line}\u2518`));
+  console.log("");
+}
+function printPhase(n, total, label) {
+  const badge = c(cBBlue + B, ` ${n}/${total} `);
+  const name = c(B + cBWhite, ` ${label} `);
+  const line = c(cGray, "\u2500".repeat(46));
+  console.log(`
+  ${badge}${name}${line}`);
+}
+function printInfo(msg) {
+  console.log(`  ${ts()}  ${c(cCyan, "\xB7")}  ${msg}`);
+}
+function printOk(msg) {
+  console.log(`  ${ts()}  ${c(cBGreen, "\u2713")}  ${msg}`);
+}
+function printWarn(msg) {
+  console.log(`  ${ts()}  ${c(cBYellow, "\u26A0")}  ${c(cYellow, msg)}`);
+}
+function printError(msg) {
+  console.log(`  ${ts()}  ${c(cRed, "\u2717")}  ${c(cRed, msg)}`);
+}
+function printSkip(msg) {
+  console.log(`  ${ts()}  ${c(cGray, "\u25CB")}  ${c(D + cGray, msg)}`);
+}
+var _progressStart = 0;
+function printProgress(current, total, label) {
+  if (current === 1) _progressStart = Date.now();
+  if (!supportsColor) {
+    if (current % 10 === 0 || current === total) {
+      console.log(`  [${current}/${total}] ${label}`);
+    }
+    return;
+  }
+  const bar = progressBar(current, total);
+  const count = c(cGray, `${current}/${total}`);
+  const elapsed = Date.now() - _progressStart;
+  const perFile = current > 0 ? elapsed / current : 0;
+  const eta = Math.round(perFile * (total - current) / 1e3);
+  const etaStr = eta > 0 ? c(cGray, `~${eta}\u0441 \u043E\u0441\u0442\u0430\u043B\u043E\u0441\u044C`) : c(cBGreen, "\u0433\u043E\u0442\u043E\u0432\u043E");
+  process.stdout.write(`\r\x1B[2K  ${bar}  ${count}  ${etaStr}  ${c(cGray, label.slice(0, 28))}  `);
+  if (current === total)
+    process.stdout.write("\n");
+}
+var _uploadStart = 0;
+function printBatch(batchN, totalBatches, fileCount, sizeStr, ok) {
+  if (batchN === 1 && _uploadStart === 0) _uploadStart = Date.now();
+  const status = ok ? c(cBGreen, "\u2713") : c(cRed, "\u2717");
+  const bar = progressBar(batchN, totalBatches, 20);
+  const files = c(cBWhite, `${fileCount} files`);
+  const size = c(cGray, `~${sizeStr}`);
+  const elapsed = Date.now() - _uploadStart;
+  const perBatch = batchN > 0 ? elapsed / batchN : 0;
+  const eta = Math.round(perBatch * (totalBatches - batchN) / 1e3);
+  const etaStr = batchN < totalBatches ? c(cGray, `~${eta}\u0441`) : c(cBGreen, "\u0433\u043E\u0442\u043E\u0432\u043E");
+  if (supportsColor) {
+    process.stdout.write(`\r\x1B[2K  ${bar}  ${status} ${files} ${size}  ${etaStr}`);
+    if (batchN === totalBatches) process.stdout.write("\n");
+  } else {
+    console.log(`  Batch ${batchN}/${totalBatches}  ${ok ? "OK" : "FAIL"}  ${fileCount} files  ~${sizeStr}`);
+  }
+}
+function resetUploadTimer() {
+  _uploadStart = 0;
+}
+var SPINNER = ["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"];
+var _spinnerInterval = null;
+var _spinnerIdx = 0;
+function startSpinner(label) {
+  if (!supportsColor) return;
+  _spinnerIdx = 0;
+  _spinnerInterval = setInterval(() => {
+    const frame = c(cBCyan, SPINNER[_spinnerIdx % SPINNER.length]);
+    process.stdout.write(`\r\x1B[2K  ${frame}  ${c(cGray, label)}`);
+    _spinnerIdx++;
+  }, 80);
+}
+function stopSpinner() {
+  if (_spinnerInterval) {
+    clearInterval(_spinnerInterval);
+    _spinnerInterval = null;
+    process.stdout.write("\r\x1B[2K");
+  }
+}
+function printSummary(opts) {
+  const ratio = opts.originalKb > 0 ? (opts.originalKb / Math.max(opts.summaryKb, 1)).toFixed(1) : "\u2014";
+  const savedPct = opts.originalKb > 0 ? Math.round((1 - opts.summaryKb / opts.originalKb) * 100) : 0;
+  const w = 62;
+  const line = "\u2500".repeat(w);
+  console.log("");
+  console.log(c(cBGreen, `  \u250C${line}\u2510`));
+  const title = opts.errors === 0 ? `  \u2705  \u041F\u0440\u043E\u0438\u043D\u0434\u0435\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043E ${opts.files} \u0444\u0430\u0439\u043B\u043E\u0432 \u0437\u0430 ${formatMs(opts.elapsedMs)}` : `  \u26A0\uFE0F   \u041F\u0440\u043E\u0438\u043D\u0434\u0435\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043E ${opts.files} \u0444\u0430\u0439\u043B\u043E\u0432 (${opts.errors} \u043E\u0448\u0438\u0431\u043E\u043A) \u0437\u0430 ${formatMs(opts.elapsedMs)}`;
+  console.log(c(cBGreen, "  \u2502") + c(B + cBWhite, title).padEnd(w + 8) + c(cBGreen, "\u2502"));
+  const stat = `  \u{1F4BE}  \u041E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E ${formatBytes(opts.summaryKb * 1024)}  (\u0438\u0437 ~${formatBytes(opts.originalKb * 1024)} \u0438\u0441\u0445\u043E\u0434\u043D\u044B\u0445)  \xD7${ratio} \u0441\u0436\u0430\u0442\u0438\u0435  (${savedPct}%)`;
+  console.log(c(cBGreen, "  \u2502") + c(cCyan, stat).padEnd(w + 9) + c(cBGreen, "\u2502"));
+  console.log(c(cBGreen, `  \u2514${line}\u2518`));
+  console.log("");
+}
+function printTokenSavings(rawBytes, summaryBytes, fileCount) {
+  if (fileCount === 0) return;
+  const CpT = 4;
+  const rawTok = Math.round(rawBytes / CpT);
+  const sumTok = Math.round(summaryBytes / CpT);
+  const savedTok = rawTok - sumTok;
+  const savedPct = rawTok > 0 ? Math.round(savedTok / rawTok * 100) : 0;
+  const ratio = rawTok > 0 ? (rawTok / Math.max(sumTok, 1)).toFixed(0) : "\u2014";
+  const avgRaw = Math.round(rawBytes / fileCount);
+  const avgSum = Math.round(summaryBytes / fileCount);
+  const fmt = (n) => {
+    if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+    if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
+    return String(n);
+  };
+  const w = 62;
+  const ln = "\u2500".repeat(w);
+  const sep = "\u2500".repeat(w - 2);
+  const bL = cBBlue;
+  const pad = (s, color) => c(bL, "  \u2502") + c(color, s).padEnd(w + 9) + c(bL, "\u2502");
+  console.log(c(bL, `  \u250C${ln}\u2510`));
+  console.log(c(bL, "  \u2502") + c(B + cBWhite, `  \u{1F9EE}  \u042D\u041A\u041E\u041D\u041E\u041C\u0418\u042F \u0422\u041E\u041A\u0415\u041D\u041E\u0412`).padEnd(w + 8) + c(bL, "\u2502"));
+  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  console.log(pad(`  \u{1F4C4}  \u0418\u0441\u0445\u043E\u0434\u043D\u044B\u0439 \u043A\u043E\u0434:   ~${fmt(rawTok)} \u0442\u043E\u043A\u0435\u043D\u043E\u0432  (${formatBytes(rawBytes)})`, cRed));
+  console.log(pad(`  \u{1F9E0}  L1+L3 \u0441\u0443\u043C\u043C\u0430\u0440\u0438:  ~${fmt(sumTok)} \u0442\u043E\u043A\u0435\u043D\u043E\u0432  (${formatBytes(summaryBytes)})`, cBGreen));
+  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  console.log(pad(`  \u{1F4B0}  \u042D\u043A\u043E\u043D\u043E\u043C\u0438\u044F:       ~${fmt(savedTok)} \u0442\u043E\u043A\u0435\u043D\u043E\u0432  (${savedPct}%)`, B + cBYellow));
+  console.log(pad(`  \u{1F4CA}  \u0421\u0442\u0435\u043F\u0435\u043D\u044C \u0441\u0436\u0430\u0442\u0438\u044F: \xD7${ratio}  (${fileCount} \u0444\u0430\u0439\u043B\u043E\u0432)`, cBCyan));
+  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  console.log(pad(`  \u{1F4D0}  \u0421\u0440\u0435\u0434\u043D\u0438\u0439 \u0444\u0430\u0439\u043B:   ${formatBytes(avgRaw)} \u2192 ${formatBytes(avgSum)}`, cGray));
+  console.log(pad(`  \u26A1  \u041D\u0430 \u043F\u0440\u043E\u0432\u043E\u0434\u0435:     gzip \u0435\u0449\u0451 ~70% \u043C\u0435\u043D\u044C\u0448\u0435`, cGray));
+  console.log(c(bL, `  \u2514${ln}\u2518`));
+  console.log("");
+}
+function printRescanResult(opts) {
+  const parts = [];
+  if (opts.added > 0) parts.push(c(cBGreen, `+${opts.added} \u043D\u043E\u0432\u044B\u0445`));
+  if (opts.changed > 0) parts.push(c(cBYellow, `~${opts.changed} \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u043E`));
+  if (opts.removed > 0) parts.push(c(cRed, `-${opts.removed} \u0443\u0434\u0430\u043B\u0435\u043D\u043E`));
+  if (parts.length === 0) {
+    console.log(`  ${ts()}  ${c(cGray, "\u25CB")}  ${c(cGray, `Rescan: \u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0439 (${opts.unchanged} \u0444\u0430\u0439\u043B\u043E\u0432)  \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0447\u0435\u0440\u0435\u0437 ${opts.nextInMin} \u043C\u0438\u043D`)}`);
+    return;
+  }
+  const diff = parts.join(c(cGray, ", "));
+  const time = c(cGray, formatMs(opts.elapsedMs));
+  const next = c(cGray, `\u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0447\u0435\u0440\u0435\u0437 ${opts.nextInMin} \u043C\u0438\u043D`);
+  console.log(`  ${ts()}  ${c(cBCyan, "\u21BB")}  Rescan: ${diff}  ${c(cGray, "|")}  \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043E ${opts.uploaded}  ${time}  ${next}`);
+}
+function printVerification(opts) {
+  const w = 62;
+  const ln = "\u2500".repeat(w);
+  const sep = "\u2500".repeat(w - 2);
+  const bL = cBCyan;
+  const pad = (s, color) => c(bL, "  \u2502") + c(color, s).padEnd(w + 9) + c(bL, "\u2502");
+  console.log(c(bL, `  \u250C${ln}\u2510`));
+  console.log(c(bL, "  \u2502") + c(B + cBWhite, `  \u{1F4CB}  \u0412\u0415\u0420\u0418\u0424\u0418\u041A\u0410\u0426\u0418\u042F \u0421\u041A\u0410\u041D\u0418\u0420\u041E\u0412\u0410\u041D\u0418\u042F`).padEnd(w + 8) + c(bL, "\u2502"));
+  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  const extEntries = Object.entries(opts.byExt).sort((a, b) => b[1] - a[1]);
+  console.log(pad(`  \u{1F4C2}  \u041E\u0431\u0440\u0430\u0431\u043E\u0442\u0430\u043D\u043E \u043F\u043E \u0442\u0438\u043F\u0430\u043C \u0444\u0430\u0439\u043B\u043E\u0432:`, B + cBWhite));
+  for (const [ext, count] of extEntries) {
+    const pct = opts.compressed > 0 ? Math.round(count / opts.compressed * 100) : 0;
+    const bar = "\u2588".repeat(Math.max(1, Math.round(pct / 5)));
+    console.log(pad(`       ${ext.padEnd(8)} ${String(count).padStart(4)} \u0444\u0430\u0439\u043B(\u043E\u0432)  ${pct}%  ${bar}`, cCyan));
+  }
+  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  const skippedExtEntries = Object.entries(opts.skippedByExt).sort((a, b) => b[1] - a[1]);
+  if (skippedExtEntries.length > 0) {
+    console.log(pad(`  \u{1F6AB}  \u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043D\u044B\u0435 \u0440\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u0438\u044F (\u043D\u0435 \u0432 \u0441\u043F\u0438\u0441\u043A\u0435 --exts):`, B + cBYellow));
+    const top = skippedExtEntries.slice(0, 10);
+    for (const [ext, count] of top) {
+      console.log(pad(`       ${ext.padEnd(8)} ${String(count).padStart(4)} \u0444\u0430\u0439\u043B(\u043E\u0432)`, cYellow));
+    }
+    if (skippedExtEntries.length > 10) {
+      const rest = skippedExtEntries.slice(10).reduce((s, [, c2]) => s + c2, 0);
+      console.log(pad(`       ...\u0438 \u0435\u0449\u0451 ${skippedExtEntries.length - 10} \u0442\u0438\u043F\u043E\u0432 (${rest} \u0444\u0430\u0439\u043B\u043E\u0432)`, cGray));
+    }
+    console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  }
+  const { tooLarge, readError, compressError } = opts.skipInfo;
+  const totalSkips = tooLarge.length + readError.length + compressError.length;
+  if (totalSkips > 0) {
+    console.log(pad(`  \u26A0\uFE0F   \u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B: ${totalSkips}`, B + cBYellow));
+    if (tooLarge.length > 0) {
+      console.log(pad(`       \u{1F5C4}\uFE0F  \u0421\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u0438\u0435 (>500KB): ${tooLarge.length}`, cYellow));
+      for (const f of tooLarge.slice(0, 5)) {
+        console.log(pad(`          ${f}`, cGray));
+      }
+      if (tooLarge.length > 5) console.log(pad(`          ...\u0438 \u0435\u0449\u0451 ${tooLarge.length - 5}`, cGray));
+    }
+    if (readError.length > 0) {
+      console.log(pad(`       \u{1F4DB}  \u041E\u0448\u0438\u0431\u043A\u0438 \u0447\u0442\u0435\u043D\u0438\u044F: ${readError.length}`, cRed));
+      for (const f of readError.slice(0, 5)) {
+        console.log(pad(`          ${f}`, cGray));
+      }
+      if (readError.length > 5) console.log(pad(`          ...\u0438 \u0435\u0449\u0451 ${readError.length - 5}`, cGray));
+    }
+    if (compressError.length > 0) {
+      console.log(pad(`       \u{1F527}  AST \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D (raw fallback): ${compressError.length}`, cYellow));
+      for (const f of compressError.slice(0, 5)) {
+        console.log(pad(`          ${f}`, cGray));
+      }
+      if (compressError.length > 5) console.log(pad(`          ...\u0438 \u0435\u0449\u0451 ${compressError.length - 5}`, cGray));
+    }
+    console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  }
+  const coveragePct = opts.total > 0 ? Math.round(opts.compressed / opts.total * 100) : 0;
+  console.log(pad(`  \u2705  \u041F\u043E\u043A\u0440\u044B\u0442\u0438\u0435: ${opts.compressed}/${opts.total} \u0444\u0430\u0439\u043B\u043E\u0432 (${coveragePct}%)`, B + cBGreen));
+  if (skippedExtEntries.length > 0) {
+    const missedTotal = skippedExtEntries.reduce((s, [, c2]) => s + c2, 0);
+    console.log(pad(`  \u{1F4A1}  +${missedTotal} \u0444\u0430\u0439\u043B\u043E\u0432 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E \u0441 \u0440\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u043D\u044B\u043C --exts`, cGray));
+  }
+  console.log(c(bL, `  \u2514${ln}\u2518`));
+  console.log("");
+}
+function printWatchReady(path) {
+  console.log("");
+  console.log(`  ${c(cBCyan + B, "  \u{1F441}  WATCH MODE  ")}  ${c(cGray, path)}`);
+  console.log(c(cGray, `  ${"\u2500".repeat(60)}`));
+  console.log(c(cGray, "  Ctrl+C \u0434\u043B\u044F \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0438\n"));
+}
+function printFileChange(event, relPath, detail = void 0) {
+  const icons = {
+    modified: c(cBYellow, "\u270E"),
+    added: c(cBGreen, "+"),
+    deleted: c(cRed, "\u2212"),
+    error: c(cRed, "\u2717")
+  };
+  const colors = {
+    modified: cBWhite,
+    added: cBGreen,
+    deleted: cGray,
+    error: cRed
+  };
+  const icon = icons[event] ?? "\xB7";
+  const path = c(colors[event] ?? cWhite, relPath.padEnd(40));
+  const det = detail ? c(cGray, detail) : "";
+  console.log(`  ${ts()}  ${icon}  ${path}  ${det}`);
+}
+function printServerCheck(url, ok, ms) {
+  const status = ok ? c(cBGreen, "\u2713 \u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D") : c(cRed, "\u2717 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D");
+  console.log(`  ${ts()}  ${c(cCyan, "\u21D7")}  ${c(cGray, url)}  ${status}  ${c(cGray, formatMs(ms))}`);
+}
+
+// cli/watch.ts
+var BRAIN_CONFIG_DIR = ".brain";
+var BRAIN_CONFIG_FILE = "config.json";
+function loadBrainConfig(projectPath) {
+  const configPath = join(projectPath, BRAIN_CONFIG_DIR, BRAIN_CONFIG_FILE);
+  if (!existsSync(configPath)) return null;
+  try {
+    const raw = readFileSync2(configPath, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+function saveBrainConfig(projectPath, config) {
+  const dirPath = join(projectPath, BRAIN_CONFIG_DIR);
+  try {
+    if (!existsSync(dirPath)) mkdirSync(dirPath, { recursive: true });
+    const configPath = join(dirPath, BRAIN_CONFIG_FILE);
+    writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+    const gitignorePath = join(dirPath, ".gitignore");
+    if (!existsSync(gitignorePath)) {
+      writeFileSync(gitignorePath, "*\n", "utf-8");
+    }
+  } catch {
+  }
+}
+function generateCursorMcpConfig(projectPath, server, token, projectId) {
+  const cursorDir = join(projectPath, ".cursor");
+  const mcpPath = join(cursorDir, "mcp.json");
+  try {
+    if (!existsSync(cursorDir)) mkdirSync(cursorDir, { recursive: true });
+    let existing = { mcpServers: {} };
+    if (existsSync(mcpPath)) {
+      try {
+        existing = JSON.parse(readFileSync2(mcpPath, "utf-8"));
+        if (!existing.mcpServers) existing.mcpServers = {};
+      } catch {
+        existing = { mcpServers: {} };
+      }
+    }
+    existing.mcpServers["project-brain"] = {
+      url: `${server.replace(/\/$/, "")}/mcp`,
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "X-Default-Project": projectId
+      }
+    };
+    writeFileSync(mcpPath, JSON.stringify(existing, null, 2), "utf-8");
+    printOk(`.cursor/mcp.json \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D (project: ${projectId})`);
+  } catch {
+    printWarn(".cursor/mcp.json \u043D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0437\u0434\u0430\u0442\u044C (\u043D\u0435 \u043A\u0440\u0438\u0442\u0438\u0447\u043D\u043E)");
+  }
+}
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+function printRetry(attempt, maxRetries, error) {
+  const msg = `  \u21BB \u043F\u043E\u043F\u044B\u0442\u043A\u0430 ${attempt}/${maxRetries}: ${error}`;
+  process.stdout.write(`\x1B[33m${msg}\x1B[0m
+`);
+}
+var DEFAULT_EXTS = ".ts,.tsx,.js,.jsx,.mjs,.cjs,.py,.cs,.go,.rs,.java,.kt,.swift,.rb,.php,.c,.cpp,.h,.hpp,.cc,.vue,.svelte,.html,.htm,.css,.scss,.sass,.less,.json,.yaml,.yml,.xml,.sql,.sh,.md,.graphql,.gql,.dart,.scala,.lua,.r,.ex,.exs,.proto";
+var DEFAULT_IGNORE = "node_modules,dist,.git,build,out,coverage,__pycache__,.venv,venv,env,.next,.nuxt,vendor,target,.cache,bin,obj,.idea,.vscode,.DS_Store,package-lock.json,yarn.lock,pnpm-lock.yaml";
+function parseArgs(argv) {
+  const get = (flag) => {
+    const idx = argv.indexOf(flag);
+    return idx !== -1 ? argv[idx + 1] : void 0;
+  };
+  const path = get("--path") ?? process.cwd();
+  const brainConfig = loadBrainConfig(path);
+  const server = get("--server") ?? brainConfig?.server ?? "";
+  const token = get("--token") ?? brainConfig?.token ?? "";
+  const project = get("--project") ?? brainConfig?.project_id ?? path.split(/[/\\]/).pop() ?? "default";
+  const watch = argv.includes("--watch");
+  const extsArg = get("--exts") ?? brainConfig?.extensions ?? DEFAULT_EXTS;
+  const ignoreArg = get("--ignore") ?? brainConfig?.ignore ?? DEFAULT_IGNORE;
+  const batchSize = parseInt(get("--batch") ?? String(brainConfig?.batch_size ?? 10), 10);
+  const intervalMin = parseInt(get("--interval") ?? String(brainConfig?.interval_min ?? 3), 10);
+  return {
+    path,
+    server: server.replace(/\/$/, ""),
+    token,
+    project,
+    watch,
+    exts: extsArg.split(",").map((e) => e.trim()),
+    ignore: ignoreArg.split(",").map((e) => e.trim()),
+    batchSize,
+    intervalMin,
+    brainConfigLoaded: brainConfig !== null
+  };
+}
+function collectFiles(dir, ignore, exts) {
+  const files = [];
+  const skippedByExt = {};
+  const extsLower = exts.map((e) => e.toLowerCase());
+  const ignoreFiles = new Set(ignore.filter((i) => i.includes(".")));
+  const ignoreDirs = new Set(ignore.filter((i) => !i.includes(".")));
+  function walk(current) {
+    let entries;
+    try {
+      entries = readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const name = String(entry.name);
+      if (name.startsWith(".")) continue;
+      const fullPath = join(current, name);
+      if (entry.isDirectory()) {
+        if (ignoreDirs.has(name)) continue;
+        walk(fullPath);
+      } else if (entry.isFile()) {
+        if (ignoreFiles.has(name)) continue;
+        const ext = extname(name).toLowerCase();
+        if (extsLower.includes(ext)) {
+          files.push(fullPath);
+        } else if (ext) {
+          skippedByExt[ext] = (skippedByExt[ext] || 0) + 1;
+        }
+      }
+    }
+  }
+  walk(dir);
+  return { files, skippedByExt };
+}
+var IMPORT_REGEX = /import\s+(?:type\s+)?(?:\{[^}]*\}|[^;{]*)\s+from\s+['"]([^'"]+)['"]/g;
+var REQUIRE_REGEX = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+var DYNAMIC_IMPORT_REGEX = /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+function extractImports(code) {
+  const paths = /* @__PURE__ */ new Set();
+  for (const regex of [IMPORT_REGEX, REQUIRE_REGEX, DYNAMIC_IMPORT_REGEX]) {
+    regex.lastIndex = 0;
+    let m;
+    while ((m = regex.exec(code)) !== null) {
+      paths.add(m[1]);
+    }
+  }
+  return [...paths];
+}
+var SYMBOL_PATTERNS = [
+  { regex: /export\s+(?:default\s+)?(?:async\s+)?function\s+(\w+)/g, type: "function", exported: true },
+  { regex: /export\s+(?:default\s+)?class\s+(\w+)/g, type: "class", exported: true },
+  { regex: /export\s+(?:default\s+)?(?:const|let|var)\s+(\w+)/g, type: "variable", exported: true },
+  { regex: /export\s+(?:default\s+)?(?:type|interface)\s+(\w+)/g, type: "type", exported: true },
+  { regex: /(?:^|\n)\s*(?:async\s+)?function\s+(\w+)/g, type: "function", exported: false },
+  { regex: /(?:^|\n)\s*class\s+(\w+)/g, type: "class", exported: false }
+];
+function extractSymbols(code) {
+  const seen = /* @__PURE__ */ new Set();
+  const symbols = [];
+  for (const { regex, type, exported } of SYMBOL_PATTERNS) {
+    regex.lastIndex = 0;
+    let m;
+    while ((m = regex.exec(code)) !== null) {
+      const name = m[1];
+      if (!seen.has(name)) {
+        seen.add(name);
+        symbols.push({ name, type, isExported: exported });
+      }
+    }
+  }
+  return symbols;
+}
+var RAW_SNIPPET_LIMIT = 3e3;
+var MAX_L1_SUMMARY_SIZE = 15e3;
+var MAX_L3_SUMMARY_SIZE = 2e3;
+function extractRawSnippet(code) {
+  if (code.length <= RAW_SNIPPET_LIMIT) return code;
+  const cut = code.lastIndexOf("\n", RAW_SNIPPET_LIMIT);
+  return code.slice(0, cut > 0 ? cut : RAW_SNIPPET_LIMIT);
+}
+function truncateSummary(text, maxSize, label) {
+  if (text.length <= maxSize) return text;
+  const cut = text.lastIndexOf("\n", maxSize);
+  const truncated = text.slice(0, cut > 0 ? cut : maxSize);
+  return `${truncated}
+// ... ${label}: \u043E\u0431\u0440\u0435\u0437\u0430\u043D\u043E (${text.length} \u2192 ${truncated.length} \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432)`;
+}
+var LANG_MAP = {
+  ".ts": "typescript",
+  ".tsx": "typescript",
+  ".js": "javascript",
+  ".jsx": "javascript",
+  ".mjs": "javascript",
+  ".cjs": "javascript",
+  ".py": "python",
+  ".cs": "csharp",
+  ".go": "go",
+  ".rs": "rust",
+  ".java": "java",
+  ".kt": "kotlin",
+  ".kts": "kotlin",
+  ".swift": "swift",
+  ".rb": "ruby",
+  ".php": "php",
+  ".c": "c",
+  ".cpp": "cpp",
+  ".cc": "cpp",
+  ".h": "c-header",
+  ".hpp": "cpp-header",
+  ".vue": "vue",
+  ".svelte": "svelte",
+  ".html": "html",
+  ".htm": "html",
+  ".css": "css",
+  ".scss": "scss",
+  ".sass": "sass",
+  ".less": "less",
+  ".json": "json",
+  ".yaml": "yaml",
+  ".yml": "yaml",
+  ".xml": "xml",
+  ".svg": "xml",
+  ".sql": "sql",
+  ".sh": "shell",
+  ".bash": "shell",
+  ".md": "markdown",
+  ".graphql": "graphql",
+  ".gql": "graphql",
+  ".proto": "protobuf",
+  ".dart": "dart",
+  ".scala": "scala",
+  ".lua": "lua",
+  ".r": "r",
+  ".ex": "elixir",
+  ".exs": "elixir"
+};
+function compressFile(absPath, projectRoot, compressor, skipInfo) {
+  const relPath = relative(projectRoot, absPath).replace(/\\/g, "/");
+  let stat;
+  try {
+    stat = statSync(absPath);
+  } catch {
+    skipInfo?.readError.push(relPath);
+    return null;
+  }
+  if (stat.size > 500 * 1024) {
+    skipInfo?.tooLarge.push(`${relPath} (${formatBytes(stat.size)})`);
+    return null;
+  }
+  let content;
+  try {
+    content = readFileSync2(absPath, "utf-8");
+  } catch {
+    skipInfo?.readError.push(relPath);
+    return null;
+  }
+  const hash = createHash2("md5").update(content).digest("hex");
+  const lineCount = content.split("\n").length;
+  const ext = extname(absPath).toLowerCase();
+  let l1Summary;
+  let l3Summary;
+  try {
+    const l1Result = compressor.compressCode(content, relPath, "L1");
+    const l3Result = compressor.compressCode(content, relPath, "L3");
+    l1Summary = l1Result.content;
+    l3Summary = l3Result.content;
+  } catch {
+    l1Summary = extractRawSnippet(content);
+    l3Summary = `// ${relPath} (${lineCount} lines, ${LANG_MAP[ext] ?? ext})`;
+    skipInfo?.compressError.push(relPath);
+  }
+  l1Summary = truncateSummary(l1Summary, MAX_L1_SUMMARY_SIZE, "L1");
+  l3Summary = truncateSummary(l3Summary, MAX_L3_SUMMARY_SIZE, "L3");
+  const imports = extractImports(content);
+  const symbols = extractSymbols(content);
+  const rawSnippet = extractRawSnippet(content);
+  return {
+    path: relPath,
+    hash,
+    sizeBytes: stat.size,
+    language: LANG_MAP[ext] ?? null,
+    lineCount,
+    l1Summary,
+    l3Summary,
+    imports,
+    symbols,
+    rawSnippet
+  };
+}
+var MAX_BATCH_BYTES = 30 * 1024;
+function estimatePayloadSize(file) {
+  const l1 = file.l1Summary?.length ?? 0;
+  const l3 = file.l3Summary?.length ?? 0;
+  const snippet = file.rawSnippet?.length ?? 0;
+  const path = file.path?.length ?? 0;
+  const importsSize = file.imports ? file.imports.reduce((s, i) => s + i.length + 4, 20) : 0;
+  const symbolsSize = file.symbols ? file.symbols.reduce((s, sym) => s + sym.name.length + sym.type.length + 30, 20) : 0;
+  return l1 + l3 + snippet + path + importsSize + symbolsSize + 200;
+}
+function createSmartBatches(files, maxBytes = MAX_BATCH_BYTES) {
+  if (files.length === 0) return [];
+  const sorted = [...files].sort(
+    (a, b) => estimatePayloadSize(a) - estimatePayloadSize(b)
+  );
+  const batches = [];
+  let currentFiles = [];
+  let currentSize = 0;
+  for (const file of sorted) {
+    const fileSize = estimatePayloadSize(file);
+    if (fileSize > maxBytes) {
+      if (currentFiles.length > 0) {
+        batches.push({ batchIndex: batches.length + 1, files: currentFiles });
+        currentFiles = [];
+        currentSize = 0;
+      }
+      batches.push({ batchIndex: batches.length + 1, files: [file] });
+      continue;
+    }
+    if (currentSize + fileSize > maxBytes && currentFiles.length > 0) {
+      batches.push({ batchIndex: batches.length + 1, files: currentFiles });
+      currentFiles = [];
+      currentSize = 0;
+    }
+    currentFiles.push(file);
+    currentSize += fileSize;
+  }
+  if (currentFiles.length > 0) {
+    batches.push({ batchIndex: batches.length + 1, files: currentFiles });
+  }
+  return batches;
+}
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (!args.server) {
+    printError("--server \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u0435\u043D  (\u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440: https://your-mcp.com)");
+    process.exit(1);
+  }
+  if (!args.token) {
+    printError("--token \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u0435\u043D");
+    process.exit(1);
+  }
+  if (!existsSync(args.path)) {
+    printError(`\u041F\u0443\u0442\u044C \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D: ${args.path}`);
+    process.exit(1);
+  }
+  printHeader(args.project, args.server, "0.11.0");
+  if (args.brainConfigLoaded) {
+    printInfo("\u{1F4C2} .brain/config.json \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D (CLI-\u0444\u043B\u0430\u0433\u0438 \u0438\u043C\u0435\u044E\u0442 \u043F\u0440\u0438\u043E\u0440\u0438\u0442\u0435\u0442)");
+  }
+  printPhase(1, 3, "\u041F\u041E\u0414\u041A\u041B\u042E\u0427\u0415\u041D\u0418\u0415");
+  const t0 = Date.now();
+  const client = new WatcherClient({
+    serverUrl: args.server,
+    authToken: args.token,
+    projectId: args.project,
+    batchSize: args.batchSize,
+    onRetry: printRetry,
+    onSplit: (original, half, depth) => {
+      const indent = "  ".repeat(depth);
+      printWarn(`${indent}\u26A1 \u0414\u0440\u043E\u0431\u043B\u0435\u043D\u0438\u0435 \u0431\u0430\u0442\u0447\u0430: ${original} \u2192 ${half} + ${original - half} \u0444\u0430\u0439\u043B\u043E\u0432 (\u0433\u043B\u0443\u0431\u0438\u043D\u0430 ${depth})`);
+    }
+  });
+  startSpinner(`\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435 \u043A ${args.server}...`);
+  const healthy = await client.healthCheck();
+  stopSpinner();
+  printServerCheck(args.server, healthy, Date.now() - t0);
+  if (!healthy) {
+    printError(`\u0421\u0435\u0440\u0432\u0435\u0440 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D: ${args.server}`);
+    process.exit(1);
+  }
+  printPhase(2, 3, "\u0421\u041A\u0410\u041D\u0418\u0420\u041E\u0412\u0410\u041D\u0418\u0415 \u0418 \u0421\u0416\u0410\u0422\u0418\u0415");
+  printInfo(`\u041F\u0443\u0442\u044C:  ${args.path}`);
+  printInfo(`\u0420\u0430\u0441\u0448:  ${args.exts.join(", ")}   Smart Batch: \u2264${Math.round(MAX_BATCH_BYTES / 1024)} \u041A\u0411`);
+  const ignoreShort = args.ignore.length > 6 ? args.ignore.slice(0, 6).join(", ") + `, +${args.ignore.length - 6} \u0435\u0449\u0451` : args.ignore.join(", ");
+  printInfo(`\u0418\u0433\u043D\u043E\u0440: ${ignoreShort}  (--ignore \u0434\u043B\u044F \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438)`);
+  const tScan = Date.now();
+  const collectResult = collectFiles(args.path, args.ignore, args.exts);
+  const allFiles = collectResult.files;
+  printOk(`\u041D\u0430\u0439\u0434\u0435\u043D\u043E ${allFiles.length} \u0444\u0430\u0439\u043B\u043E\u0432  (${formatBytes(allFiles.reduce((s, f) => {
+    try {
+      return s + statSync(f).size;
+    } catch {
+      return s;
+    }
+  }, 0))} \u0438\u0441\u0445\u043E\u0434\u043D\u044B\u0445)`);
+  const skippedExtTotal = Object.values(collectResult.skippedByExt).reduce((s, c2) => s + c2, 0);
+  if (skippedExtTotal > 0) {
+    const topSkipped = Object.entries(collectResult.skippedByExt).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([ext, cnt]) => `${ext}(${cnt})`).join(", ");
+    printWarn(`${skippedExtTotal} \u0444\u0430\u0439\u043B\u043E\u0432 \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E (\u0440\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u0438\u0435 \u043D\u0435 \u0432 --exts): ${topSkipped}`);
+  }
+  const silentLogger = {
+    info: () => {
+    },
+    warn: () => {
+    },
+    error: () => {
+    },
+    debug: () => {
+    },
+    trace: () => {
+    },
+    fatal: () => {
+    }
+  };
+  const compressor = new AstCompressor(silentLogger);
+  const compressed = [];
+  const skipInfo = { tooLarge: [], readError: [], compressError: [] };
+  for (let i = 0; i < allFiles.length; i++) {
+    const absPath = allFiles[i];
+    printProgress(i + 1, allFiles.length, relative(args.path, absPath).replace(/\\/g, "/"));
+    const file = compressFile(absPath, args.path, compressor, skipInfo);
+    if (file) {
+      compressed.push(file);
+    }
+  }
+  const compressErrors = skipInfo.tooLarge.length + skipInfo.readError.length;
+  const compressElapsed = Date.now() - tScan;
+  const rawKb = Math.round(allFiles.reduce((s, f) => {
+    try {
+      return s + statSync(f).size;
+    } catch {
+      return s;
+    }
+  }, 0) / 1024);
+  const sumKb = Math.round(compressed.reduce((s, f) => s + f.l1Summary.length, 0) / 1024);
+  const ratio = rawKb > 0 ? (rawKb / Math.max(sumKb, 1)).toFixed(1) : "\u2014";
+  printOk(`\u0421\u0436\u0430\u0442\u043E ${compressed.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u0437\u0430 ${(compressElapsed / 1e3).toFixed(1)}\u0441  \u2192  ${formatBytes(sumKb * 1024)}  (\xD7${ratio})`);
+  if (compressErrors > 0) printWarn(`${compressErrors} \u0444\u0430\u0439\u043B\u043E\u0432 \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E (\u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u0438\u0435 \u0438\u043B\u0438 \u043D\u0435\u0447\u0438\u0442\u0430\u0435\u043C\u044B\u0435)`);
+  if (skipInfo.compressError.length > 0) printInfo(`${skipInfo.compressError.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u0431\u0435\u0437 AST (raw fallback)`);
+  printPhase(3, 3, "\u0417\u0410\u0413\u0420\u0423\u0417\u041A\u0410");
+  const allBatches = createSmartBatches(compressed);
+  const totalBatches = allBatches.length;
+  printInfo(`${totalBatches} \u0431\u0430\u0442\u0447\u0435\u0439 (smart: \u2264${Math.round(MAX_BATCH_BYTES / 1024)} \u041A\u0411/\u0431\u0430\u0442\u0447)`);
+  resetUploadTimer();
+  const uploadStart = Date.now();
+  let uploaded = 0;
+  const allFailed = [];
+  const uploadedPaths = /* @__PURE__ */ new Set();
+  for (let bIdx = 0; bIdx < allBatches.length; bIdx++) {
+    const entry = allBatches[bIdx];
+    const batchBytes = entry.files.reduce((s, f) => s + estimatePayloadSize(f), 0);
+    const batchKb = (batchBytes / 1024).toFixed(1);
+    startSpinner(`\u0411\u0430\u0442\u0447 ${entry.batchIndex}/${totalBatches} (${entry.files.length} \u0444\u0430\u0439\u043B\u043E\u0432, ~${batchKb} \u041A\u0411)...`);
+    const result = await client.pushBatchAdaptive(entry.files);
+    stopSpinner();
+    uploaded += result.uploaded.length;
+    for (const f of result.uploaded) uploadedPaths.add(f.path);
+    allFailed.push(...result.failed);
+    const elapsed = Date.now() - uploadStart;
+    const eta = totalBatches > 1 ? ` ~${((totalBatches - bIdx - 1) * (elapsed / (bIdx + 1)) / 1e3).toFixed(0)}\u0441` : "";
+    if (result.failed.length === 0) {
+      printOk(`  \u0411\u0430\u0442\u0447 ${entry.batchIndex}/${totalBatches}: ${entry.files.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u2713${eta}`);
+    } else if (result.uploaded.length > 0) {
+      printWarn(
+        `  \u0411\u0430\u0442\u0447 ${entry.batchIndex}/${totalBatches}: ${result.uploaded.length} \u2713 / ${result.failed.length} \u2717${eta}`
+      );
+    } else {
+      printError(`  \u0411\u0430\u0442\u0447 ${entry.batchIndex}/${totalBatches}: \u0432\u0441\u0435 ${entry.files.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u2717${eta}`);
+    }
+    if (bIdx < allBatches.length - 1) {
+      await sleep(150);
+    }
+  }
+  const uploadElapsed = Date.now() - uploadStart;
+  printBatch(totalBatches, totalBatches, uploaded, formatBytes(sumKb * 1024), allFailed.length === 0);
+  printOk(`\u0417\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043E: ${uploaded} \u0444\u0430\u0439\u043B\u043E\u0432 \u0437\u0430 ${(uploadElapsed / 1e3).toFixed(1)}\u0441 (${totalBatches} \u0431\u0430\u0442\u0447\u0435\u0439)`);
+  if (allFailed.length > 0) {
+    printWarn(`  ${allFailed.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u043D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C:`);
+    for (const f of allFailed.slice(0, 10)) {
+      printError(`    \u2717 ${f.path} (~${(estimatePayloadSize(f) / 1024).toFixed(1)} \u041A\u0411)`);
+    }
+    if (allFailed.length > 10) {
+      printError(`    ... \u0438 \u0435\u0449\u0451 ${allFailed.length - 10}`);
+    }
+  }
+  if (uploaded > 0) {
+    const freshConfig = {
+      project_id: args.project,
+      server: args.server,
+      token: args.token,
+      extensions: args.exts.join(","),
+      ignore: args.ignore.join(","),
+      batch_size: args.batchSize,
+      interval_min: args.intervalMin
+    };
+    saveBrainConfig(args.path, freshConfig);
+    printOk(args.brainConfigLoaded ? ".brain/config.json \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D (\u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u044B \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u043D\u044B)" : ".brain/config.json \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D (\u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0437\u0430\u043F\u0443\u0441\u043A \u0431\u0435\u0437 --server --token --project)");
+    generateCursorMcpConfig(args.path, args.server, args.token, args.project);
+  } else {
+    printWarn("\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043D\u0435 \u0441\u043E\u0441\u0442\u043E\u044F\u043B\u0430\u0441\u044C \u2014 .cursor/mcp.json \u043D\u0435 \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D");
+  }
+  printSummary({
+    files: uploaded,
+    batches: totalBatches,
+    originalKb: rawKb,
+    summaryKb: sumKb,
+    elapsedMs: Date.now() - tScan,
+    errors: allFailed.length + compressErrors
+  });
+  const rawBytesTotal = allFiles.reduce((s, f) => {
+    try {
+      return s + statSync(f).size;
+    } catch {
+      return s;
+    }
+  }, 0);
+  const summaryBytesTotal = compressed.reduce((s, f) => s + f.l1Summary.length + f.l3Summary.length, 0);
+  printTokenSavings(rawBytesTotal, summaryBytesTotal, uploaded);
+  const byExt = {};
+  for (const f of compressed) {
+    const ext = extname(f.path).toLowerCase() || "(\u0431\u0435\u0437 \u0440\u0430\u0441\u0448.)";
+    byExt[ext] = (byExt[ext] || 0) + 1;
+  }
+  printVerification({
+    byExt,
+    skipInfo,
+    total: allFiles.length + skippedExtTotal,
+    compressed: compressed.length,
+    skippedByExt: collectResult.skippedByExt
+  });
+  const hashMap = /* @__PURE__ */ new Map();
+  for (const file of compressed) {
+    if (uploadedPaths.has(file.path)) {
+      hashMap.set(file.path, file.hash);
+    }
+  }
+  const intervalMs = args.intervalMin * 60 * 1e3;
+  let rescanRunning = false;
+  let consecutiveFailures = 0;
+  const MAX_CONSECUTIVE_FAILURES = 5;
+  const doRescan = async () => {
+    if (rescanRunning) return;
+    rescanRunning = true;
+    const t = Date.now();
+    try {
+      const serverAlive = await client.healthCheck();
+      if (!serverAlive) {
+        consecutiveFailures++;
+        const backoffSec = Math.min(30, Math.pow(2, consecutiveFailures));
+        printWarn(`\u0421\u0435\u0440\u0432\u0435\u0440 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D (\u043F\u043E\u043F\u044B\u0442\u043A\u0430 ${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}), \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0430\u044F \u0447\u0435\u0440\u0435\u0437 ${backoffSec}\u0441`);
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+          printError("\u0421\u0435\u0440\u0432\u0435\u0440 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u0434\u043B\u0438\u0442\u0435\u043B\u044C\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F. \u0412\u043E\u0442\u0447\u0435\u0440 \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0430\u0435\u0442 \u0440\u0430\u0431\u043E\u0442\u0430\u0442\u044C \u0432 offline-\u0440\u0435\u0436\u0438\u043C\u0435.");
+        }
+        rescanRunning = false;
+        return;
+      }
+      if (consecutiveFailures > 0) {
+        printOk(`\u0421\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u0438\u0435 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u043F\u043E\u0441\u043B\u0435 ${consecutiveFailures} \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u044B\u0445 \u043F\u043E\u043F\u044B\u0442\u043E\u043A`);
+        consecutiveFailures = 0;
+      }
+      const { files } = collectFiles(args.path, args.ignore, args.exts);
+      const currentPaths = /* @__PURE__ */ new Set();
+      const changedFiles = [];
+      let addedCount = 0;
+      let changedCount = 0;
+      for (const absPath of files) {
+        const content = (() => {
+          try {
+            return readFileSync2(absPath, "utf-8");
+          } catch {
+            return null;
+          }
+        })();
+        if (!content) continue;
+        const relPath = relative(args.path, absPath).replace(/\\/g, "/");
+        currentPaths.add(relPath);
+        const hash = createHash2("md5").update(content).digest("hex");
+        const prevHash = hashMap.get(relPath);
+        if (prevHash === hash) continue;
+        const file = compressFile(absPath, args.path, compressor);
+        if (!file) continue;
+        changedFiles.push(file);
+        if (prevHash === void 0) {
+          addedCount++;
+        } else {
+          changedCount++;
+        }
+      }
+      const removedPaths = [];
+      for (const [path] of hashMap) {
+        if (!currentPaths.has(path)) {
+          removedPaths.push(path);
+        }
+      }
+      for (const p of removedPaths) {
+        hashMap.delete(p);
+      }
+      let uploadedCount = 0;
+      if (changedFiles.length > 0) {
+        const rescanBatches = createSmartBatches(changedFiles);
+        for (const batch of rescanBatches) {
+          const result = await client.pushBatchAdaptive(batch.files);
+          uploadedCount += result.uploaded.length;
+          for (const f of result.uploaded) {
+            hashMap.set(f.path, f.hash);
+          }
+          for (const f of result.failed) {
+            hashMap.delete(f.path);
+          }
+          if (result.failed.length > 0) {
+            printError(`  Rescan: ${result.failed.length} \u0444\u0430\u0439\u043B\u043E\u0432 \u043D\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043E`);
+          }
+          await sleep(150);
+        }
+      }
+      printRescanResult({
+        changed: changedCount,
+        added: addedCount,
+        removed: removedPaths.length,
+        unchanged: currentPaths.size - changedFiles.length,
+        uploaded: uploadedCount,
+        elapsedMs: Date.now() - t,
+        nextInMin: args.intervalMin
+      });
+    } catch (err) {
+      consecutiveFailures++;
+      printError(`Rescan \u043E\u0448\u0438\u0431\u043A\u0430 (${consecutiveFailures}): ${String(err)}`);
+    } finally {
+      rescanRunning = false;
+    }
+  };
+  const rescanTimer = setInterval(() => void doRescan(), intervalMs);
+  printOk(`Periodic rescan \u043A\u0430\u0436\u0434\u044B\u0435 ${args.intervalMin} \u043C\u0438\u043D (${hashMap.size} \u0444\u0430\u0439\u043B\u043E\u0432 \u043E\u0442\u0441\u043B\u0435\u0436\u0438\u0432\u0430\u044E\u0442\u0441\u044F)`);
+  const HEARTBEAT_INTERVAL_MS = 6e4;
+  const heartbeatTimer = setInterval(() => {
+    void client.sendHeartbeat(hashMap.size);
+  }, HEARTBEAT_INTERVAL_MS);
+  if (args.watch) {
+    printWatchReady(args.path);
+    const watcher = chokidar.watch(args.path, {
+      ignored: (p) => {
+        const parts = p.split(/[/\\]/);
+        return parts.some((part) => args.ignore.includes(part) || part.startsWith("."));
+      },
+      ignoreInitial: true,
+      persistent: true
+    });
+    const handleChange = async (absPath, event) => {
+      if (!args.exts.includes(extname(absPath))) return;
+      const file = compressFile(absPath, args.path, compressor);
+      if (!file) return;
+      hashMap.set(file.path, file.hash);
+      const detail = `${formatBytes(file.sizeBytes)} \u2192 ${formatBytes(file.l1Summary.length)} \u0441\u0443\u043C\u043C\u0430\u0440\u0438`;
+      try {
+        await client.pushBatch([file]);
+        printFileChange(event, file.path, detail);
+      } catch (err) {
+        printFileChange("error", file.path, String(err));
+      }
+    };
+    watcher.on("change", (p) => void handleChange(p, "modified"));
+    watcher.on("add", (p) => void handleChange(p, "added"));
+    watcher.on("unlink", (absPath) => {
+      const relPath = relative(args.path, absPath).replace(/\\/g, "/");
+      hashMap.delete(relPath);
+      printFileChange("deleted", relPath, "\u0443\u0434\u0430\u043B\u0451\u043D \u0438\u0437 \u0438\u043D\u0434\u0435\u043A\u0441\u0430");
+    });
+    process.on("SIGINT", async () => {
+      console.log("");
+      printWarn("\u041E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0430 \u0432\u043E\u0442\u0447\u0435\u0440\u0430...");
+      clearInterval(rescanTimer);
+      clearInterval(heartbeatTimer);
+      await watcher.close();
+      process.exit(0);
+    });
+  } else {
+    printSkip("\u0421\u043E\u0432\u0435\u0442: \u0434\u043E\u0431\u0430\u0432\u044C --watch \u0434\u043B\u044F \u043C\u0433\u043D\u043E\u0432\u0435\u043D\u043D\u043E\u0439 \u0440\u0435\u0430\u043A\u0446\u0438\u0438 \u043D\u0430 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0444\u0430\u0439\u043B\u043E\u0432");
+    printInfo("\u041F\u0440\u043E\u0446\u0435\u0441\u0441 \u043E\u0441\u0442\u0430\u0451\u0442\u0441\u044F \u0437\u0430\u043F\u0443\u0449\u0435\u043D\u043D\u044B\u043C \u0434\u043B\u044F periodic rescan. Ctrl+C \u0434\u043B\u044F \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0438.");
+    process.on("SIGINT", () => {
+      console.log("");
+      printWarn("\u041E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0430...");
+      clearInterval(rescanTimer);
+      clearInterval(heartbeatTimer);
+      process.exit(0);
+    });
+  }
+}
+main().catch((err) => {
+  printError(`\u041A\u0440\u0438\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043E\u0448\u0438\u0431\u043A\u0430: ${String(err)}`);
+  process.exit(1);
+});
