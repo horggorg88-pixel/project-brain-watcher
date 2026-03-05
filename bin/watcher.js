@@ -2,8 +2,8 @@
 
 // cli/watch.ts
 import { createHash as createHash2 } from "node:crypto";
-import { readFileSync as readFileSync2, writeFileSync, mkdirSync, statSync, readdirSync, existsSync } from "node:fs";
-import { join as join3, relative as relative3, extname as extname2 } from "node:path";
+import { readFileSync as readFileSync2, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2, statSync, readdirSync, existsSync as existsSync2 } from "node:fs";
+import { join as join4, relative as relative3, extname as extname2 } from "node:path";
 
 // node_modules/chokidar/esm/index.js
 import { stat as statcb } from "fs";
@@ -734,9 +734,9 @@ var NodeFsHandler = class {
     if (this.fsw.closed) {
       return;
     }
-    const dirname3 = sysPath.dirname(file);
+    const dirname4 = sysPath.dirname(file);
     const basename3 = sysPath.basename(file);
-    const parent = this.fsw._getWatchedDir(dirname3);
+    const parent = this.fsw._getWatchedDir(dirname4);
     let prevStats = stats;
     if (parent.has(basename3))
       return;
@@ -763,7 +763,7 @@ var NodeFsHandler = class {
             prevStats = newStats2;
           }
         } catch (error) {
-          this.fsw._remove(dirname3, basename3);
+          this.fsw._remove(dirname4, basename3);
         }
       } else if (parent.has(basename3)) {
         const at = newStats.atimeMs;
@@ -859,7 +859,7 @@ var NodeFsHandler = class {
         this._addToNodeFs(path, initialAdd, wh, depth + 1);
       }
     }).on(EV.ERROR, this._boundHandleError);
-    return new Promise((resolve3, reject) => {
+    return new Promise((resolve4, reject) => {
       if (!stream)
         return reject();
       stream.once(STR_END, () => {
@@ -868,7 +868,7 @@ var NodeFsHandler = class {
           return;
         }
         const wasThrottled = throttler ? throttler.clear() : false;
-        resolve3(void 0);
+        resolve4(void 0);
         previous.getChildren().filter((item) => {
           return item !== directory && !current.has(item);
         }).forEach((item) => {
@@ -4260,7 +4260,7 @@ var WatcherClient = class {
     const exponential = config.baseDelayMs * Math.pow(2, attempt);
     const jitter = Math.random() * 500;
     const delay = Math.min(exponential + jitter, config.maxDelayMs);
-    return new Promise((resolve3) => setTimeout(resolve3, delay));
+    return new Promise((resolve4) => setTimeout(resolve4, delay));
   }
 };
 
@@ -4556,12 +4556,241 @@ function printServerCheck(url, ok, ms) {
   console.log(`  ${ts()}  ${c(cCyan, "\u21D7")}  ${c(cGray, url)}  ${status}  ${c(cGray, formatMs(ms))}`);
 }
 
+// cli/swarm-applier.ts
+import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { dirname as dirname3, resolve as resolve3 } from "node:path";
+import { execSync } from "node:child_process";
+var SwarmApplier = class {
+  serverUrl;
+  token;
+  projectId;
+  projectPath;
+  abortController = null;
+  activeJobId = null;
+  branchCreated = false;
+  currentBatch = { files: [], batchIdx: -1 };
+  constructor(opts) {
+    this.serverUrl = opts.serverUrl.replace(/\/$/, "");
+    this.token = opts.token;
+    this.projectId = opts.projectId;
+    this.projectPath = opts.projectPath;
+  }
+  start() {
+    this.abortController = new AbortController();
+    this.connect();
+    printInfo("\u{1F41D} Swarm Applier: SSE-listener \u0437\u0430\u043F\u0443\u0449\u0435\u043D (\u043E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 \u0437\u0430\u0434\u0430\u0447)");
+  }
+  stop() {
+    this.abortController?.abort();
+    this.abortController = null;
+    printInfo("\u{1F41D} Swarm Applier: \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D");
+  }
+  connect() {
+    const url = `${this.serverUrl}/api/swarm/stream?project_id=${encodeURIComponent(this.projectId)}`;
+    const doConnect = async () => {
+      while (this.abortController && !this.abortController.signal.aborted) {
+        try {
+          await this.listenSse(url);
+        } catch (err) {
+          if (this.abortController?.signal.aborted) return;
+          printWarn(`\u{1F41D} SSE \u0440\u0430\u0437\u0440\u044B\u0432: ${err instanceof Error ? err.message : String(err)}. \u041F\u0435\u0440\u0435\u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435 \u0447\u0435\u0440\u0435\u0437 5\u0441...`);
+          await this.sleep(5e3);
+        }
+      }
+    };
+    void doConnect();
+  }
+  async listenSse(url) {
+    const response = await fetch(url, {
+      headers: { "Authorization": `Bearer ${this.token}` },
+      signal: this.abortController?.signal
+    });
+    if (!response.ok) {
+      throw new Error(`SSE HTTP ${response.status}`);
+    }
+    if (!response.body) {
+      throw new Error("SSE: \u043D\u0435\u0442 body \u0432 \u043E\u0442\u0432\u0435\u0442\u0435");
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      let currentEvent = "";
+      let currentData = "";
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.startsWith("data: ")) {
+          currentData = line.slice(6);
+        } else if (line.trim() === "" && currentData) {
+          this.handleEvent(currentEvent, currentData);
+          currentEvent = "";
+          currentData = "";
+        }
+      }
+    }
+  }
+  handleEvent(eventType, dataStr) {
+    try {
+      const parsed = JSON.parse(dataStr);
+      const type = eventType || parsed.type || "";
+      const payload = parsed.payload ?? parsed;
+      switch (type) {
+        case "task_complete":
+          void this.onTaskComplete(payload);
+          break;
+        case "task_failed":
+          this.onTaskFailed(payload);
+          break;
+        case "batch_complete":
+          void this.onBatchComplete(payload);
+          break;
+        case "job_complete":
+          this.onJobComplete(payload);
+          break;
+        case "job_error":
+          this.onJobError(payload);
+          break;
+        case "connected":
+          break;
+        default:
+          break;
+      }
+    } catch {
+    }
+  }
+  async onTaskComplete(payload) {
+    if (!payload.taskId || !payload.filePath) return;
+    if (!this.branchCreated && payload.jobId) {
+      this.activeJobId = payload.jobId;
+      this.createBranch(payload.jobId);
+    }
+    try {
+      const delivery = await this.fetchTaskCode(payload.taskId);
+      if (!delivery) {
+        printError(`  \u{1F41D} ${payload.filePath}: \u043A\u043E\u0434 \u043D\u0435 \u043F\u043E\u043B\u0443\u0447\u0435\u043D`);
+        return;
+      }
+      this.writeFile(delivery.filePath, delivery.code);
+      await this.ackTask(payload.taskId);
+      printOk(`  \u{1F41D} ${delivery.filePath} (${(delivery.code.length / 1024).toFixed(1)} \u041A\u0411)`);
+      if (payload.batchIdx !== void 0) {
+        if (this.currentBatch.batchIdx !== payload.batchIdx) {
+          this.currentBatch = { files: [], batchIdx: payload.batchIdx };
+        }
+        this.currentBatch.files.push(delivery.filePath);
+      }
+    } catch (err) {
+      printError(`  \u{1F41D} ${payload.filePath}: \u043E\u0448\u0438\u0431\u043A\u0430 \u2014 ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  onTaskFailed(payload) {
+    printError(`  \u{1F41D} FAIL ${payload.taskId ?? "unknown"}: ${payload.error ?? "\u043D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043E\u0448\u0438\u0431\u043A\u0430"}`);
+  }
+  async onBatchComplete(payload) {
+    const filesList = this.currentBatch.files.join(", ");
+    const batchLabel = payload.batchIdx !== void 0 ? `batch ${(payload.batchIdx ?? 0) + 1}` : "batch";
+    this.gitCommit(`swarm: ${batchLabel} -- ${filesList || "empty"}`);
+    printOk(`  \u{1F41D} Commit: swarm ${batchLabel} (${this.currentBatch.files.length} \u0444\u0430\u0439\u043B\u043E\u0432)`);
+    this.currentBatch = { files: [], batchIdx: -1 };
+  }
+  onJobComplete(payload) {
+    const cost = payload.costUsd ? `~$${payload.costUsd.toFixed(4)}` : "";
+    const tokens = payload.totalTokens ? `${payload.totalTokens} \u0442\u043E\u043A\u0435\u043D\u043E\u0432` : "";
+    const files = payload.totalFiles ?? 0;
+    printOk(`
+  \u{1F41D} \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550`);
+    printOk(`  \u{1F41D} SWARM JOB ${payload.jobId} \u0417\u0410\u0412\u0415\u0420\u0428\u0401\u041D`);
+    printOk(`  \u{1F41D} \u0424\u0430\u0439\u043B\u043E\u0432: ${files}  ${tokens}  ${cost}`);
+    printOk(`  \u{1F41D} \u0412\u0435\u0442\u043A\u0430: swarm/job-${payload.jobId}`);
+    printOk(`  \u{1F41D} \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+`);
+    this.branchCreated = false;
+    this.activeJobId = null;
+  }
+  onJobError(payload) {
+    printError(`
+  \u{1F41D} SWARM JOB ${payload.jobId} \u041E\u0428\u0418\u0411\u041A\u0410: ${payload.error ?? "unknown"}
+`);
+    this.branchCreated = false;
+    this.activeJobId = null;
+  }
+  createBranch(jobId) {
+    const branchName = `swarm/job-${jobId}`;
+    try {
+      execSync(`git checkout -b ${branchName}`, {
+        cwd: this.projectPath,
+        stdio: "pipe"
+      });
+      this.branchCreated = true;
+      printOk(`  \u{1F41D} Git: \u0441\u043E\u0437\u0434\u0430\u043D\u0430 \u0432\u0435\u0442\u043A\u0430 ${branchName}`);
+    } catch (err) {
+      try {
+        execSync(`git checkout ${branchName}`, {
+          cwd: this.projectPath,
+          stdio: "pipe"
+        });
+        this.branchCreated = true;
+        printWarn(`  \u{1F41D} Git: \u043F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0435\u043D\u043E \u043D\u0430 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0443\u044E \u0432\u0435\u0442\u043A\u0443 ${branchName}`);
+      } catch {
+        printError(`  \u{1F41D} Git: \u043D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0437\u0434\u0430\u0442\u044C/\u043F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0432\u0435\u0442\u043A\u0443: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+  writeFile(filePath, code) {
+    const fullPath = resolve3(this.projectPath, filePath);
+    const dir = dirname3(fullPath);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(fullPath, code, "utf-8");
+  }
+  gitCommit(message) {
+    try {
+      execSync("git add .", { cwd: this.projectPath, stdio: "pipe" });
+      execSync(`git commit -m "${message.replace(/"/g, '\\"')}" --allow-empty`, {
+        cwd: this.projectPath,
+        stdio: "pipe"
+      });
+    } catch (err) {
+      printWarn(`  \u{1F41D} Git commit: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  async fetchTaskCode(taskId) {
+    const url = `${this.serverUrl}/api/swarm/task/${encodeURIComponent(taskId)}/code`;
+    const response = await fetch(url, {
+      headers: { "Authorization": `Bearer ${this.token}` }
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  }
+  async ackTask(taskId) {
+    const url = `${this.serverUrl}/api/swarm/task/${encodeURIComponent(taskId)}/ack`;
+    await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${this.token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ taskId })
+    });
+  }
+  sleep(ms) {
+    return new Promise((resolve4) => setTimeout(resolve4, ms));
+  }
+};
+
 // cli/watch.ts
 var BRAIN_CONFIG_DIR = ".brain";
 var BRAIN_CONFIG_FILE = "config.json";
 function loadBrainConfig(projectPath) {
-  const configPath = join3(projectPath, BRAIN_CONFIG_DIR, BRAIN_CONFIG_FILE);
-  if (!existsSync(configPath)) return null;
+  const configPath = join4(projectPath, BRAIN_CONFIG_DIR, BRAIN_CONFIG_FILE);
+  if (!existsSync2(configPath)) return null;
   try {
     const raw = readFileSync2(configPath, "utf-8");
     return JSON.parse(raw);
@@ -4570,25 +4799,25 @@ function loadBrainConfig(projectPath) {
   }
 }
 function saveBrainConfig(projectPath, config) {
-  const dirPath = join3(projectPath, BRAIN_CONFIG_DIR);
+  const dirPath = join4(projectPath, BRAIN_CONFIG_DIR);
   try {
-    if (!existsSync(dirPath)) mkdirSync(dirPath, { recursive: true });
-    const configPath = join3(dirPath, BRAIN_CONFIG_FILE);
-    writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
-    const gitignorePath = join3(dirPath, ".gitignore");
-    if (!existsSync(gitignorePath)) {
-      writeFileSync(gitignorePath, "*\n", "utf-8");
+    if (!existsSync2(dirPath)) mkdirSync2(dirPath, { recursive: true });
+    const configPath = join4(dirPath, BRAIN_CONFIG_FILE);
+    writeFileSync2(configPath, JSON.stringify(config, null, 2), "utf-8");
+    const gitignorePath = join4(dirPath, ".gitignore");
+    if (!existsSync2(gitignorePath)) {
+      writeFileSync2(gitignorePath, "*\n", "utf-8");
     }
   } catch {
   }
 }
 function generateCursorMcpConfig(projectPath, server, token, projectId) {
-  const cursorDir = join3(projectPath, ".cursor");
-  const mcpPath = join3(cursorDir, "mcp.json");
+  const cursorDir = join4(projectPath, ".cursor");
+  const mcpPath = join4(cursorDir, "mcp.json");
   try {
-    if (!existsSync(cursorDir)) mkdirSync(cursorDir, { recursive: true });
+    if (!existsSync2(cursorDir)) mkdirSync2(cursorDir, { recursive: true });
     let existing = { mcpServers: {} };
-    if (existsSync(mcpPath)) {
+    if (existsSync2(mcpPath)) {
       try {
         existing = JSON.parse(readFileSync2(mcpPath, "utf-8"));
         if (!existing.mcpServers) existing.mcpServers = {};
@@ -4603,14 +4832,14 @@ function generateCursorMcpConfig(projectPath, server, token, projectId) {
         "X-Default-Project": projectId
       }
     };
-    writeFileSync(mcpPath, JSON.stringify(existing, null, 2), "utf-8");
+    writeFileSync2(mcpPath, JSON.stringify(existing, null, 2), "utf-8");
     printOk(`.cursor/mcp.json \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D (project: ${projectId})`);
   } catch {
     printWarn(".cursor/mcp.json \u043D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0437\u0434\u0430\u0442\u044C (\u043D\u0435 \u043A\u0440\u0438\u0442\u0438\u0447\u043D\u043E)");
   }
 }
 function sleep(ms) {
-  return new Promise((resolve3) => setTimeout(resolve3, ms));
+  return new Promise((resolve4) => setTimeout(resolve4, ms));
 }
 function printRetry(attempt, maxRetries, error) {
   const msg = `  \u21BB \u043F\u043E\u043F\u044B\u0442\u043A\u0430 ${attempt}/${maxRetries}: ${error}`;
@@ -4663,7 +4892,7 @@ function collectFiles(dir, ignore, exts) {
     for (const entry of entries) {
       const name = String(entry.name);
       if (name.startsWith(".")) continue;
-      const fullPath = join3(current, name);
+      const fullPath = join4(current, name);
       if (entry.isDirectory()) {
         if (ignoreDirs.has(name)) continue;
         walk(fullPath);
@@ -4888,7 +5117,7 @@ async function main() {
     printError("--token \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u0435\u043D");
     process.exit(1);
   }
-  if (!existsSync(args.path)) {
+  if (!existsSync2(args.path)) {
     printError(`\u041F\u0443\u0442\u044C \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D: ${args.path}`);
     process.exit(1);
   }
@@ -5174,6 +5403,13 @@ async function main() {
   const heartbeatTimer = setInterval(() => {
     void client.sendHeartbeat(hashMap.size);
   }, HEARTBEAT_INTERVAL_MS);
+  const swarmApplier = new SwarmApplier({
+    serverUrl: args.server,
+    token: args.token,
+    projectId: args.project,
+    projectPath: args.path
+  });
+  swarmApplier.start();
   if (args.watch) {
     printWatchReady(args.path);
     const watcher = esm_default.watch(args.path, {
@@ -5207,6 +5443,7 @@ async function main() {
     process.on("SIGINT", async () => {
       console.log("");
       printWarn("\u041E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0430 \u0432\u043E\u0442\u0447\u0435\u0440\u0430...");
+      swarmApplier.stop();
       clearInterval(rescanTimer);
       clearInterval(heartbeatTimer);
       await watcher.close();
@@ -5218,6 +5455,7 @@ async function main() {
     process.on("SIGINT", () => {
       console.log("");
       printWarn("\u041E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0430...");
+      swarmApplier.stop();
       clearInterval(rescanTimer);
       clearInterval(heartbeatTimer);
       process.exit(0);
