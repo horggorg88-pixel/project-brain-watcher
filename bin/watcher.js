@@ -3,7 +3,7 @@
 // cli/watch.ts
 import { createHash as createHash2 } from "node:crypto";
 import { readFileSync as readFileSync2, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2, statSync, readdirSync, existsSync as existsSync2 } from "node:fs";
-import { join as join4, relative as relative3, extname as extname2 } from "node:path";
+import { join as join3, relative as relative3, extname as extname2 } from "node:path";
 
 // node_modules/chokidar/esm/index.js
 import { stat as statcb } from "fs";
@@ -4430,18 +4430,18 @@ function printTokenSavings(rawBytes, summaryBytes, fileCount) {
   };
   const w = 62;
   const ln = "\u2500".repeat(w);
-  const sep = "\u2500".repeat(w - 2);
+  const sep2 = "\u2500".repeat(w - 2);
   const bL = cBBlue;
   const pad = (s, color) => c(bL, "  \u2502") + c(color, s).padEnd(w + 9) + c(bL, "\u2502");
   console.log(c(bL, `  \u250C${ln}\u2510`));
   console.log(c(bL, "  \u2502") + c(B + cBWhite, `  \u{1F9EE}  \u042D\u041A\u041E\u041D\u041E\u041C\u0418\u042F \u0422\u041E\u041A\u0415\u041D\u041E\u0412`).padEnd(w + 8) + c(bL, "\u2502"));
-  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep2}`).padEnd(w + 8) + c(bL, "\u2502"));
   console.log(pad(`  \u{1F4C4}  \u0418\u0441\u0445\u043E\u0434\u043D\u044B\u0439 \u043A\u043E\u0434:   ~${fmt(rawTok)} \u0442\u043E\u043A\u0435\u043D\u043E\u0432  (${formatBytes(rawBytes)})`, cRed));
   console.log(pad(`  \u{1F9E0}  L1+L3 \u0441\u0443\u043C\u043C\u0430\u0440\u0438:  ~${fmt(sumTok)} \u0442\u043E\u043A\u0435\u043D\u043E\u0432  (${formatBytes(summaryBytes)})`, cBGreen));
-  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep2}`).padEnd(w + 8) + c(bL, "\u2502"));
   console.log(pad(`  \u{1F4B0}  \u042D\u043A\u043E\u043D\u043E\u043C\u0438\u044F:       ~${fmt(savedTok)} \u0442\u043E\u043A\u0435\u043D\u043E\u0432  (${savedPct}%)`, B + cBYellow));
   console.log(pad(`  \u{1F4CA}  \u0421\u0442\u0435\u043F\u0435\u043D\u044C \u0441\u0436\u0430\u0442\u0438\u044F: \xD7${ratio}  (${fileCount} \u0444\u0430\u0439\u043B\u043E\u0432)`, cBCyan));
-  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep2}`).padEnd(w + 8) + c(bL, "\u2502"));
   console.log(pad(`  \u{1F4D0}  \u0421\u0440\u0435\u0434\u043D\u0438\u0439 \u0444\u0430\u0439\u043B:   ${formatBytes(avgRaw)} \u2192 ${formatBytes(avgSum)}`, cGray));
   console.log(pad(`  \u26A1  \u041D\u0430 \u043F\u0440\u043E\u0432\u043E\u0434\u0435:     gzip \u0435\u0449\u0451 ~70% \u043C\u0435\u043D\u044C\u0448\u0435`, cGray));
   console.log(c(bL, `  \u2514${ln}\u2518`));
@@ -4464,12 +4464,12 @@ function printRescanResult(opts) {
 function printVerification(opts) {
   const w = 62;
   const ln = "\u2500".repeat(w);
-  const sep = "\u2500".repeat(w - 2);
+  const sep2 = "\u2500".repeat(w - 2);
   const bL = cBCyan;
   const pad = (s, color) => c(bL, "  \u2502") + c(color, s).padEnd(w + 9) + c(bL, "\u2502");
   console.log(c(bL, `  \u250C${ln}\u2510`));
   console.log(c(bL, "  \u2502") + c(B + cBWhite, `  \u{1F4CB}  \u0412\u0415\u0420\u0418\u0424\u0418\u041A\u0410\u0426\u0418\u042F \u0421\u041A\u0410\u041D\u0418\u0420\u041E\u0412\u0410\u041D\u0418\u042F`).padEnd(w + 8) + c(bL, "\u2502"));
-  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep2}`).padEnd(w + 8) + c(bL, "\u2502"));
   const extEntries = Object.entries(opts.byExt).sort((a, b) => b[1] - a[1]);
   console.log(pad(`  \u{1F4C2}  \u041E\u0431\u0440\u0430\u0431\u043E\u0442\u0430\u043D\u043E \u043F\u043E \u0442\u0438\u043F\u0430\u043C \u0444\u0430\u0439\u043B\u043E\u0432:`, B + cBWhite));
   for (const [ext, count] of extEntries) {
@@ -4477,7 +4477,7 @@ function printVerification(opts) {
     const bar = "\u2588".repeat(Math.max(1, Math.round(pct / 5)));
     console.log(pad(`       ${ext.padEnd(8)} ${String(count).padStart(4)} \u0444\u0430\u0439\u043B(\u043E\u0432)  ${pct}%  ${bar}`, cCyan));
   }
-  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+  console.log(c(bL, "  \u2502") + c(cGray, `  ${sep2}`).padEnd(w + 8) + c(bL, "\u2502"));
   const skippedExtEntries = Object.entries(opts.skippedByExt).sort((a, b) => b[1] - a[1]);
   if (skippedExtEntries.length > 0) {
     console.log(pad(`  \u{1F6AB}  \u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043D\u044B\u0435 \u0440\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u0438\u044F (\u043D\u0435 \u0432 \u0441\u043F\u0438\u0441\u043A\u0435 --exts):`, B + cBYellow));
@@ -4489,7 +4489,7 @@ function printVerification(opts) {
       const rest = skippedExtEntries.slice(10).reduce((s, [, c2]) => s + c2, 0);
       console.log(pad(`       ...\u0438 \u0435\u0449\u0451 ${skippedExtEntries.length - 10} \u0442\u0438\u043F\u043E\u0432 (${rest} \u0444\u0430\u0439\u043B\u043E\u0432)`, cGray));
     }
-    console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+    console.log(c(bL, "  \u2502") + c(cGray, `  ${sep2}`).padEnd(w + 8) + c(bL, "\u2502"));
   }
   const { tooLarge, readError, compressError } = opts.skipInfo;
   const totalSkips = tooLarge.length + readError.length + compressError.length;
@@ -4516,7 +4516,7 @@ function printVerification(opts) {
       }
       if (compressError.length > 5) console.log(pad(`          ...\u0438 \u0435\u0449\u0451 ${compressError.length - 5}`, cGray));
     }
-    console.log(c(bL, "  \u2502") + c(cGray, `  ${sep}`).padEnd(w + 8) + c(bL, "\u2502"));
+    console.log(c(bL, "  \u2502") + c(cGray, `  ${sep2}`).padEnd(w + 8) + c(bL, "\u2502"));
   }
   const coveragePct = opts.total > 0 ? Math.round(opts.compressed / opts.total * 100) : 0;
   console.log(pad(`  \u2705  \u041F\u043E\u043A\u0440\u044B\u0442\u0438\u0435: ${opts.compressed}/${opts.total} \u0444\u0430\u0439\u043B\u043E\u0432 (${coveragePct}%)`, B + cBGreen));
@@ -4558,8 +4558,8 @@ function printServerCheck(url, ok, ms) {
 
 // cli/swarm-applier.ts
 import { mkdirSync, writeFileSync, existsSync } from "node:fs";
-import { dirname as dirname3, resolve as resolve3 } from "node:path";
-import { execSync } from "node:child_process";
+import { dirname as dirname3, resolve as resolve3, sep } from "node:path";
+import { execFileSync } from "node:child_process";
 var SwarmApplier = class {
   serverUrl;
   token;
@@ -4568,7 +4568,7 @@ var SwarmApplier = class {
   abortController = null;
   activeJobId = null;
   branchCreated = false;
-  currentBatch = { files: [], batchIdx: -1 };
+  batchFiles = /* @__PURE__ */ new Map();
   constructor(opts) {
     this.serverUrl = opts.serverUrl.replace(/\/$/, "");
     this.token = opts.token;
@@ -4590,6 +4590,7 @@ var SwarmApplier = class {
     const doConnect = async () => {
       while (this.abortController && !this.abortController.signal.aborted) {
         try {
+          await this.recoverPendingTasks();
           await this.listenSse(url);
         } catch (err) {
           if (this.abortController?.signal.aborted) return;
@@ -4599,6 +4600,28 @@ var SwarmApplier = class {
       }
     };
     void doConnect();
+  }
+  async recoverPendingTasks() {
+    try {
+      const url = `${this.serverUrl}/api/swarm/pending?project_id=${encodeURIComponent(this.projectId)}`;
+      const response = await fetch(url, {
+        headers: { "Authorization": `Bearer ${this.token}` }
+      });
+      if (!response.ok) return;
+      const tasks = await response.json();
+      if (tasks.length === 0) return;
+      printInfo(`\u{1F41D} Recovery: ${tasks.length} \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043D\u044B\u0445 \u0437\u0430\u0434\u0430\u0447`);
+      for (const task of tasks) {
+        if (!this.branchCreated && task.jobId) {
+          this.activeJobId = task.jobId;
+          this.createBranch(task.jobId);
+        }
+        this.writeFile(task.filePath, task.code);
+        await this.ackTask(task.taskId);
+        printOk(`  \u{1F41D} [recovery] ${task.filePath}`);
+      }
+    } catch {
+    }
   }
   async listenSse(url) {
     const response = await fetch(url, {
@@ -4680,10 +4703,11 @@ var SwarmApplier = class {
       await this.ackTask(payload.taskId);
       printOk(`  \u{1F41D} ${delivery.filePath} (${(delivery.code.length / 1024).toFixed(1)} \u041A\u0411)`);
       if (payload.batchIdx !== void 0) {
-        if (this.currentBatch.batchIdx !== payload.batchIdx) {
-          this.currentBatch = { files: [], batchIdx: payload.batchIdx };
+        const batchIdx = payload.batchIdx;
+        if (!this.batchFiles.has(batchIdx)) {
+          this.batchFiles.set(batchIdx, []);
         }
-        this.currentBatch.files.push(delivery.filePath);
+        this.batchFiles.get(batchIdx).push(delivery.filePath);
       }
     } catch (err) {
       printError(`  \u{1F41D} ${payload.filePath}: \u043E\u0448\u0438\u0431\u043A\u0430 \u2014 ${err instanceof Error ? err.message : String(err)}`);
@@ -4693,11 +4717,13 @@ var SwarmApplier = class {
     printError(`  \u{1F41D} FAIL ${payload.taskId ?? "unknown"}: ${payload.error ?? "\u043D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043E\u0448\u0438\u0431\u043A\u0430"}`);
   }
   async onBatchComplete(payload) {
-    const filesList = this.currentBatch.files.join(", ");
-    const batchLabel = payload.batchIdx !== void 0 ? `batch ${(payload.batchIdx ?? 0) + 1}` : "batch";
-    this.gitCommit(`swarm: ${batchLabel} -- ${filesList || "empty"}`);
-    printOk(`  \u{1F41D} Commit: swarm ${batchLabel} (${this.currentBatch.files.length} \u0444\u0430\u0439\u043B\u043E\u0432)`);
-    this.currentBatch = { files: [], batchIdx: -1 };
+    const batchIdx = payload.batchIdx ?? 0;
+    const files = this.batchFiles.get(batchIdx) ?? [];
+    const filesList = files.join(", ");
+    const batchLabel = `batch ${batchIdx + 1}`;
+    this.gitCommit(`swarm: ${batchLabel} -- ${filesList || "empty"}`, files);
+    printOk(`  \u{1F41D} Commit: swarm ${batchLabel} (${files.length} \u0444\u0430\u0439\u043B\u043E\u0432)`);
+    this.batchFiles.delete(batchIdx);
   }
   onJobComplete(payload) {
     const cost = payload.costUsd ? `~$${payload.costUsd.toFixed(4)}` : "";
@@ -4712,6 +4738,7 @@ var SwarmApplier = class {
 `);
     this.branchCreated = false;
     this.activeJobId = null;
+    this.batchFiles.clear();
   }
   onJobError(payload) {
     printError(`
@@ -4719,11 +4746,13 @@ var SwarmApplier = class {
 `);
     this.branchCreated = false;
     this.activeJobId = null;
+    this.batchFiles.clear();
   }
   createBranch(jobId) {
-    const branchName = `swarm/job-${jobId}`;
+    const sanitizedId = jobId.replace(/[^a-zA-Z0-9\-]/g, "");
+    const branchName = `swarm/job-${sanitizedId}`;
     try {
-      execSync(`git checkout -b ${branchName}`, {
+      execFileSync("git", ["checkout", "-b", branchName], {
         cwd: this.projectPath,
         stdio: "pipe"
       });
@@ -4731,7 +4760,7 @@ var SwarmApplier = class {
       printOk(`  \u{1F41D} Git: \u0441\u043E\u0437\u0434\u0430\u043D\u0430 \u0432\u0435\u0442\u043A\u0430 ${branchName}`);
     } catch (err) {
       try {
-        execSync(`git checkout ${branchName}`, {
+        execFileSync("git", ["checkout", branchName], {
           cwd: this.projectPath,
           stdio: "pipe"
         });
@@ -4744,16 +4773,25 @@ var SwarmApplier = class {
   }
   writeFile(filePath, code) {
     const fullPath = resolve3(this.projectPath, filePath);
+    const projectRoot = resolve3(this.projectPath);
+    if (!fullPath.startsWith(projectRoot + sep)) {
+      throw new Error(`Path traversal blocked: "${filePath}" resolves outside project root`);
+    }
     const dir = dirname3(fullPath);
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true });
     }
     writeFileSync(fullPath, code, "utf-8");
   }
-  gitCommit(message) {
+  gitCommit(message, files) {
     try {
-      execSync("git add .", { cwd: this.projectPath, stdio: "pipe" });
-      execSync(`git commit -m "${message.replace(/"/g, '\\"')}" --allow-empty`, {
+      if (files.length > 0) {
+        execFileSync("git", ["add", "--", ...files], {
+          cwd: this.projectPath,
+          stdio: "pipe"
+        });
+      }
+      execFileSync("git", ["commit", "-m", message, "--allow-empty"], {
         cwd: this.projectPath,
         stdio: "pipe"
       });
@@ -4789,7 +4827,7 @@ var SwarmApplier = class {
 var BRAIN_CONFIG_DIR = ".brain";
 var BRAIN_CONFIG_FILE = "config.json";
 function loadBrainConfig(projectPath) {
-  const configPath = join4(projectPath, BRAIN_CONFIG_DIR, BRAIN_CONFIG_FILE);
+  const configPath = join3(projectPath, BRAIN_CONFIG_DIR, BRAIN_CONFIG_FILE);
   if (!existsSync2(configPath)) return null;
   try {
     const raw = readFileSync2(configPath, "utf-8");
@@ -4799,12 +4837,12 @@ function loadBrainConfig(projectPath) {
   }
 }
 function saveBrainConfig(projectPath, config) {
-  const dirPath = join4(projectPath, BRAIN_CONFIG_DIR);
+  const dirPath = join3(projectPath, BRAIN_CONFIG_DIR);
   try {
     if (!existsSync2(dirPath)) mkdirSync2(dirPath, { recursive: true });
-    const configPath = join4(dirPath, BRAIN_CONFIG_FILE);
+    const configPath = join3(dirPath, BRAIN_CONFIG_FILE);
     writeFileSync2(configPath, JSON.stringify(config, null, 2), "utf-8");
-    const gitignorePath = join4(dirPath, ".gitignore");
+    const gitignorePath = join3(dirPath, ".gitignore");
     if (!existsSync2(gitignorePath)) {
       writeFileSync2(gitignorePath, "*\n", "utf-8");
     }
@@ -4812,8 +4850,8 @@ function saveBrainConfig(projectPath, config) {
   }
 }
 function generateCursorMcpConfig(projectPath, server, token, projectId) {
-  const cursorDir = join4(projectPath, ".cursor");
-  const mcpPath = join4(cursorDir, "mcp.json");
+  const cursorDir = join3(projectPath, ".cursor");
+  const mcpPath = join3(cursorDir, "mcp.json");
   try {
     if (!existsSync2(cursorDir)) mkdirSync2(cursorDir, { recursive: true });
     let existing = { mcpServers: {} };
@@ -4892,7 +4930,7 @@ function collectFiles(dir, ignore, exts) {
     for (const entry of entries) {
       const name = String(entry.name);
       if (name.startsWith(".")) continue;
-      const fullPath = join4(current, name);
+      const fullPath = join3(current, name);
       if (entry.isDirectory()) {
         if (ignoreDirs.has(name)) continue;
         walk(fullPath);
