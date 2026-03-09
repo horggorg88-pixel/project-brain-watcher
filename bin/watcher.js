@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+import{createRequire}from'module';const require=createRequire(import.meta.url);
 
 // cli/watch.ts
 import { createHash as createHash2 } from "node:crypto";
@@ -4899,7 +4899,13 @@ var OutcomeReporter = class _OutcomeReporter {
   reportFileChange(relPath) {
     if (!this.isGitRepo) return;
     this.getGitDiffAsync(relPath).then(async (diff) => {
-      if (!diff || diff.length < 10) return;
+      let reverted = false;
+      if (!diff || diff.length < 10) {
+        const revertResult = await this.checkRevertCommitAsync(relPath);
+        if (!revertResult) return;
+        diff = revertResult.diff;
+        reverted = true;
+      }
       if (diff.length > MAX_DIFF_BYTES) return;
       const isTs = /\.[tj]sx?$/.test(relPath);
       let tscResult = "unknown";
@@ -4916,7 +4922,8 @@ var OutcomeReporter = class _OutcomeReporter {
         diffTokens: Math.ceil(diff.length / 3.3),
         tscResult,
         tscErrors,
-        modelHint: null
+        modelHint: null,
+        reverted
       });
     }).catch(() => {
     });
@@ -4930,7 +4937,8 @@ var OutcomeReporter = class _OutcomeReporter {
       diffTokens: Math.ceil(diff.length / 3.3),
       tscResult: tscPass ? "pass" : "fail",
       tscErrors,
-      modelHint: null
+      modelHint: null,
+      reverted: false
     });
   }
   enqueue(payload) {
@@ -4989,6 +4997,42 @@ var OutcomeReporter = class _OutcomeReporter {
             return;
           }
           resolve4(stdout.trim());
+        }
+      );
+    });
+  }
+  /**
+   * Проверяет, был ли последний коммит по файлу revert.
+   * Возвращает diff того коммита (откат) для correction-паттернов.
+   */
+  checkRevertCommitAsync(relPath) {
+    return new Promise((resolve4) => {
+      execFile(
+        "git",
+        ["log", "-1", "--format=%s", "--", relPath],
+        { cwd: this.projectPath, timeout: 3e3, maxBuffer: 4096 },
+        (err, msg) => {
+          if (err || !msg) {
+            resolve4(null);
+            return;
+          }
+          const subject = msg.trim();
+          if (!subject.toLowerCase().startsWith("revert ")) {
+            resolve4(null);
+            return;
+          }
+          execFile(
+            "git",
+            ["show", "HEAD", "--", relPath],
+            { cwd: this.projectPath, timeout: 5e3, maxBuffer: 1024 * 1024 },
+            (showErr, diffOut) => {
+              if (showErr || !diffOut || diffOut.trim().length < 10) {
+                resolve4(null);
+                return;
+              }
+              resolve4({ diff: diffOut.trim() });
+            }
+          );
         }
       );
     });
