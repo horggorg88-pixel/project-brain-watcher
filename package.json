@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "project-brain-watcher": "bin/watcher.js",
+    "project-brain-watcher": "bin/run-watcher.js",
     "project-brain-refactor": "bin/refactorer.js"
   },
   "keywords": [
@@ -19,6 +19,7 @@
     "project-brain"
   ],
   "files": [
+    "bin/run-watcher.js",
     "bin/watcher.js",
     "bin/refactorer.js",
     "README.md"
