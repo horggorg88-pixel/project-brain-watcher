@@ -5,7 +5,6 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "project-brain-codex": "bin/codex.js",
     "project-brain-watcher": "bin/run-watcher.js",
     "project-brain-refactor": "bin/refactorer.js"
   },
@@ -20,7 +19,6 @@
     "project-brain"
   ],
   "files": [
-    "bin/codex.js",
     "bin/run-watcher.js",
     "bin/watcher.js",
     "bin/refactorer.js",
