@@ -22,4 +22,4 @@ npx --yes github:horggorg88-pixel/project-brain-watcher desktop update
 npx --yes github:horggorg88-pixel/project-brain-watcher desktop status
 ```
 
-The npm/npx package stays small. `desktop install` downloads the portable Windows executable from GitHub Releases in this repository and stores it under `%LOCALAPPDATA%\ProjectBrainWatcher\desktop`.
+The npm/npx package stays small. `desktop install` downloads the Windows desktop zip from GitHub Releases in this repository, extracts it under `%LOCALAPPDATA%\ProjectBrainWatcher\desktop`, and launches the unpacked Electron executable.
