@@ -1,6 +1,6 @@
 {
   "name": "project-brain-watcher",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Smart Local Watcher & SOLID Refactorer for Project Brain MCP Server",
   "license": "MIT",
   "type": "module",
