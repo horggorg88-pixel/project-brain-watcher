@@ -98,7 +98,7 @@ cabinetButton?.addEventListener('click', () => {
   window.open('http://149.33.14.250:3020', '_blank', 'noopener');
 });
 
-for (const button of serviceButtons) {
+Array.from(serviceButtons).forEach(button => {
   button.addEventListener('click', () => {
     const action = button.dataset.serviceAction;
     if (!isServiceAction(action)) return;
@@ -114,7 +114,7 @@ for (const button of serviceButtons) {
       .catch(error => setText(serviceOutputEl, errorMessage(error)))
       .finally(() => setServiceBusy(serviceButtons, false));
   });
-}
+});
 
 async function refresh(): Promise<void> {
   accessState ??= await readAccessStatus();

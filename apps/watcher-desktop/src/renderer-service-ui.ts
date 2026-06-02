@@ -5,7 +5,9 @@ export function isServiceAction(value: string | undefined): value is WatcherServ
 }
 
 export function setServiceBusy(buttons: NodeListOf<HTMLButtonElement>, busy: boolean): void {
-  for (const button of buttons) button.disabled = busy;
+  Array.from(buttons).forEach(button => {
+    button.disabled = busy;
+  });
 }
 
 export function actionLabel(action: WatcherServiceAction): string {
