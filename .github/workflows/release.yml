@@ -1,0 +1,89 @@
+name: Release Watcher
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install desktop dependencies
+        run: npm --prefix apps/watcher-desktop ci
+
+      - name: Verify release contract
+        run: npm run verify-release
+
+      - name: Build desktop portable
+        run: npm run desktop:dist
+
+      - name: Pack watcher npm package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          npm pack . --pack-destination release
+
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          $files = @()
+          $files += Get-ChildItem -LiteralPath release -File
+          $files += Get-ChildItem -LiteralPath apps/watcher-desktop/release -File | Where-Object { $_.Name -match '^ProjectBrainWatcher-.+-x64\.(exe|zip)$' }
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($file.Name)"
+          }
+          $lines | Set-Content -LiteralPath release/SHA256SUMS.txt -Encoding utf8
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          gh release view $env:TAG_NAME *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:TAG_NAME --title $env:TAG_NAME --notes "Project Brain watcher release $env:TAG_NAME"
+          }
+          $watcherVersion = (Get-Content -LiteralPath package.json | ConvertFrom-Json).version
+          $desktopVersion = (Get-Content -LiteralPath apps/watcher-desktop/package.json | ConvertFrom-Json).version
+          $desktopAssetPattern = "^ProjectBrainWatcher-$([regex]::Escape($desktopVersion))-x64\.(exe|zip)$"
+          $assets = @()
+          $assets += Get-ChildItem -LiteralPath release -File | Where-Object { $_.Name -eq "project-brain-watcher-$watcherVersion.tgz" }
+          $assets += Get-ChildItem -LiteralPath apps/watcher-desktop/release -File | Where-Object { $_.Name -match $desktopAssetPattern }
+          $assets += Get-Item -LiteralPath release/SHA256SUMS.txt
+          $assetPaths = @($assets | Sort-Object -Property Name -Unique | ForEach-Object { $_.FullName })
+          if ($assetPaths.Count -eq 0) {
+            throw "No watcher release assets were found"
+          }
+          Write-Host "Uploading release assets:"
+          $assetPaths | ForEach-Object { Write-Host " - $_" }
+          $expectedAssetNames = @($assetPaths | ForEach-Object { Split-Path -Leaf $_ })
+          $releaseInfo = gh release view $env:TAG_NAME --json assets | ConvertFrom-Json
+          foreach ($asset in $releaseInfo.assets) {
+            if ($expectedAssetNames -notcontains $asset.name) {
+              Write-Host "Deleting stale release asset: $($asset.name)"
+              gh release delete-asset $env:TAG_NAME $asset.name -y
+            }
+          }
+          gh release upload $env:TAG_NAME @assetPaths --clobber

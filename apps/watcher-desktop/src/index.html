@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Project Brain Watcher</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topline">
+        <div>
+          <p class="brand">MCP Консоль</p>
+          <p class="subbrand">desktop watcher</p>
+        </div>
+        <button type="button" class="ghost" data-open-cabinet>Личный кабинет</button>
+      </header>
+
+      <section class="hero">
+        <div>
+          <p class="eyebrow">локальный пульт</p>
+          <h1 data-hero-title>Подключите watcher</h1>
+          <p class="lead" data-hero-copy>
+            После входа здесь останется только рабочий пульт: служба, файл настройки MCP,
+            профили проекта, изменения конфигурации и диагностика.
+          </p>
+        </div>
+        <form class="login" data-auth-form novalidate>
+          <label>Почта<input name="email" type="email" autocomplete="email" required /></label>
+          <label>Пароль<input name="password" type="password" autocomplete="current-password" minlength="8" required /></label>
+          <button type="submit">Войти</button>
+          <p data-auth-status>Проверяем локальный файл настройки MCP...</p>
+        </form>
+        <aside class="profile-card" data-profile-card hidden></aside>
+      </section>
+
+      <section class="console-shell" data-dashboard hidden>
+        <div class="status-strip" data-status-strip></div>
+
+        <div class="primary-flow">
+          <section class="panel panel-lead">
+            <p class="eyebrow">следующий шаг</p>
+            <h2>Импортируйте настройку MCP</h2>
+            <p class="section-copy">Выберите файл из личного кабинета. После импорта Watcher подставит проект, сервер и переменную токена.</p>
+            <button type="button" data-import-config>Импортировать настройку MCP</button>
+            <pre data-service-output>Команды службы ещё не запускались</pre>
+          </section>
+
+          <section class="panel">
+            <p class="eyebrow">служба watcher</p>
+            <h2>Состояние</h2>
+            <p class="section-copy">Сначала проверьте подключение. Запуск и установка службы доступны в администрировании.</p>
+            <pre data-service-status>Проверяем службу...</pre>
+            <button type="button" data-service-action="health">Проверить подключение</button>
+          </section>
+        </div>
+
+        <details class="admin-shell">
+          <summary>Администрирование</summary>
+          <div class="console-grid">
+          <form class="panel" data-project-form>
+            <p class="eyebrow">данные проекта</p>
+            <h2>Профиль</h2>
+            <label>ID проекта<input name="id" required /></label>
+            <label>Название<input name="name" required /></label>
+            <label>Путь<input name="root" required /></label>
+            <button type="button" class="ghost" data-select-root>Выбрать папку</button>
+            <label>ID индекса<input name="indexId" required /></label>
+            <label>MCP сервер<input name="serverUrl" required /></label>
+            <label>Имя переменной окружения с токеном<input name="tokenEnv" required /></label>
+            <button type="submit">Сохранить профиль</button>
+          </form>
+
+          <section class="panel">
+            <p class="eyebrow">служба watcher</p>
+            <h2>Команды</h2>
+            <p class="section-copy">Эти действия меняют локальную службу и требуют подтверждения.</p>
+            <div class="actions">
+              <button type="button" data-service-action="start">Запустить</button>
+              <button type="button" data-service-action="stop">Стоп</button>
+              <button type="button" data-service-action="restart">Перезапустить</button>
+              <button type="button" data-service-action="install">Установить службу</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <p class="eyebrow">контроль</p>
+            <h2>Проверки допуска</h2>
+            <pre data-config-status>Загрузка конфига...</pre>
+            <ul class="gates" data-gates></ul>
+          </section>
+          </div>
+
+        <div class="workspace-grid">
+          <section class="code-panel">
+            <div>
+              <h3>Сохраненные проекты</h3>
+              <span>профили</span>
+            </div>
+            <pre data-projects>Загрузка...</pre>
+          </section>
+
+          <section class="code-panel">
+            <div>
+              <h3>Изменения файла настройки MCP</h3>
+              <span>резервная копия</span>
+            </div>
+            <pre data-mcp-diff>Загрузка...</pre>
+          </section>
+
+          <section class="code-panel wide">
+            <div>
+              <h3>Диагностика</h3>
+              <span>проверка секретов</span>
+            </div>
+            <pre data-diagnostics>Загрузка...</pre>
+          </section>
+          </div>
+        </details>
+      </section>
+    </main>
+    <script type="module" src="../dist/renderer.js"></script>
+  </body>
+</html>

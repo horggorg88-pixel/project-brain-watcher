@@ -1,0 +1,43 @@
+{
+  "name": "@project-brain/watcher-desktop",
+  "version": "1.4.4",
+  "description": "Desktop control panel for Project Brain Watcher service",
+  "author": "Project Brain",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "npm run build && electron dist/main.js",
+    "dist": "npm run build && electron-builder --win portable --x64"
+  },
+  "build": {
+    "appId": "com.projectbrain.watcher",
+    "productName": "Project Brain Watcher",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "src/index.html",
+      "src/styles.css",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "artifactName": "ProjectBrainWatcher-${version}-${arch}.${ext}"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "electron": "^42.3.0",
+    "electron-builder": "^26.8.1",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "smol-toml": "^1.6.1"
+  }
+}

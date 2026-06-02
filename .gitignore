@@ -1,0 +1,8 @@
+node_modules/
+release/
+apps/watcher-desktop/node_modules/
+apps/watcher-desktop/dist/
+apps/watcher-desktop/release/
+*.tgz
+.codex-*.log
+apps/watcher-desktop/.codex-*.log
