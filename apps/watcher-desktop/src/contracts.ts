@@ -3,6 +3,19 @@ export type WatcherServiceAction = 'health' | 'install' | 'start' | 'stop' | 're
 export type WatcherPolicyDecision = 'allow' | 'prompt' | 'deny';
 export type WatcherPolicyRisk = 'low' | 'medium' | 'high';
 export type McpConfigSource = 'codex' | 'claude' | 'cursor' | 'generic' | 'none';
+export type DesktopTheme = 'light' | 'dark';
+export type DesktopSection = 'start' | 'mcp' | 'prompt' | 'watcher' | 'projects' | 'modes' | 'diagnostics' | 'settings';
+export type DesktopOverallStatus = 'ready' | 'action_required' | 'error';
+export type DesktopCheckStatus = 'active' | 'inactive' | 'waiting' | 'error';
+export type DesktopCheckAction =
+  | 'none'
+  | 'select_project'
+  | 'import_config'
+  | 'download_config'
+  | 'start_service'
+  | 'open_logs'
+  | 'verify';
+export type DesktopModeStatus = 'ready' | 'action_required' | 'error';
 export type AccessStatus =
   | 'signed_out'
   | 'config_missing'
@@ -116,23 +129,89 @@ export interface WatcherServiceActionResult {
   readonly output: string;
 }
 
+export interface DesktopUiState {
+  readonly activeSection: DesktopSection;
+  readonly theme: DesktopTheme;
+  readonly consoleOpen: boolean;
+  readonly lastProjectId: string | null;
+  readonly keyVisible: boolean;
+}
+
+export interface DesktopCheckNode {
+  readonly id: string;
+  readonly label: string;
+  readonly status: DesktopCheckStatus;
+  readonly detail: string;
+  readonly action: DesktopCheckAction;
+  readonly actionLabel: string | null;
+}
+
+export interface DesktopConnectionCheck {
+  readonly overall: DesktopOverallStatus;
+  readonly message: string;
+  readonly projectId: string | null;
+  readonly checkedAt: string;
+  readonly nodes: readonly DesktopCheckNode[];
+  readonly service: WatcherServiceStatus;
+  readonly diagnostics: DiagnosticsPreview;
+}
+
+export interface DesktopConfigPackage {
+  readonly projectId: string;
+  readonly fileName: string;
+  readonly configJson: string;
+  readonly prompt: string;
+  readonly tokenEnv: string;
+  readonly tokenAvailable: boolean;
+  readonly tokenPreview: string;
+  readonly tokenValue: string | null;
+  readonly secretPath: string | null;
+}
+
+export interface DesktopModeRailStage {
+  readonly id: string;
+  readonly label: string;
+  readonly active: boolean;
+  readonly detail: string;
+}
+
+export interface DesktopModeSummary {
+  readonly id: string;
+  readonly title: string;
+  readonly technicalName: string;
+  readonly status: DesktopModeStatus;
+  readonly summary: string;
+  readonly primaryAction: string;
+  readonly rails: readonly DesktopModeRailStage[];
+}
+
 export interface WatcherDesktopApi {
   readonly access: {
     status(): Promise<DesktopAccessState>;
     login(request: AccessLoginRequest): Promise<DesktopAccessState>;
   };
+  readonly ui: {
+    loadState(): Promise<DesktopUiState>;
+    saveState(state: DesktopUiState): Promise<DesktopUiState>;
+  };
   readonly service: {
     status(): Promise<WatcherServiceStatus>;
     run(request: WatcherServiceActionRequest): Promise<WatcherServiceActionResult>;
+    fullCheck(projectId: string): Promise<DesktopConnectionCheck>;
   };
   readonly projects: {
     list(): Promise<readonly SavedProjectProfile[]>;
     save(project: ProjectDraft): Promise<SavedProjectProfile>;
     selectRoot(): Promise<string | null>;
     importConfig(): Promise<ProjectImportResult | null>;
+    buildConfigPackage(projectId: string): Promise<DesktopConfigPackage>;
+    saveConfigPackage(projectId: string): Promise<string | null>;
   };
   readonly mcp: {
     previewDiff(client: McpDiffPreview['client']): Promise<McpDiffPreview>;
+  };
+  readonly modes: {
+    list(): Promise<readonly DesktopModeSummary[]>;
   };
   readonly diagnostics: {
     previewExport(): Promise<DiagnosticsPreview>;

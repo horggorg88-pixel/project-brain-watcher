@@ -3,8 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loginAccess } from '../../apps/watcher-desktop/src/desktop-access.js';
+import { buildDesktopConfigPackage } from '../../apps/watcher-desktop/src/desktop-config-package.js';
+import { buildDesktopConnectionCheck } from '../../apps/watcher-desktop/src/desktop-connection-check.js';
 import { importProjectConfig } from '../../apps/watcher-desktop/src/desktop-config-import.js';
 import { discoverMcpConfig } from '../../apps/watcher-desktop/src/desktop-config-discovery.js';
+import { listDesktopModeSummaries } from '../../apps/watcher-desktop/src/desktop-mode-summary.js';
 import {
   readProfiles,
   readServiceStatus,
@@ -14,6 +17,7 @@ import {
 } from '../../apps/watcher-desktop/src/desktop-core.js';
 import { readDesktopServiceSecret, readDesktopServiceSecretState } from '../../apps/watcher-desktop/src/desktop-service-secret.js';
 import { parseWindowsServiceOutput } from '../../apps/watcher-desktop/src/desktop-service-status.js';
+import { readDesktopUiState, saveDesktopUiState } from '../../apps/watcher-desktop/src/desktop-ui-state.js';
 
 const tempDirs: string[] = [];
 
@@ -215,6 +219,85 @@ describe('watcher desktop core', () => {
     expect(result.tokenDetected).toBe(false);
     expect(result.secretStaged).toBe(false);
     expect(readDesktopServiceSecret(result.profile)).toBeNull();
+  });
+
+  it('persists desktop UI state for section, theme and console preferences', () => {
+    const paths = tempPaths();
+
+    const saved = saveDesktopUiState(paths, {
+      activeSection: 'prompt',
+      theme: 'dark',
+      consoleOpen: false,
+      lastProjectId: 'demo',
+      keyVisible: true,
+    });
+
+    expect(saved.activeSection).toBe('prompt');
+    expect(readDesktopUiState(paths)).toEqual(saved);
+  });
+
+  it('builds a downloadable MCP config package with key and start prompt', () => {
+    const paths = tempPaths();
+    const source = join(paths.homePath, 'mcp-monorepo-mcp-config.json');
+    mkdirSync(paths.homePath, { recursive: true });
+    writeFileSync(source, JSON.stringify({
+      project_id: 'mcp-monorepo',
+      endpoint: 'http://149.33.14.250/mcp/p/mcp-monorepo',
+      local_path: join(paths.homePath, 'repo'),
+      token_env: 'MCP_BEARER_TOKEN',
+      mcpServers: {
+        'project-brain': {
+          url: 'http://149.33.14.250/mcp/p/mcp-monorepo',
+          headers: { Authorization: 'Bearer pb_secret_value' },
+        },
+      },
+    }), 'utf-8');
+    mkdirSync(join(paths.homePath, 'repo'), { recursive: true });
+    importProjectConfig(paths, source);
+
+    const pack = buildDesktopConfigPackage(paths, 'mcp-monorepo');
+
+    expect(pack.fileName).toBe('mcp-monorepo-mcp-config.json');
+    expect(pack.tokenAvailable).toBe(true);
+    expect(pack.tokenValue).toBe('pb_secret_value');
+    expect(pack.configJson).toContain('Bearer pb_secret_value');
+    expect(pack.prompt).toContain('Работай только через MCP Project Brain');
+  });
+
+  it('builds the connection checklist from config, key, server and service state', async () => {
+    const paths = tempPaths();
+    const source = join(paths.homePath, 'mcp-monorepo-mcp-config.json');
+    mkdirSync(paths.homePath, { recursive: true });
+    writeFileSync(source, JSON.stringify({
+      project_id: 'mcp-monorepo',
+      endpoint: 'http://149.33.14.250/mcp/p/mcp-monorepo',
+      local_path: join(paths.homePath, 'repo'),
+      token_env: 'MCP_BEARER_TOKEN',
+      mcpServers: {
+        'project-brain': {
+          url: 'http://149.33.14.250/mcp/p/mcp-monorepo',
+          headers: { Authorization: 'Bearer pb_secret_value' },
+        },
+      },
+    }), 'utf-8');
+    mkdirSync(join(paths.homePath, 'repo'), { recursive: true });
+    importProjectConfig(paths, source);
+    vi.stubGlobal('fetch', verifiedMcpFetch());
+
+    const check = await buildDesktopConnectionCheck(paths, 'mcp-monorepo');
+
+    expect(check.nodes.map(node => node.id)).toEqual(['project', 'config', 'key', 'server', 'watcher']);
+    expect(check.nodes.find(node => node.id === 'server')?.status).toBe('active');
+    expect(check.overall).toBe('action_required');
+  });
+
+  it('lists MCP mode rails for the desktop readiness screen', () => {
+    const paths = tempPaths();
+
+    const modes = listDesktopModeSummaries(paths);
+
+    expect(modes.map(mode => mode.id)).toEqual(['brain', 'wave', 'idol', 'swarm', 'watcher']);
+    expect(modes.find(mode => mode.id === 'idol')?.rails.length).toBeGreaterThan(0);
   });
 
   it('opens a local desktop session only after valid credentials and config discovery', async () => {

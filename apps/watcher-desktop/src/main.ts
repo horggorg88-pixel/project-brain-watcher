@@ -1,15 +1,20 @@
 import { app, BrowserWindow, Tray, Menu, ipcMain, dialog } from 'electron';
-import { existsSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AccessLoginRequest,
+  DesktopUiState,
   McpDiffPreview,
   ProjectDraft,
   ProjectImportResult,
   WatcherServiceActionRequest,
 } from './contracts.js';
 import { loginAccess, readAccessState } from './desktop-access.js';
+import { buildDesktopConfigPackage } from './desktop-config-package.js';
+import { buildDesktopConnectionCheck } from './desktop-connection-check.js';
 import { importProjectConfig } from './desktop-config-import.js';
+import { listDesktopModeSummaries } from './desktop-mode-summary.js';
+import { readDesktopUiState, saveDesktopUiState } from './desktop-ui-state.js';
 import {
   previewDiagnostics,
   previewMcpDiff,
@@ -81,8 +86,9 @@ function createTray(window: BrowserWindow): Tray | null {
   const appTray = new Tray(iconPath);
   appTray.setToolTip('Project Brain Watcher');
   appTray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Открыть панель', click: () => window.show() },
-    { label: 'Обновить панель', click: () => { window.show(); window.webContents.reloadIgnoringCache(); } },
+    { label: 'Статус: открыть пульт', click: () => window.show() },
+    { label: 'Проверить подключение', click: () => { window.show(); window.webContents.reloadIgnoringCache(); } },
+    { label: 'Перезапустить окно', click: () => { window.show(); window.webContents.reloadIgnoringCache(); } },
     { type: 'separator' },
     { label: 'Закрыть', click: () => app.quit() },
   ]));
@@ -92,9 +98,14 @@ function createTray(window: BrowserWindow): Tray | null {
 function registerIpcHandlers(): void {
   ipcMain.handle('access:status', () => readAccessState(corePaths()));
   ipcMain.handle('access:login', (_event, request: AccessLoginRequest) => loginAccess(corePaths(), request));
+  ipcMain.handle('ui:load-state', () => readDesktopUiState(corePaths()));
+  ipcMain.handle('ui:save-state', (_event, state: DesktopUiState) => saveDesktopUiState(corePaths(), state));
   ipcMain.handle('service:status', () => readServiceStatus(corePaths()));
   ipcMain.handle('service:run', (_event, request: WatcherServiceActionRequest) => (
     runServiceAction(corePaths(), request)
+  ));
+  ipcMain.handle('service:full-check', (_event, projectId: string) => (
+    buildDesktopConnectionCheck(corePaths(), projectId)
   ));
   ipcMain.handle('projects:list', () => readProfiles(corePaths()));
   ipcMain.handle('projects:save', (_event, project: ProjectDraft) => saveProfile(corePaths(), project));
@@ -110,9 +121,24 @@ function registerIpcHandlers(): void {
     const sourcePath = result.canceled ? null : result.filePaths[0] ?? null;
     return sourcePath ? importProjectConfig(corePaths(), sourcePath) : null;
   });
+  ipcMain.handle('projects:build-config-package', (_event, projectId: string) => (
+    buildDesktopConfigPackage(corePaths(), projectId)
+  ));
+  ipcMain.handle('projects:save-config-package', async (_event, projectId: string): Promise<string | null> => {
+    const pack = buildDesktopConfigPackage(corePaths(), projectId);
+    const result = await dialog.showSaveDialog({
+      defaultPath: pack.fileName,
+      filters: [{ name: 'MCP config package', extensions: ['json'] }],
+    });
+    const targetPath = result.canceled ? null : result.filePath ?? null;
+    if (!targetPath) return null;
+    writeFileSync(targetPath, pack.configJson, 'utf-8');
+    return targetPath;
+  });
   ipcMain.handle('mcp:preview-diff', (_event, client: McpDiffPreview['client']) => (
     previewMcpDiff(corePaths(), client)
   ));
+  ipcMain.handle('modes:list', () => listDesktopModeSummaries(corePaths()));
   ipcMain.handle('diagnostics:preview-export', () => previewDiagnostics(corePaths()));
 }
 

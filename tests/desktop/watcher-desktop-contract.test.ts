@@ -34,24 +34,36 @@ describe('watcher desktop contract', () => {
     expect(preloadSource).toContain("ipcRenderer.invoke('access:login'");
     expect(preloadSource).toContain("ipcRenderer.invoke('projects:select-root'");
     expect(preloadSource).toContain("ipcRenderer.invoke('projects:import-config'");
+    expect(preloadSource).toContain("ipcRenderer.invoke('projects:build-config-package'");
+    expect(preloadSource).toContain("ipcRenderer.invoke('projects:save-config-package'");
     expect(preloadSource).toContain("ipcRenderer.invoke('service:run'");
+    expect(preloadSource).toContain("ipcRenderer.invoke('service:full-check'");
+    expect(preloadSource).toContain("ipcRenderer.invoke('ui:load-state'");
+    expect(preloadSource).toContain("ipcRenderer.invoke('modes:list'");
     expect(preloadSource).not.toContain('ipcRenderer.on');
     expect(preloadSource).not.toContain('send: ipcRenderer.send');
     expect(contractsSource).not.toContain('readonly serverVerified?: boolean');
-    expect(rendererSource).not.toContain('serverVerified');
+    expect(contractsSource).toContain('buildConfigPackage(projectId: string)');
+    expect(contractsSource).toContain('fullCheck(projectId: string)');
+    expect(rendererSource).toContain('service.fullCheck');
     expect(readFileSync(join(appRoot, 'src', 'main.ts'), 'utf-8')).toContain("'preload.cjs'");
   });
 
-  it('keeps the desktop entry screen authentication-first, not registration-first', () => {
+  it('keeps the desktop entry screen as a clean login before the control panel', () => {
     const html = readFileSync(join(appRoot, 'src', 'index.html'), 'utf-8');
 
     expect(html).toContain('data-auth-form');
-    expect(html).toContain('data-import-config');
-    expect(html).toContain('Администрирование');
-    expect(html).toContain('Импортируйте настройку MCP');
+    expect(html).toContain('data-login-screen');
+    expect(html).toContain('data-app-shell hidden');
+    expect(html).toContain('data-nav-section="start"');
+    expect(html).toContain('data-checklist');
+    expect(html).toContain('data-download-config');
+    expect(html).toContain('data-start-prompt');
+    expect(html).toContain('data-bottom-console');
+    expect(html).toContain('data-modes');
     expect(html).toContain('autocomplete="current-password"');
-    expect(html).toContain('data-dashboard hidden');
     expect(html).not.toContain('Зарегистрироваться');
+    expect(html).not.toContain('Подключите watcher');
   });
 
   it('declares an isolated package for the desktop application', () => {
@@ -64,6 +76,7 @@ describe('watcher desktop contract', () => {
     expect(packageJson.scripts?.build).toBe('tsc -p tsconfig.json');
     expect(packageJson.scripts?.start).toContain('electron dist/main.js');
     expect(packageJson.scripts?.dist).toContain('electron-builder');
+    expect(JSON.stringify(packageJson)).toContain('src/styles/**/*');
     expect(packageJson.dependencies?.electron).toBeUndefined();
     expect(packageJson.dependencies?.['project-brain-mcp']).toBeUndefined();
     expect(packageJson.devDependencies?.electron).toBeDefined();

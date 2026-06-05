@@ -1,39 +1,70 @@
 import type {
   DesktopAccessState,
+  DesktopConfigPackage,
+  DesktopConnectionCheck,
+  DesktopModeSummary,
+  DesktopSection,
+  DesktopUiState,
   DiagnosticsPreview,
   McpConfigDiscovery,
   McpDiffPreview,
   SavedProjectProfile,
-  WatcherPolicyGate,
   WatcherServiceStatus,
 } from './contracts.js';
 
-export interface AccessRenderTargets {
+export interface ShellRenderTargets {
+  readonly accountEl: HTMLElement | null;
+  readonly appShellEl: HTMLElement | null;
   readonly authStatusEl: HTMLElement | null;
-  readonly configStatusEl: HTMLElement | null;
-  readonly dashboardEl: HTMLElement | null;
-  readonly gateListEl: HTMLElement | null;
-  readonly heroCopyEl: HTMLElement | null;
-  readonly heroTitleEl: HTMLElement | null;
-  readonly profileCardEl: HTMLElement | null;
-  readonly statusStripEl: HTMLElement | null;
+  readonly loginScreenEl: HTMLElement | null;
 }
 
-export function renderAccess(state: DesktopAccessState, targets: AccessRenderTargets): void {
+export function renderShellAccess(state: DesktopAccessState, targets: ShellRenderTargets): void {
   document.body.dataset.access = state.signedIn ? 'signed-in' : 'signed-out';
   setText(targets.authStatusEl, state.message);
-  setText(targets.heroTitleEl, state.signedIn ? 'Project Brain Watcher открыт' : 'Подключите watcher');
-  setText(targets.heroCopyEl, state.signedIn
-    ? 'Вход выполнен. Импортируйте файл настройки MCP и проверьте подключение watcher.'
-    : 'После входа откроется простой пульт: импорт настройки MCP, проверка watcher и администрирование по требованию.');
-  renderProfileCard(state, targets.profileCardEl);
-  renderStatusStrip(state, targets.statusStripEl);
-  targets.dashboardEl?.toggleAttribute('hidden', !state.signedIn);
-  renderConfig(state.config, targets.configStatusEl);
-  renderGates(state.gates, targets.gateListEl);
+  targets.loginScreenEl?.toggleAttribute('hidden', state.signedIn);
+  targets.appShellEl?.toggleAttribute('hidden', !state.signedIn);
+  renderAccount(state, targets.accountEl);
 }
 
-export function renderService(status: WatcherServiceStatus, element: HTMLElement | null): void {
+export function applyUiState(state: DesktopUiState, sections: NodeListOf<HTMLElement>, navButtons: NodeListOf<HTMLButtonElement>): void {
+  document.body.dataset.theme = state.theme;
+  sections.forEach(section => section.toggleAttribute('hidden', section.dataset.section !== state.activeSection));
+  navButtons.forEach(button => button.toggleAttribute('aria-current', button.dataset.navSection === state.activeSection));
+}
+
+export function renderProjectSelect(
+  projects: readonly SavedProjectProfile[],
+  select: HTMLSelectElement | null,
+  selectedProjectId: string | null,
+): void {
+  if (!select) return;
+  const current = selectedProjectId ?? projects[0]?.id ?? '';
+  select.innerHTML = projects.length
+    ? projects.map(project => `<option value="${escapeHtml(project.id)}">${escapeHtml(project.name)}</option>`).join('')
+    : '<option value="">Проект не выбран</option>';
+  select.value = current;
+}
+
+export function renderConnectionCheck(check: DesktopConnectionCheck, element: HTMLElement | null): void {
+  if (!element) return;
+  element.innerHTML = check.nodes.map(node => (
+    `<article class="check-row" data-node="${escapeHtml(node.id)}">
+      <span class="toggle ${node.status === 'active' ? 'on' : 'off'}" aria-hidden="true"></span>
+      <div><strong>${escapeHtml(node.label)}</strong><p>${escapeHtml(node.detail)}</p></div>
+      ${node.actionLabel ? `<button type="button" class="ghost" data-check-action="${node.action}">${escapeHtml(node.actionLabel)}</button>` : '<span class="check-ok">Активен</span>'}
+    </article>`
+  )).join('');
+}
+
+export function renderOverall(check: DesktopConnectionCheck, element: HTMLElement | null): void {
+  if (!element) return;
+  element.dataset.status = check.overall;
+  setText(element, check.message);
+}
+
+export function renderService(status: WatcherServiceStatus, statusEl: HTMLElement | null, summaryEl: HTMLElement | null): void {
+  setText(summaryEl, status.running ? 'Активен' : status.installed ? 'Остановлен' : 'Не установлен');
   const lines = [
     `Состояние: ${healthLabel(status.health)}`,
     `Служба: ${status.installed ? 'установлена' : 'не установлена'} / ${status.running ? 'запущена' : 'остановлена'}`,
@@ -41,29 +72,67 @@ export function renderService(status: WatcherServiceStatus, element: HTMLElement
     `Папка: ${status.root ?? 'не выбрана'}`,
     `PID: ${status.pid ?? 'нет'}`,
     `Последняя синхронизация: ${status.lastSyncAt ?? 'нет данных'}`,
-    `Повторные попытки: ${status.queueDepth}`,
+    `Очередь: ${status.queueDepth}`,
     `Ошибка: ${status.lastError ?? 'нет'}`,
   ];
-  setText(element, lines.join('\n'));
+  setText(statusEl, lines.join('\n'));
+}
+
+export function renderConfigPackage(pack: DesktopConfigPackage | null, targets: {
+  readonly configFileEl: HTMLElement | null;
+  readonly configJsonEl: HTMLElement | null;
+  readonly configStatusEl: HTMLElement | null;
+  readonly keyPreviewEl: HTMLElement | null;
+  readonly promptEl: HTMLElement | null;
+}, keyVisible: boolean): void {
+  setText(targets.configFileEl, pack?.fileName ?? 'Проект не выбран');
+  setText(targets.configJsonEl, pack?.configJson ?? 'Сначала выберите проект.');
+  setText(targets.configStatusEl, pack ? `Проект: ${pack.projectId}. Secret: ${pack.secretPath ?? 'нет'}` : 'Пакет не собран');
+  setText(targets.keyPreviewEl, pack ? keyText(pack, keyVisible) : 'Ключ недоступен');
+  setText(targets.promptEl, pack?.prompt ?? 'Сначала выберите проект.');
 }
 
 export function renderProjects(projects: readonly SavedProjectProfile[], element: HTMLElement | null): void {
-  const text = projects.length === 0
-    ? 'Профили ещё не сохранены. Выберите папку проекта и сохраните профиль.'
-    : projects.map(project => `${project.name}\n${project.root}\n${project.serverUrl || 'MCP сервер не задан'} / ${project.tokenEnv}`).join('\n\n');
-  setText(element, text);
+  if (!element) return;
+  element.innerHTML = projects.length
+    ? projects.map(project => (
+      `<article class="project-row">
+        <strong>${escapeHtml(project.name)}</strong>
+        <span>${escapeHtml(project.id)}</span>
+        <p>${escapeHtml(project.root)}</p>
+      </article>`
+    )).join('')
+    : '<p class="empty-state">Выберите папку проекта, чтобы создать профиль.</p>';
+}
+
+export function renderModes(modes: readonly DesktopModeSummary[], element: HTMLElement | null): void {
+  if (!element) return;
+  element.innerHTML = modes.map(mode => (
+    `<article class="mode-card" data-status="${mode.status}">
+      <div class="panel-head">
+        <div><h3>${escapeHtml(mode.title)}</h3><span>${escapeHtml(mode.technicalName)}</span></div>
+        <strong>${escapeHtml(mode.status === 'ready' ? 'Готов' : mode.status === 'error' ? 'Ошибка' : 'Действие')}</strong>
+      </div>
+      <p>${escapeHtml(mode.summary)}</p>
+      <div class="rail-line">${mode.rails.map(stage => `<span class="${stage.active ? 'active' : ''}" title="${escapeHtml(stage.detail)}">${escapeHtml(stage.label)}</span>`).join('')}</div>
+    </article>`
+  )).join('');
+}
+
+export function renderDiagnostics(diagnostics: DiagnosticsPreview, element: HTMLElement | null): void {
+  if (!element) return;
+  const findings = diagnostics.findings.length ? diagnostics.findings : ['Проблем не найдено'];
+  element.innerHTML = findings.map((finding, index) => (
+    `<article class="diagnostic-row">
+      <strong>${index + 1}. ${escapeHtml(finding)}</strong>
+      <p>Влияние: ${diagnostics.blocked ? 'контур требует исправления' : 'можно продолжать работу'}</p>
+      <button type="button" class="ghost" data-nav-section="start">Открыть чеклист</button>
+    </article>`
+  )).join('');
 }
 
 export function renderDiff(diff: McpDiffPreview, element: HTMLElement | null): void {
   setText(element, `${diff.configPath}\nРезервная копия: ${diff.backupRequired ? 'да' : 'нет'}\n${diff.changes.join('\n')}`);
-}
-
-export function renderDiagnostics(diagnostics: DiagnosticsPreview, element: HTMLElement | null): void {
-  const secretGate = diagnostics.requiresSecretConfirmation
-    ? `Полный пакет: требуется подтверждение\nСекреты: ${diagnostics.secretWarnings.join(', ')}`
-    : 'Полный пакет: без секретов';
-  const checks = diagnostics.checks.map(check => `${decisionLabel(check.decision)}: ${check.reasons.join(' ')}`);
-  setText(element, `Готовность: ${decisionLabel(diagnostics.readiness)}\n${secretGate}\n\n${checks.join('\n')}\n\n${diagnostics.findings.join('\n')}\n\n${diagnostics.included.join('\n')}`);
 }
 
 export function hydrateProjectForm(
@@ -109,49 +178,20 @@ export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function renderConfig(config: McpConfigDiscovery, element: HTMLElement | null): void {
-  const lines = config.found
-    ? [
-      `Источник: ${sourceLabel(config.source)}`,
-      `Файл: ${config.configPath ?? 'не указан'}`,
-      `Сервер: ${config.serverUrl ?? 'не найден'}`,
-      `Переменная токена: ${config.tokenEnv ?? 'не найдена'}`,
-      `Проект: ${config.projectId ?? 'выбирается в приложении'}`,
-    ]
-    : ['Файл настройки MCP не найден', ...config.findings];
-  setText(element, lines.join('\n'));
+export function sectionFrom(value: string | undefined): DesktopSection | null {
+  const sections: readonly DesktopSection[] = ['start', 'mcp', 'prompt', 'watcher', 'projects', 'modes', 'diagnostics', 'settings'];
+  return typeof value === 'string' && sections.includes(value as DesktopSection) ? value as DesktopSection : null;
 }
 
-function renderGates(gates: readonly WatcherPolicyGate[], element: HTMLElement | null): void {
-  if (!element) return;
-  element.innerHTML = gates.map(gate => (
-    `<li><span class="pill ${gate.decision}">${decisionLabel(gate.decision)}</span>${escapeHtml(gate.reasons.join(' '))}</li>`
-  )).join('');
-}
-
-function renderProfileCard(state: DesktopAccessState, element: HTMLElement | null): void {
+function renderAccount(state: DesktopAccessState, element: HTMLElement | null): void {
   if (!element) return;
   element.toggleAttribute('hidden', !state.signedIn);
-  const gate = state.serverVerified ? 'сервер подтверждён' : 'локальная проверка';
-  element.innerHTML = `<p>${escapeHtml(state.email ?? 'Локальный профиль')}</p><span>${escapeHtml(accessLabel(state.status))} · ${gate}</span>`;
+  element.innerHTML = `<strong>${escapeHtml(state.email ?? 'Локальный профиль')}</strong><span>${escapeHtml(accessLabel(state.status))}</span><button type="button" class="ghost" disabled>Выход</button>`;
 }
 
-function renderStatusStrip(state: DesktopAccessState, element: HTMLElement | null): void {
-  if (!element) return;
-  const allowCount = state.gates.filter(gate => gate.decision === 'allow').length;
-  const cards = [
-    ['Настройка MCP', state.config.found ? 'Готово' : 'Нужно импортировать', state.config.found ? `Источник: ${sourceLabel(state.config.source)}` : 'Скачайте файл в личном кабинете'],
-    ['Учётная запись', state.signedIn ? 'Готово' : 'Нужно войти', state.email ?? 'Вход не выполнен'],
-    ['Secret службы', state.serviceSecretConfigured ? 'Готово' : 'Нужен импорт', state.serviceSecretConfigured ? 'Bearer сохранён локально' : 'Скачайте конфиг в личном кабинете'],
-    ['Допуск', `${allowCount}/${state.gates.length}`, state.gates.map(gate => decisionLabel(gate.decision)).join(' / ')],
-  ] as const;
-  element.innerHTML = cards.map(([title, mark, detail]) => (
-    `<div class="status-card"><span>${escapeHtml(title)}</span><strong>${escapeHtml(mark)}</strong><p>${escapeHtml(detail)}</p></div>`
-  )).join('');
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
+function keyText(pack: DesktopConfigPackage, visible: boolean): string {
+  if (!pack.tokenAvailable) return pack.tokenPreview;
+  return visible ? pack.tokenValue ?? pack.tokenPreview : pack.tokenPreview;
 }
 
 function healthLabel(value: WatcherServiceStatus['health']): string {
@@ -172,12 +212,6 @@ function accessLabel(value: DesktopAccessState['status']): string {
   return labels[value];
 }
 
-function decisionLabel(value: WatcherPolicyGate['decision']): string {
-  const labels = { allow: 'Разрешено', prompt: 'Требует подтверждения', deny: 'Запрещено' };
-  return labels[value];
-}
-
-function sourceLabel(value: McpConfigDiscovery['source']): string {
-  const labels = { codex: 'Codex', claude: 'Claude', cursor: 'Cursor', generic: 'общий файл', none: 'не найден' };
-  return labels[value];
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
 }

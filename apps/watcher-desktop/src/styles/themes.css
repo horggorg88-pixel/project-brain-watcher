@@ -1,0 +1,38 @@
+body[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121212;
+  --ink: #f4f4f0;
+  --muted: #a6a6a0;
+  --line: rgba(244, 244, 240, 0.18);
+  --line-strong: rgba(244, 244, 240, 0.42);
+  --panel: rgba(27, 27, 25, 0.94);
+  --soft: #242421;
+  --inverse: #f4f4f0;
+  --inverse-ink: #111;
+}
+
+body[data-theme="dark"] button {
+  background: var(--ink);
+  color: var(--inverse-ink);
+}
+
+body[data-theme="dark"] .ghost {
+  background: transparent;
+  color: var(--ink);
+}
+
+body[data-theme="dark"] .code-block,
+body[data-theme="dark"] .check-row,
+body[data-theme="dark"] .diagnostic-row,
+body[data-theme="dark"] .project-row,
+body[data-theme="dark"] .mode-card,
+body[data-theme="dark"] .panel,
+body[data-theme="dark"] .sidebar,
+body[data-theme="dark"] .topbar {
+  background: var(--panel);
+}
+
+body[data-theme="dark"] .bottom-console {
+  background: #050505;
+  color: #f4f4f0;
+}

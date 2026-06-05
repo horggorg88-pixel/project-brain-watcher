@@ -6,119 +6,185 @@
     <title>Project Brain Watcher</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
-    <main class="shell">
-      <header class="topline">
-        <div>
-          <p class="brand">MCP Консоль</p>
-          <p class="subbrand">desktop watcher</p>
-        </div>
-        <button type="button" class="ghost" data-open-cabinet>Личный кабинет</button>
-      </header>
+  <body data-access="signed-out" data-theme="light">
+    <main class="login-screen" data-login-screen>
+      <form class="login-card" data-auth-form novalidate>
+        <p class="eyebrow">MCP-пульт</p>
+        <h1>Вход</h1>
+        <label>Почта<input name="email" type="email" autocomplete="email" required /></label>
+        <label>Пароль или барьер-ключ<input name="password" type="password" autocomplete="current-password" minlength="8" required /></label>
+        <button type="submit">Войти</button>
+        <p class="status-line" data-auth-status>Проверяем локальный файл настройки MCP...</p>
+      </form>
+    </main>
 
-      <section class="hero">
-        <div>
-          <p class="eyebrow">локальный пульт</p>
-          <h1 data-hero-title>Подключите watcher</h1>
-          <p class="lead" data-hero-copy>
-            После входа здесь останется только рабочий пульт: служба, файл настройки MCP,
-            профили проекта, изменения конфигурации и диагностика.
-          </p>
-        </div>
-        <form class="login" data-auth-form novalidate>
-          <label>Почта<input name="email" type="email" autocomplete="email" required /></label>
-          <label>Пароль<input name="password" type="password" autocomplete="current-password" minlength="8" required /></label>
-          <button type="submit">Войти</button>
-          <p data-auth-status>Проверяем локальный файл настройки MCP...</p>
-        </form>
-        <aside class="profile-card" data-profile-card hidden></aside>
-      </section>
-
-      <section class="console-shell" data-dashboard hidden>
-        <div class="status-strip" data-status-strip></div>
-
-        <div class="primary-flow">
-          <section class="panel panel-lead">
-            <p class="eyebrow">следующий шаг</p>
-            <h2>Импортируйте настройку MCP</h2>
-            <p class="section-copy">Выберите файл из личного кабинета. После импорта Watcher подставит проект, сервер и переменную токена.</p>
-            <button type="button" data-import-config>Импортировать настройку MCP</button>
-            <pre data-service-output>Команды службы ещё не запускались</pre>
-          </section>
-
-          <section class="panel">
-            <p class="eyebrow">служба watcher</p>
-            <h2>Состояние</h2>
-            <p class="section-copy">Сначала проверьте подключение. Запуск и установка службы доступны в администрировании.</p>
-            <pre data-service-status>Проверяем службу...</pre>
-            <button type="button" data-service-action="health">Проверить подключение</button>
-          </section>
+    <main class="app-shell" data-app-shell hidden>
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <p class="brand">MCP</p>
+          <p class="subbrand">watcher console</p>
         </div>
 
-        <details class="admin-shell">
-          <summary>Администрирование</summary>
-          <div class="console-grid">
-          <form class="panel" data-project-form>
-            <p class="eyebrow">данные проекта</p>
-            <h2>Профиль</h2>
+        <nav class="sidebar-nav" aria-label="Разделы пульта">
+          <p>Запуск</p>
+          <button type="button" data-nav-section="start">Обзор</button>
+          <button type="button" data-nav-section="watcher">Watcher</button>
+          <p>Контур MCP</p>
+          <button type="button" data-nav-section="mcp">Конфиг</button>
+          <button type="button" data-nav-section="prompt">Промт</button>
+          <button type="button" data-nav-section="modes">Режимы</button>
+          <p>Проект</p>
+          <button type="button" data-nav-section="projects">Проекты</button>
+          <button type="button" data-nav-section="diagnostics">Диагностика</button>
+          <button type="button" data-nav-section="settings">Настройки</button>
+        </nav>
+
+        <section class="account-card" data-profile-card hidden></section>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div class="project-picker">
+            <label>Проект<select data-project-select></select></label>
+            <button type="button" class="ghost" data-select-root>Выбрать папку</button>
+          </div>
+          <div class="topbar-actions">
+            <span class="overall-badge" data-overall-status>Проверяем...</span>
+            <button type="button" data-download-config>Скачать MCP-конфиг</button>
+            <button type="button" class="ghost" data-toggle-theme>Тема</button>
+          </div>
+        </header>
+
+        <section class="content-section" data-section="start">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">мастер запуска</p>
+              <h2>Проверка контура</h2>
+            </div>
+            <button type="button" data-run-full-check>Проверить подключение</button>
+          </div>
+          <div class="checklist" data-checklist></div>
+        </section>
+
+        <section class="content-section" data-section="mcp" hidden>
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">конфиг и ключ</p>
+              <h2>MCP-пакет</h2>
+            </div>
+            <button type="button" data-copy-config>Копировать конфиг</button>
+          </div>
+          <div class="split-grid">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Барьер-ключ</h3>
+                <button type="button" class="ghost" data-toggle-key>Показать</button>
+              </div>
+              <p class="secret-line" data-key-preview>Ключ загружается...</p>
+              <p class="hint">i<span>Ключ не хранится в интерфейсе постоянно. Он читается из локального secret-файла watcher.</span></p>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Файл</h3>
+                <span data-config-file>mcp-config.json</span>
+              </div>
+              <p data-config-status>Загрузка конфига...</p>
+            </section>
+          </div>
+          <pre class="code-block" data-config-json>Загрузка...</pre>
+        </section>
+
+        <section class="content-section" data-section="prompt" hidden>
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">стартовый контракт</p>
+              <h2>Первый промт</h2>
+            </div>
+            <button type="button" data-copy-prompt>Копировать промт</button>
+          </div>
+          <pre class="code-block" data-start-prompt>Загрузка...</pre>
+        </section>
+
+        <section class="content-section" data-section="watcher" hidden>
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">служба watcher</p>
+              <h2>Команды</h2>
+            </div>
+            <span class="overall-badge" data-service-summary>Проверяем...</span>
+          </div>
+          <div class="command-list">
+            <button type="button" data-service-action="install">Установить службу</button>
+            <button type="button" data-service-action="start">Запустить</button>
+            <button type="button" data-service-action="restart">Перезапустить</button>
+            <button type="button" data-service-action="stop">Остановить</button>
+            <button type="button" data-service-action="health">Проверить</button>
+          </div>
+          <pre class="code-block" data-service-status>Проверяем службу...</pre>
+        </section>
+
+        <section class="content-section" data-section="projects" hidden>
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">проект</p>
+              <h2>Профиль</h2>
+            </div>
+            <button type="submit" form="project-form">Сохранить профиль</button>
+          </div>
+          <form class="form-grid" id="project-form" data-project-form>
             <label>ID проекта<input name="id" required /></label>
             <label>Название<input name="name" required /></label>
             <label>Путь<input name="root" required /></label>
-            <button type="button" class="ghost" data-select-root>Выбрать папку</button>
             <label>ID индекса<input name="indexId" required /></label>
-            <label>MCP сервер<input name="serverUrl" required /></label>
-            <label>Имя переменной окружения с токеном<input name="tokenEnv" required /></label>
-            <button type="submit">Сохранить профиль</button>
+            <label>MCP сервер<input name="serverUrl" /></label>
+            <label>Переменная токена<input name="tokenEnv" required /></label>
           </form>
+          <div class="project-list" data-projects>Загрузка...</div>
+        </section>
 
-          <section class="panel">
-            <p class="eyebrow">служба watcher</p>
-            <h2>Команды</h2>
-            <p class="section-copy">Эти действия меняют локальную службу и требуют подтверждения.</p>
-            <div class="actions">
-              <button type="button" data-service-action="start">Запустить</button>
-              <button type="button" data-service-action="stop">Стоп</button>
-              <button type="button" data-service-action="restart">Перезапустить</button>
-              <button type="button" data-service-action="install">Установить службу</button>
+        <section class="content-section" data-section="modes" hidden>
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">режимы MCP</p>
+              <h2>Рельсы готовности</h2>
             </div>
-          </section>
-
-          <section class="panel">
-            <p class="eyebrow">контроль</p>
-            <h2>Проверки допуска</h2>
-            <pre data-config-status>Загрузка конфига...</pre>
-            <ul class="gates" data-gates></ul>
-          </section>
           </div>
+          <div class="mode-grid" data-modes>Загрузка...</div>
+        </section>
 
-        <div class="workspace-grid">
-          <section class="code-panel">
+        <section class="content-section" data-section="diagnostics" hidden>
+          <div class="section-head">
             <div>
-              <h3>Сохраненные проекты</h3>
-              <span>профили</span>
+              <p class="eyebrow">диагностика</p>
+              <h2>Проблема и действие</h2>
             </div>
-            <pre data-projects>Загрузка...</pre>
-          </section>
-
-          <section class="code-panel">
-            <div>
-              <h3>Изменения файла настройки MCP</h3>
-              <span>резервная копия</span>
-            </div>
-            <pre data-mcp-diff>Загрузка...</pre>
-          </section>
-
-          <section class="code-panel wide">
-            <div>
-              <h3>Диагностика</h3>
-              <span>проверка секретов</span>
-            </div>
-            <pre data-diagnostics>Загрузка...</pre>
-          </section>
           </div>
-        </details>
+          <div class="diagnostic-list" data-diagnostics>Загрузка...</div>
+        </section>
+
+        <section class="content-section" data-section="settings" hidden>
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">расширенное</p>
+              <h2>Настройки</h2>
+            </div>
+          </div>
+          <details class="danger-zone">
+            <summary>Расширенные технические данные</summary>
+            <pre class="code-block" data-mcp-diff>Загрузка...</pre>
+          </details>
+        </section>
+      </section>
+
+      <section class="bottom-console" data-bottom-console>
+        <div>
+          <strong>Логи</strong>
+          <button type="button" class="ghost" data-console-toggle>Скрыть</button>
+        </div>
+        <pre data-service-output>Команды службы ещё не запускались</pre>
       </section>
     </main>
+
     <script type="module" src="../dist/renderer.js"></script>
   </body>
 </html>
