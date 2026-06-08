@@ -164,4 +164,12 @@ describe('watcher desktop contract', () => {
     expect(watcherBundle).toContain('lease owner mismatch');
     expect(watcherBundle).toContain('replace:!0');
   });
+
+  it('reports warm delta verification against the retained index coverage', () => {
+    const watcherBundle = readFileSync(join(process.cwd(), 'bin', 'watcher.js'), 'utf-8');
+
+    expect(watcherBundle).toContain('L.mode==="warm_delta"&&it?Se:he');
+    expect(watcherBundle).toContain('L.mode==="warm_delta"&&it?L.currentPaths.length:he.length');
+    expect(watcherBundle).not.toContain('js({byExt:Pn,skipInfo:ve,total:G.length+pe,compressed:he.length');
+  });
 });
