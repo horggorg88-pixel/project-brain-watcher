@@ -14,7 +14,7 @@ import { readDesktopServiceToken, stageDesktopServiceSecret, type DesktopService
 import { verifyProjectServerAccess } from './desktop-server-access.js';
 import { readServiceStatus } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.8';
+const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.9';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 
