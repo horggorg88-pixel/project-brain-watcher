@@ -28,6 +28,21 @@ export function readDesktopServiceSecret(profile: SavedProjectProfile): string |
   return readRestrictedSecretFile(serviceTokenFilePath(profile));
 }
 
+export function readDesktopServiceToken(profile: SavedProjectProfile): string | null {
+  const envToken = process.env[profile.tokenEnv];
+  if (isConcreteBearerToken(envToken)) return envToken.trim();
+  const secret = readDesktopServiceSecret(profile);
+  return isConcreteBearerToken(secret) ? secret.trim() : null;
+}
+
+export function syncDesktopServiceSecretFromEnv(profile: SavedProjectProfile): DesktopServiceSecretState | null {
+  const envToken = process.env[profile.tokenEnv];
+  if (!isConcreteBearerToken(envToken)) return null;
+  const token = envToken.trim();
+  if (readDesktopServiceSecret(profile)?.trim() === token) return readDesktopServiceSecretState(profile);
+  return stageDesktopServiceSecret(profile, token);
+}
+
 export function readDesktopServiceSecretState(profile: SavedProjectProfile | null): DesktopServiceSecretState {
   if (!profile) {
     return {
@@ -44,11 +59,28 @@ export function readDesktopServiceSecretState(profile: SavedProjectProfile | nul
   }
   const tokenFilePath = serviceTokenFilePath(profile);
   const health = readRestrictedSecretHealth(tokenFilePath);
+  const secret = readDesktopServiceSecret(profile);
+  const concreteSecret = isConcreteBearerToken(secret);
+  const concreteEnv = isConcreteBearerToken(process.env[profile.tokenEnv]);
   return {
-    configured: health.configured,
+    configured: concreteSecret || (health.configured && concreteEnv),
     tokenFilePath,
     tokenEnv: profile.tokenEnv,
     actualFingerprint: health.actualFingerprint,
     acl: health.acl,
   };
+}
+
+export function isConcreteBearerToken(token: string | null | undefined): token is string {
+  const value = token?.trim();
+  if (!value || value.length < 12) return false;
+  if (/^\$\{[^}]+\}$/.test(value)) return false;
+  if (/^%[^%]+%$/.test(value)) return false;
+  if (/^<[^>]+>$/.test(value)) return false;
+  const normalized = value.toLowerCase().replace(/[\s-]+/g, '_');
+  if (normalized === 'pb_secret_value' || normalized === 'secret_value') return false;
+  if (normalized === 'mcp_bearer_token' || normalized === 'project_brain_token') return false;
+  if (normalized.includes('placeholder') || normalized.includes('replace_me')) return false;
+  if (normalized.includes('your_token') || normalized.includes('example_token')) return false;
+  return true;
 }

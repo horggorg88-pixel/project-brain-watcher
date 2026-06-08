@@ -23,6 +23,7 @@ const api: WatcherDesktopApi = {
     login: (request: AccessLoginRequest) => (
       ipcRenderer.invoke('access:login', request) as Promise<DesktopAccessState>
     ),
+    logout: () => ipcRenderer.invoke('access:logout') as Promise<DesktopAccessState>,
   },
   ui: {
     loadState: () => ipcRenderer.invoke('ui:load-state') as Promise<DesktopUiState>,

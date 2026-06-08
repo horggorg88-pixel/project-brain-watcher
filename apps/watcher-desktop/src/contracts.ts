@@ -189,6 +189,7 @@ export interface WatcherDesktopApi {
   readonly access: {
     status(): Promise<DesktopAccessState>;
     login(request: AccessLoginRequest): Promise<DesktopAccessState>;
+    logout(): Promise<DesktopAccessState>;
   };
   readonly ui: {
     loadState(): Promise<DesktopUiState>;

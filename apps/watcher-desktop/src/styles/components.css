@@ -68,6 +68,7 @@ h3 {
 }
 
 .sidebar-nav button {
+  width: 100%;
   justify-content: start;
   border-color: transparent;
   background: transparent;

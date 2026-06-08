@@ -28,10 +28,13 @@ describe('watcher desktop contract', () => {
   it('exposes typed preload APIs without raw ipcRenderer forwarding', () => {
     const preloadSource = readFileSync(join(appRoot, 'src', 'preload.cts'), 'utf-8');
     const contractsSource = readFileSync(join(appRoot, 'src', 'contracts.ts'), 'utf-8');
+    const mainSource = readFileSync(join(appRoot, 'src', 'main.ts'), 'utf-8');
     const rendererSource = readFileSync(join(appRoot, 'src', 'renderer.ts'), 'utf-8');
+    const rendererViewSource = readFileSync(join(appRoot, 'src', 'renderer-view.ts'), 'utf-8');
 
     expect(preloadSource).toContain("contextBridge.exposeInMainWorld('watcherDesktop'");
     expect(preloadSource).toContain("ipcRenderer.invoke('access:login'");
+    expect(preloadSource).toContain("ipcRenderer.invoke('access:logout'");
     expect(preloadSource).toContain("ipcRenderer.invoke('projects:select-root'");
     expect(preloadSource).toContain("ipcRenderer.invoke('projects:import-config'");
     expect(preloadSource).toContain("ipcRenderer.invoke('projects:build-config-package'");
@@ -42,11 +45,30 @@ describe('watcher desktop contract', () => {
     expect(preloadSource).toContain("ipcRenderer.invoke('modes:list'");
     expect(preloadSource).not.toContain('ipcRenderer.on');
     expect(preloadSource).not.toContain('send: ipcRenderer.send');
+    expect(mainSource).toContain("ipcMain.handle('access:logout'");
     expect(contractsSource).not.toContain('readonly serverVerified?: boolean');
+    expect(contractsSource).toContain('logout(): Promise<DesktopAccessState>');
     expect(contractsSource).toContain('buildConfigPackage(projectId: string)');
     expect(contractsSource).toContain('fullCheck(projectId: string)');
     expect(rendererSource).toContain('service.fullCheck');
-    expect(readFileSync(join(appRoot, 'src', 'main.ts'), 'utf-8')).toContain("'preload.cjs'");
+    expect(rendererSource).toContain('data-check-action');
+    expect(rendererSource).toContain('handleCheckAction');
+    expect(rendererSource).toContain("case 'start_service'");
+    expect(rendererSource).toContain("case 'verify'");
+    expect(rendererSource).toContain("case 'download_config'");
+    expect(rendererSource).toContain("case 'import_config'");
+    expect(rendererSource).toContain('watcherDesktop.access.logout');
+    expect(rendererViewSource).toContain('data-access-logout');
+    expect(rendererViewSource).not.toContain('disabled>Выход</button>');
+    expect(readFileSync(join(appRoot, 'src', 'desktop-app-paths.ts'), 'utf-8')).toContain("'preload.cjs'");
+  });
+
+  it('resolves Electron assets from the app root during local dist launches', () => {
+    const mainSource = readFileSync(join(appRoot, 'src', 'main.ts'), 'utf-8');
+
+    expect(mainSource).toContain('resolveDesktopAppAssetPaths(app.getAppPath())');
+    expect(mainSource).not.toContain("join(app.getAppPath(), 'src', 'index.html')");
+    expect(mainSource).not.toContain("join(app.getAppPath(), 'dist', 'preload.cjs')");
   });
 
   it('keeps the desktop entry screen as a clean login before the control panel', () => {
@@ -64,6 +86,23 @@ describe('watcher desktop contract', () => {
     expect(html).toContain('autocomplete="current-password"');
     expect(html).not.toContain('Зарегистрироваться');
     expect(html).not.toContain('Подключите watcher');
+  });
+
+  it('keeps project block buttons aligned without text wrapping', () => {
+    const baseCss = readFileSync(join(appRoot, 'src', 'styles', 'base.css'), 'utf-8');
+    const layoutCss = readFileSync(join(appRoot, 'src', 'styles', 'layout.css'), 'utf-8');
+    const componentsCss = readFileSync(join(appRoot, 'src', 'styles', 'components.css'), 'utf-8');
+
+    expect(baseCss).toContain('display: inline-flex;');
+    expect(baseCss).toContain('white-space: nowrap;');
+    expect(baseCss).toMatch(/body\s*\{[\s\S]*color:\s*var\(--ink\)/);
+    expect(layoutCss).toContain('.project-picker > button');
+    expect(layoutCss).toContain('.project-picker label');
+    expect(layoutCss).toContain('margin-bottom: 0;');
+    expect(layoutCss).toContain('.topbar-actions > button');
+    expect(layoutCss).toContain('.topbar-actions .overall-badge');
+    expect(layoutCss).toContain('align-items: end;');
+    expect(componentsCss).toContain('width: 100%;');
   });
 
   it('declares an isolated package for the desktop application', () => {
@@ -100,5 +139,7 @@ describe('watcher desktop contract', () => {
     };
 
     expect(serviceRunnerSource).toContain(`project-brain-watcher#v${watcherPackage.version}`);
+    expect(serviceRunnerSource).toContain("'cmd.exe'");
+    expect(serviceRunnerSource).toContain("'/d', '/s', '/c'");
   });
 });

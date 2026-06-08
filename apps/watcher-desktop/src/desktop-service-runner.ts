@@ -7,8 +7,9 @@ import type {
   WatcherServiceActionRequest,
   WatcherServiceActionResult,
 } from './contracts.js';
-import { defaultProfile, readProfiles, type DesktopCorePaths } from './desktop-profile-store.js';
-import { readDesktopServiceSecret } from './desktop-service-secret.js';
+import { discoverMcpConfig } from './desktop-config-discovery.js';
+import { applyMcpConfigToProfile, defaultProfile, readProfiles, type DesktopCorePaths } from './desktop-profile-store.js';
+import { readDesktopServiceToken } from './desktop-service-secret.js';
 import { verifyProjectServerAccess } from './desktop-server-access.js';
 import { readServiceStatus } from './desktop-service-status.js';
 
@@ -18,9 +19,12 @@ export async function runServiceAction(
   paths: DesktopCorePaths,
   request: WatcherServiceActionRequest,
 ): Promise<WatcherServiceActionResult> {
-  const profile = readProfiles(paths).find(item => item.id === request.projectId) ?? defaultProfile(paths);
+  const profile = applyMcpConfigToProfile(
+    readProfiles(paths).find(item => item.id === request.projectId) ?? defaultProfile(paths),
+    discoverMcpConfig(paths),
+  );
   if (request.action === 'health') return healthResult(paths);
-  const token = profile ? readDesktopServiceSecret(profile) ?? process.env[profile.tokenEnv] ?? null : null;
+  const token = profile ? readDesktopServiceToken(profile) : null;
   const policy = servicePolicy(request, profile, token);
   if (policy.decision !== 'allow') {
     return { executed: false, policy, status: readServiceStatus(paths), exitCode: null, output: policy.reasons.join('\n') };
@@ -78,7 +82,7 @@ function servicePolicy(
   if (!request.confirmed) {
     return { decision: 'prompt', risk: 'high', reasons: [`Подтвердите действие: ${actionLabel(request.action)}`] };
   }
-  if (request.action !== 'stop' && !token && !process.env[profile.tokenEnv]) {
+  if (request.action !== 'stop' && !token) {
     return { decision: 'deny', risk: 'high', reasons: [`Bearer для ${profile.tokenEnv} не найден. Импортируйте конфиг из личного кабинета.`] };
   }
   return { decision: 'allow', risk: request.action === 'install' ? 'high' : 'medium', reasons: ['Действие подтверждено пользователем'] };
@@ -108,11 +112,18 @@ function spawnWatcher(
   env: Readonly<Record<string, string>>,
 ): Promise<{ readonly exitCode: number; readonly output: string }> {
   return new Promise(resolve => {
-    const child = spawn(command, args, { cwd, env: { ...process.env, ...env }, windowsHide: true });
     const chunks: string[] = [];
+    const invocation = spawnInvocation(command, args);
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(invocation.command, invocation.args, { cwd, env: { ...process.env, ...env }, windowsHide: true });
+    } catch (error) {
+      resolve({ exitCode: 1, output: error instanceof Error ? error.message : String(error) });
+      return;
+    }
     const timer = setTimeout(() => child.kill(), 60_000);
-    child.stdout.on('data', chunk => chunks.push(String(chunk)));
-    child.stderr.on('data', chunk => chunks.push(String(chunk)));
+    child.stdout?.on('data', chunk => chunks.push(String(chunk)));
+    child.stderr?.on('data', chunk => chunks.push(String(chunk)));
     child.on('close', code => {
       clearTimeout(timer);
       resolve({ exitCode: code ?? 1, output: chunks.join('').trim() });
@@ -122,6 +133,13 @@ function spawnWatcher(
       resolve({ exitCode: 1, output: error.message });
     });
   });
+}
+
+function spawnInvocation(command: string, args: readonly string[]): { readonly command: string; readonly args: readonly string[] } {
+  if (process.platform === 'win32' && command.toLowerCase().endsWith('.cmd')) {
+    return { command: 'cmd.exe', args: ['/d', '/s', '/c', command, ...args] };
+  }
+  return { command, args };
 }
 
 function defaultNpxExecutable(): string {

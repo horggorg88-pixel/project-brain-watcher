@@ -21,6 +21,7 @@
 body {
   min-height: 100vh;
   margin: 0;
+  color: var(--ink);
   background:
     linear-gradient(90deg, rgba(17, 17, 17, 0.035) 1px, transparent 1px),
     linear-gradient(180deg, rgba(17, 17, 17, 0.035) 1px, transparent 1px),
@@ -35,12 +36,16 @@ select {
 }
 
 button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 34px;
   border: 1px solid var(--ink);
   background: var(--ink);
   color: var(--inverse-ink);
   padding: 0 12px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 button:hover { background: #303030; }

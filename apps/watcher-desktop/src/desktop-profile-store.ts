@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ProjectDraft, SavedProjectProfile } from './contracts.js';
+import type { McpConfigDiscovery, ProjectDraft, SavedProjectProfile } from './contracts.js';
 
 export interface DesktopCorePaths {
   readonly homePath: string;
@@ -38,6 +38,18 @@ export function defaultProfile(paths: DesktopCorePaths): SavedProjectProfile | n
     serverUrl: '',
     tokenEnv: 'MCP_BEARER_TOKEN',
     createdAt: new Date(0).toISOString(),
+  };
+}
+
+export function applyMcpConfigToProfile(
+  profile: SavedProjectProfile | null,
+  config: McpConfigDiscovery,
+): SavedProjectProfile | null {
+  if (!profile) return null;
+  return {
+    ...profile,
+    serverUrl: profile.serverUrl || config.serverUrl || '',
+    tokenEnv: profile.tokenEnv || config.tokenEnv || 'MCP_BEARER_TOKEN',
   };
 }
 

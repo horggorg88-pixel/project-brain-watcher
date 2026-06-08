@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import type { ProjectDraft, ProjectImportResult } from './contracts.js';
 import { saveProfile, type DesktopCorePaths } from './desktop-profile-store.js';
-import { stageDesktopServiceSecret } from './desktop-service-secret.js';
+import { isConcreteBearerToken, stageDesktopServiceSecret } from './desktop-service-secret.js';
 
 interface HandoffFile {
   readonly project_id?: unknown;
@@ -100,12 +100,4 @@ function readString(value: unknown): string | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
-}
-
-function isConcreteBearerToken(token: string): boolean {
-  if (token.length < 12) return false;
-  if (/^\$\{[^}]+\}$/.test(token)) return false;
-  if (/^%[^%]+%$/.test(token)) return false;
-  if (/^<[^>]+>$/.test(token)) return false;
-  return true;
 }

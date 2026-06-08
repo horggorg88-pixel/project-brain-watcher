@@ -1,14 +1,15 @@
 import { basename } from 'node:path';
 import type { DesktopConfigPackage, SavedProjectProfile } from './contracts.js';
-import { defaultProfile, readProfiles, type DesktopCorePaths } from './desktop-profile-store.js';
+import { discoverMcpConfig } from './desktop-config-discovery.js';
+import { applyMcpConfigToProfile, defaultProfile, readProfiles, type DesktopCorePaths } from './desktop-profile-store.js';
 import {
-  readDesktopServiceSecret,
+  readDesktopServiceToken,
   readDesktopServiceSecretState,
 } from './desktop-service-secret.js';
 
 export function buildDesktopConfigPackage(paths: DesktopCorePaths, projectId: string): DesktopConfigPackage {
   const profile = resolveProfile(paths, projectId);
-  const token = readDesktopServiceSecret(profile);
+  const token = readDesktopServiceToken(profile);
   const secret = readDesktopServiceSecretState(profile);
   const endpoint = projectMcpEndpoint(profile);
   const prompt = buildStartPrompt(profile, endpoint);
@@ -46,7 +47,7 @@ export function buildDesktopConfigPackage(paths: DesktopCorePaths, projectId: st
 function resolveProfile(paths: DesktopCorePaths, projectId: string): SavedProjectProfile {
   const profiles = readProfiles(paths);
   const requested = profiles.find(profile => profile.id === projectId);
-  const fallback = requested ?? profiles[0] ?? defaultProfile(paths);
+  const fallback = applyMcpConfigToProfile(requested ?? profiles[0] ?? defaultProfile(paths), discoverMcpConfig(paths));
   if (!fallback) throw new Error('Проект не выбран. Сначала выберите папку проекта.');
   return fallback;
 }

@@ -2,9 +2,11 @@ import { join } from 'node:path';
 import type {
   DiagnosticsPreview,
   McpDiffPreview,
+  SavedProjectProfile,
   WatcherPolicyGate,
 } from './contracts.js';
 import {
+  applyMcpConfigToProfile,
   defaultProfile,
   readProfiles,
   type DesktopCorePaths,
@@ -15,6 +17,16 @@ import { readServiceStatus } from './desktop-service-status.js';
 export { readProfiles, saveProfile, type DesktopCorePaths } from './desktop-profile-store.js';
 export { readServiceStatus } from './desktop-service-status.js';
 export { runServiceAction } from './desktop-service-runner.js';
+
+export function listDesktopProjectProfiles(paths: DesktopCorePaths): readonly SavedProjectProfile[] {
+  const profiles = readProfiles(paths);
+  const config = discoverMcpConfig(paths);
+  if (profiles.length > 0) {
+    return profiles.map(profile => applyMcpConfigToProfile(profile, config) ?? profile);
+  }
+  const fallback = applyMcpConfigToProfile(defaultProfile(paths), config);
+  return fallback ? [fallback] : [];
+}
 
 export function previewMcpDiff(paths: DesktopCorePaths, client: McpDiffPreview['client']): McpDiffPreview {
   const configPath = client === 'codex'
@@ -30,12 +42,12 @@ export function previewMcpDiff(paths: DesktopCorePaths, client: McpDiffPreview['
 
 export function previewDiagnostics(paths: DesktopCorePaths): DiagnosticsPreview {
   const profiles = readProfiles(paths);
-  const profile = profiles[0] ?? defaultProfile(paths);
   const config = discoverMcpConfig(paths);
+  const profile = applyMcpConfigToProfile(profiles[0] ?? defaultProfile(paths), config);
   const secret = readDesktopServiceSecretState(profile);
   const service = readServiceStatus(paths);
   const checks = diagnosticChecks({
-    profileCount: profiles.length,
+    profileConfigured: profile !== null,
     configFound: config.found,
     secretConfigured: secret.configured,
     secretAclRestricted: secret.acl.restricted,
@@ -50,7 +62,7 @@ export function previewDiagnostics(paths: DesktopCorePaths): DiagnosticsPreview 
     readiness,
     findings: checks.flatMap(check => check.reasons),
     included: [
-      `Профили: ${profiles.length}`,
+      `Профили: ${profiles.length > 0 ? profiles.length : profile ? 'Codex fallback' : 0}`,
       `MCP config: ${config.found ? config.source : 'не найден'}`,
       `Secret file: ${secret.configured ? 'есть' : 'нет'}`,
       `Secret ACL: ${secret.acl.restricted ? 'ограничен' : `не подтверждён (${secret.acl.reason ?? 'unknown'})`}`,
@@ -64,14 +76,14 @@ export function previewDiagnostics(paths: DesktopCorePaths): DiagnosticsPreview 
 }
 
 function diagnosticChecks(input: {
-  readonly profileCount: number;
+  readonly profileConfigured: boolean;
   readonly configFound: boolean;
   readonly secretConfigured: boolean;
   readonly secretAclRestricted: boolean;
   readonly serviceHealthy: boolean;
 }): WatcherPolicyGate[] {
   return [
-    gate(input.profileCount > 0, 'deny', 'Профиль проекта найден', 'Профиль проекта не импортирован'),
+    gate(input.profileConfigured, 'deny', 'Профиль проекта найден', 'Профиль проекта не импортирован'),
     gate(input.configFound, 'deny', 'MCP config найден', 'MCP config не найден'),
     gate(input.secretConfigured, 'prompt', 'Secret-файл службы найден', 'Secret-файл службы не создан'),
     gate(input.secretAclRestricted, 'prompt', 'ACL secret-файла ограничен', 'ACL secret-файла не подтверждён'),

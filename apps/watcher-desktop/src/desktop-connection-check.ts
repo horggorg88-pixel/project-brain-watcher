@@ -7,9 +7,9 @@ import type {
 } from './contracts.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { previewDiagnostics } from './desktop-core.js';
-import { defaultProfile, readProfiles, type DesktopCorePaths } from './desktop-profile-store.js';
+import { applyMcpConfigToProfile, defaultProfile, readProfiles, type DesktopCorePaths } from './desktop-profile-store.js';
 import { verifyProjectServerAccess } from './desktop-server-access.js';
-import { readDesktopServiceSecret, readDesktopServiceSecretState } from './desktop-service-secret.js';
+import { readDesktopServiceSecretState, readDesktopServiceToken } from './desktop-service-secret.js';
 import { readServiceStatus } from './desktop-service-status.js';
 
 export async function buildDesktopConnectionCheck(
@@ -17,10 +17,10 @@ export async function buildDesktopConnectionCheck(
   projectId: string,
 ): Promise<DesktopConnectionCheck> {
   const profiles = readProfiles(paths);
-  const profile = resolveProfile(paths, profiles, projectId);
   const config = discoverMcpConfig(paths);
+  const profile = resolveProfile(paths, profiles, projectId, config);
   const secret = readDesktopServiceSecretState(profile);
-  const token = profile ? readDesktopServiceSecret(profile) : null;
+  const token = profile ? readDesktopServiceToken(profile) : null;
   const service = readServiceStatus(paths);
   const diagnostics = previewDiagnostics(paths);
   const server = profile ? await verifyProjectServerAccess(profile, token) : null;
@@ -41,8 +41,9 @@ function resolveProfile(
   paths: DesktopCorePaths,
   profiles: readonly SavedProjectProfile[],
   projectId: string,
+  config: ReturnType<typeof discoverMcpConfig>,
 ): SavedProjectProfile | null {
-  return profiles.find(profile => profile.id === projectId) ?? profiles[0] ?? defaultProfile(paths);
+  return applyMcpConfigToProfile(profiles.find(profile => profile.id === projectId) ?? profiles[0] ?? defaultProfile(paths), config);
 }
 
 function buildNodes(input: {

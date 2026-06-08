@@ -1,6 +1,5 @@
 import { app, BrowserWindow, Tray, Menu, ipcMain, dialog } from 'electron';
 import { existsSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type {
   AccessLoginRequest,
   DesktopUiState,
@@ -9,7 +8,8 @@ import type {
   ProjectImportResult,
   WatcherServiceActionRequest,
 } from './contracts.js';
-import { loginAccess, readAccessState } from './desktop-access.js';
+import { loginAccess, logoutAccess, readAccessState } from './desktop-access.js';
+import { resolveDesktopAppAssetPaths } from './desktop-app-paths.js';
 import { buildDesktopConfigPackage } from './desktop-config-package.js';
 import { buildDesktopConnectionCheck } from './desktop-connection-check.js';
 import { importProjectConfig } from './desktop-config-import.js';
@@ -18,7 +18,7 @@ import { readDesktopUiState, saveDesktopUiState } from './desktop-ui-state.js';
 import {
   previewDiagnostics,
   previewMcpDiff,
-  readProfiles,
+  listDesktopProjectProfiles,
   readServiceStatus,
   runServiceAction,
   saveProfile,
@@ -55,6 +55,7 @@ app.on('window-all-closed', () => {
 });
 
 function createMainWindow(): BrowserWindow {
+  const assetPaths = resolveDesktopAppAssetPaths(app.getAppPath());
   const window = new BrowserWindow({
     width: 1180,
     height: 780,
@@ -63,13 +64,13 @@ function createMainWindow(): BrowserWindow {
     title: 'Project Brain Watcher',
     show: false,
     webPreferences: {
-      preload: join(app.getAppPath(), 'dist', 'preload.cjs'),
+      preload: assetPaths.preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
     },
   });
-  window.loadFile(join(app.getAppPath(), 'src', 'index.html'));
+  window.loadFile(assetPaths.indexHtmlPath);
   window.webContents.once('did-finish-load', () => {
     window.show();
     window.focus();
@@ -81,7 +82,8 @@ function createMainWindow(): BrowserWindow {
 }
 
 function createTray(window: BrowserWindow): Tray | null {
-  const iconPath = join(app.getAppPath(), 'src', 'tray.ico');
+  const { trayIconPath } = resolveDesktopAppAssetPaths(app.getAppPath());
+  const iconPath = trayIconPath;
   if (!existsSync(iconPath)) return null;
   const appTray = new Tray(iconPath);
   appTray.setToolTip('Project Brain Watcher');
@@ -98,6 +100,7 @@ function createTray(window: BrowserWindow): Tray | null {
 function registerIpcHandlers(): void {
   ipcMain.handle('access:status', () => readAccessState(corePaths()));
   ipcMain.handle('access:login', (_event, request: AccessLoginRequest) => loginAccess(corePaths(), request));
+  ipcMain.handle('access:logout', () => logoutAccess(corePaths()));
   ipcMain.handle('ui:load-state', () => readDesktopUiState(corePaths()));
   ipcMain.handle('ui:save-state', (_event, state: DesktopUiState) => saveDesktopUiState(corePaths(), state));
   ipcMain.handle('service:status', () => readServiceStatus(corePaths()));
@@ -107,7 +110,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle('service:full-check', (_event, projectId: string) => (
     buildDesktopConnectionCheck(corePaths(), projectId)
   ));
-  ipcMain.handle('projects:list', () => readProfiles(corePaths()));
+  ipcMain.handle('projects:list', () => listDesktopProjectProfiles(corePaths()));
   ipcMain.handle('projects:save', (_event, project: ProjectDraft) => saveProfile(corePaths(), project));
   ipcMain.handle('projects:select-root', async () => {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });

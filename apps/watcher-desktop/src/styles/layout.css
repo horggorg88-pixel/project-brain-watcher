@@ -62,10 +62,26 @@
   align-items: end;
 }
 
+.project-picker label {
+  margin-bottom: 0;
+}
+
 .topbar-actions {
   display: flex;
   gap: 8px;
-  align-items: center;
+  align-items: end;
+}
+
+.project-picker > button,
+.topbar-actions > button,
+.section-head > button {
+  min-height: 34px;
+  align-self: end;
+}
+
+.topbar-actions .overall-badge {
+  min-height: 34px;
+  white-space: nowrap;
 }
 
 .content-section {

@@ -1,5 +1,6 @@
 import type {
   DesktopAccessState,
+  DesktopCheckAction,
   DesktopConfigPackage,
   DesktopConnectionCheck,
   DesktopSection,
@@ -7,7 +8,10 @@ import type {
   DiagnosticsPreview,
   McpDiffPreview,
   ProjectDraft,
+  ProjectImportResult,
   SavedProjectProfile,
+  WatcherServiceAction,
+  WatcherServiceActionResult,
   WatcherServiceStatus,
 } from './contracts.js';
 import {
@@ -91,6 +95,22 @@ authForm?.addEventListener('submit', event => {
   }).catch(error => setText(authStatusEl, errorMessage(error)));
 });
 
+accountEl?.addEventListener('click', event => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest<HTMLButtonElement>('[data-access-logout]');
+  if (!button) return;
+  button.disabled = true;
+  void window.watcherDesktop.access.logout()
+    .then(state => {
+      accessState = state;
+      return saveUiState({ ...uiState, activeSection: 'start' });
+    })
+    .then(() => refresh())
+    .catch(error => setText(authStatusEl, errorMessage(error)))
+    .finally(() => { button.disabled = false; });
+});
+
 projectForm?.addEventListener('submit', event => {
   event.preventDefault();
   const project = projectDraftFromForm(projectForm);
@@ -104,7 +124,7 @@ navButtons.forEach(button => {
   button.addEventListener('click', () => {
     const activeSection = sectionFrom(button.dataset.navSection);
     if (!activeSection) return;
-    void saveUiState({ ...uiState, activeSection }).then(() => renderUiState());
+    void goToSection(activeSection);
   });
 });
 
@@ -120,9 +140,7 @@ selectRootButton?.addEventListener('click', () => {
 });
 
 downloadConfigButton?.addEventListener('click', () => {
-  void window.watcherDesktop.projects.saveConfigPackage(currentProjectId())
-    .then(path => writeLog(path ? `MCP-конфиг сохранён: ${path}` : 'Скачивание отменено'))
-    .catch(error => writeLog(errorMessage(error)));
+  void saveCurrentConfigPackage();
 });
 
 copyConfigButton?.addEventListener('click', () => {
@@ -154,23 +172,95 @@ runFullCheckButton?.addEventListener('click', () => {
   void refresh();
 });
 
+checklistEl?.addEventListener('click', event => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest<HTMLButtonElement>('[data-check-action]');
+  if (!button) return;
+  void handleCheckAction(button.dataset.checkAction).catch(error => writeLog(errorMessage(error)));
+});
+
+diagnosticsEl?.addEventListener('click', event => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest<HTMLButtonElement>('[data-nav-section]');
+  const activeSection = sectionFrom(button?.dataset.navSection);
+  if (!activeSection) return;
+  void goToSection(activeSection);
+});
+
 serviceButtons.forEach(button => {
   button.addEventListener('click', () => {
     const action = button.dataset.serviceAction;
     if (!isServiceAction(action)) return;
-    const projectId = currentProjectId();
-    if (action !== 'health' && !window.confirm(`Выполнить действие «${actionLabel(action)}» для ${projectId}?`)) return;
-    setServiceBusy(serviceButtons, true);
-    writeLog(`Выполняем: ${actionLabel(action)}...`);
-    void window.watcherDesktop.service.run({ action, projectId, confirmed: true })
-      .then(result => {
-        writeLog(`${decisionLabel(result.policy.decision)}: код=${result.exitCode ?? 'нет'}\n${result.output}`);
-        return refresh();
-      })
-      .catch(error => writeLog(errorMessage(error)))
-      .finally(() => setServiceBusy(serviceButtons, false));
+    void runServiceActionFromUi(action, action !== 'health');
   });
 });
+
+async function handleCheckAction(value: string | undefined): Promise<void> {
+  const action = checkActionFrom(value);
+  if (!action || action === 'none') return;
+  switch (action) {
+    case 'select_project':
+      await goToSection('projects');
+      return;
+    case 'import_config':
+      await importConfigFromDialog();
+      return;
+    case 'download_config':
+      await saveCurrentConfigPackage();
+      return;
+    case 'start_service':
+      await runServiceActionFromUi('start', true);
+      return;
+    case 'verify':
+      writeLog('Проверяем MCP-сервер, bearer/session и службу...');
+      await refresh();
+      writeLog('Проверка завершена. Результат обновлён в чеклисте и диагностике.');
+      return;
+    case 'open_logs':
+      await saveUiState({ ...uiState, consoleOpen: true });
+      renderUiState();
+      return;
+  }
+}
+
+async function runServiceActionFromUi(action: WatcherServiceAction, confirmAction: boolean): Promise<void> {
+  const projectId = currentProjectId();
+  if (confirmAction && !window.confirm(`Выполнить действие «${actionLabel(action)}» для ${projectId}?`)) return;
+  setServiceBusy(serviceButtons, true);
+  writeLog(`Выполняем: ${actionLabel(action)}...`);
+  try {
+    const result = await window.watcherDesktop.service.run({ action, projectId, confirmed: true });
+    writeLog(serviceActionLog(result));
+    await refresh();
+  } catch (error) {
+    writeLog(errorMessage(error));
+  } finally {
+    setServiceBusy(serviceButtons, false);
+  }
+}
+
+async function saveCurrentConfigPackage(): Promise<void> {
+  const path = await window.watcherDesktop.projects.saveConfigPackage(currentProjectId());
+  writeLog(path ? `MCP-конфиг сохранён: ${path}` : 'Скачивание отменено');
+}
+
+async function importConfigFromDialog(): Promise<void> {
+  const result = await window.watcherDesktop.projects.importConfig();
+  if (!result) {
+    writeLog('Импорт MCP-конфига отменён');
+    return;
+  }
+  await saveUiState({ ...uiState, lastProjectId: result.profile.id, activeSection: 'start' });
+  writeLog(importResultLog(result));
+  await refresh();
+}
+
+async function goToSection(activeSection: DesktopSection): Promise<void> {
+  await saveUiState({ ...uiState, activeSection });
+  renderUiState();
+}
 
 async function refresh(): Promise<void> {
   accessState = await safeAccessStatus();
@@ -350,6 +440,35 @@ async function copyText(value: string): Promise<void> {
 function writeLog(value: string): void {
   setText(serviceOutputEl, value);
   if (!uiState.consoleOpen) void saveUiState({ ...uiState, consoleOpen: true }).then(() => renderUiState());
+}
+
+function serviceActionLog(result: WatcherServiceActionResult): string {
+  const output = result.output.trim() || 'Команда завершилась без вывода';
+  const lines = [`${decisionLabel(result.policy.decision)}: код=${result.exitCode ?? 'нет'}`, output];
+  if (result.status.lastError && !output.includes(result.status.lastError)) {
+    lines.push(`Статус службы: ${result.status.lastError}`);
+  }
+  return lines.join('\n');
+}
+
+function importResultLog(result: ProjectImportResult): string {
+  const warnings = result.warnings.length ? `\n${result.warnings.join('\n')}` : '';
+  return `MCP-конфиг импортирован: ${result.profile.name}${warnings}`;
+}
+
+function checkActionFrom(value: string | undefined): DesktopCheckAction | null {
+  const actions: readonly DesktopCheckAction[] = [
+    'none',
+    'select_project',
+    'import_config',
+    'download_config',
+    'start_service',
+    'open_logs',
+    'verify',
+  ];
+  return typeof value === 'string' && actions.includes(value as DesktopCheckAction)
+    ? value as DesktopCheckAction
+    : null;
 }
 
 function slug(value: string): string {

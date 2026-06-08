@@ -186,7 +186,7 @@ export function sectionFrom(value: string | undefined): DesktopSection | null {
 function renderAccount(state: DesktopAccessState, element: HTMLElement | null): void {
   if (!element) return;
   element.toggleAttribute('hidden', !state.signedIn);
-  element.innerHTML = `<strong>${escapeHtml(state.email ?? 'Локальный профиль')}</strong><span>${escapeHtml(accessLabel(state.status))}</span><button type="button" class="ghost" disabled>Выход</button>`;
+  element.innerHTML = `<strong>${escapeHtml(state.email ?? 'Локальный профиль')}</strong><span>${escapeHtml(accessLabel(state.status))}</span><button type="button" class="ghost" data-access-logout>Выход</button>`;
 }
 
 function keyText(pack: DesktopConfigPackage, visible: boolean): string {

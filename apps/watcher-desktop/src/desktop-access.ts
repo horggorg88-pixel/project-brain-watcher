@@ -6,23 +6,34 @@ import type {
   WatcherPolicyGate,
 } from './contracts.js';
 import type { DesktopCorePaths } from './desktop-profile-store.js';
-import { defaultProfile, readProfiles } from './desktop-profile-store.js';
+import { applyMcpConfigToProfile, defaultProfile, readProfiles } from './desktop-profile-store.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
-import { readDesktopServiceSecret, readDesktopServiceSecretState } from './desktop-service-secret.js';
+import {
+  readDesktopServiceSecretState,
+  readDesktopServiceToken,
+  stageDesktopServiceSecret,
+  syncDesktopServiceSecretFromEnv,
+} from './desktop-service-secret.js';
 import { verifyProjectServerAccess } from './desktop-server-access.js';
+import { clearDesktopAccessSession, readDesktopAccessSession, saveDesktopAccessSession } from './desktop-access-session.js';
 
 export function readAccessState(paths: DesktopCorePaths): DesktopAccessState {
   const config = discoverMcpConfig(paths);
   const secretState = readDesktopServiceSecretState(resolveConfiguredProfile(paths, config));
   const serviceSecretReady = secretState.configured && secretState.acl.restricted;
+  const session = readDesktopAccessSession(paths);
+  const signedIn = session !== null;
+  const serverVerified = signedIn && serviceSecretReady && session.serverVerified;
   return buildAccessState({
-    email: null,
-    signedIn: false,
-    serverVerified: false,
+    email: session?.email ?? null,
+    signedIn,
+    serverVerified,
     secretConfigured: secretState.configured,
     serviceSecretConfigured: serviceSecretReady,
     config,
-    message: 'Войдите данными личного кабинета, чтобы открыть локальный пульт watcher.',
+    message: signedIn
+      ? 'Локальный пульт открыт. Состояние MCP-контура обновлено.'
+      : 'Войдите данными личного кабинета, чтобы открыть локальный пульт watcher.',
   });
 }
 
@@ -31,11 +42,10 @@ export async function loginAccess(paths: DesktopCorePaths, request: AccessLoginR
   const password = request.password;
   const config = discoverMcpConfig(paths);
   const profile = resolveConfiguredProfile(paths, config);
-  const secretState = readDesktopServiceSecretState(profile);
-  const serviceSecretReady = secretState.configured && secretState.acl.restricted;
-  const token = profile ? readDesktopServiceSecret(profile) ?? process.env[profile.tokenEnv] ?? null : null;
+  let secretState = readDesktopServiceSecretState(profile);
   const authGate = validateLogin(email, password);
   if (authGate.decision !== 'allow') {
+    const serviceSecretReady = secretState.configured && secretState.acl.restricted;
     return buildAccessState({
       email,
       signedIn: false,
@@ -47,10 +57,18 @@ export async function loginAccess(paths: DesktopCorePaths, request: AccessLoginR
       extraGates: [authGate],
     });
   }
-  const serverAccess = config.found && serviceSecretReady && profile
+  const enteredBarrierKey = barrierTokenFromLogin(password);
+  if (profile && enteredBarrierKey) secretState = stageDesktopServiceSecret(profile, enteredBarrierKey);
+  const token = profile ? enteredBarrierKey ?? readDesktopServiceToken(profile) : null;
+  const serverAccess = config.found && token !== null && profile
     ? await verifyProjectServerAccess(profile, token)
     : { verified: false, message: '' };
+  if (profile && serverAccess.verified && !enteredBarrierKey) {
+    secretState = syncDesktopServiceSecretFromEnv(profile) ?? secretState;
+  }
+  const serviceSecretReady = secretState.configured && secretState.acl.restricted;
   const serverVerified = serverAccess.verified;
+  saveDesktopAccessSession(paths, { email, serverVerified });
   return buildAccessState({
     email,
     signedIn: true,
@@ -69,6 +87,11 @@ export async function loginAccess(paths: DesktopCorePaths, request: AccessLoginR
       : 'Учётные данные приняты локально, но файл настройки MCP не найден. Откройте личный кабинет и скачайте настройку.',
     extraGates: [authGate],
   });
+}
+
+export function logoutAccess(paths: DesktopCorePaths): DesktopAccessState {
+  clearDesktopAccessSession(paths);
+  return readAccessState(paths);
 }
 
 function buildAccessState(input: {
@@ -127,6 +150,11 @@ function validateLogin(email: string, password: string): WatcherPolicyGate {
     : { decision: 'deny', risk: 'medium', reasons };
 }
 
+function barrierTokenFromLogin(value: string): string | null {
+  const token = value.trim();
+  return /^pb_[^\s]{8,}$/.test(token) ? token : null;
+}
+
 function configDiscoveryGate(config: McpConfigDiscovery): WatcherPolicyGate {
   return config.found
     ? { decision: 'allow', risk: 'low', reasons: [`Файл настройки MCP найден: ${config.source}`] }
@@ -139,5 +167,5 @@ function resolveConfiguredProfile(paths: DesktopCorePaths, config: McpConfigDisc
     (config.projectId && profile.id === config.projectId)
     || (config.localPath && profile.root === config.localPath)
   ));
-  return matched ?? profiles[0] ?? defaultProfile(paths);
+  return applyMcpConfigToProfile(matched ?? profiles[0] ?? defaultProfile(paths), config);
 }
