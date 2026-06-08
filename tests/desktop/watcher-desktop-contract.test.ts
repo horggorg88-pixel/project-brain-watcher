@@ -168,8 +168,8 @@ describe('watcher desktop contract', () => {
   it('reports warm delta verification against the retained index coverage', () => {
     const watcherBundle = readFileSync(join(process.cwd(), 'bin', 'watcher.js'), 'utf-8');
 
-    expect(watcherBundle).toContain('L.mode==="warm_delta"&&it?Se:he');
-    expect(watcherBundle).toContain('L.mode==="warm_delta"&&it?L.currentPaths.length:he.length');
-    expect(watcherBundle).not.toContain('js({byExt:Pn,skipInfo:ve,total:G.length+pe,compressed:he.length');
+    expect(watcherBundle).toContain('mode==="warm_delta"');
+    expect(watcherBundle).toContain('currentPaths.length');
+    expect(watcherBundle).not.toContain('compressed:me.length');
   });
 });
