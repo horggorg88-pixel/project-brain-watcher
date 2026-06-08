@@ -132,14 +132,35 @@ describe('watcher desktop contract', () => {
     expect(watcherPackage.dependencies?.['better-sqlite3']).toBeDefined();
   });
 
-  it('starts service actions through the pinned watcher release', () => {
+  it('starts service actions through the current watcher release', () => {
     const serviceRunnerSource = readFileSync(join(appRoot, 'src', 'desktop-service-runner.ts'), 'utf-8');
     const watcherPackage = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8')) as {
       version?: string;
     };
 
     expect(serviceRunnerSource).toContain(`project-brain-watcher#v${watcherPackage.version}`);
+    expect(serviceRunnerSource).not.toContain('project-brain-watcher#v1.4.4');
     expect(serviceRunnerSource).toContain("'cmd.exe'");
     expect(serviceRunnerSource).toContain("'/d', '/s', '/c'");
+  });
+
+  it('keeps generated service launches on the current watcher release with explicit takeover', () => {
+    const watcherBundle = readFileSync(join(process.cwd(), 'bin', 'watcher.js'), 'utf-8');
+    const watcherPackage = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8')) as {
+      version?: string;
+    };
+
+    expect(watcherBundle).toContain(`"v${watcherPackage.version}"`);
+    expect(watcherBundle).not.toContain('"v1.4.4"');
+    expect(watcherBundle).toContain('"--watch","--replace"');
+  });
+
+  it('recovers a watcher lease owner mismatch before stopping the service process', () => {
+    const watcherBundle = readFileSync(join(process.cwd(), 'bin', 'watcher.js'), 'utf-8');
+
+    expect(watcherBundle).toContain('Watcher lease mismatch');
+    expect(watcherBundle).toContain('Watcher lease reacquired');
+    expect(watcherBundle).toContain('lease owner mismatch');
+    expect(watcherBundle).toContain('replace:!0');
   });
 });
