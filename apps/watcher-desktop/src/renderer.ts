@@ -33,6 +33,11 @@ import {
   setText,
 } from './renderer-view.js';
 import { actionLabel, decisionLabel, isServiceAction, setServiceBusy } from './renderer-service-ui.js';
+import {
+  resolveServiceActionConfirmation,
+  setServiceConfirmationHint,
+  type PendingServiceActionConfirmation,
+} from './renderer-service-ui.js';
 
 declare global {
   interface Window {
@@ -78,6 +83,7 @@ let accessState: DesktopAccessState | null = null;
 let uiState: DesktopUiState = defaultUiState();
 let currentProjects: readonly SavedProjectProfile[] = [];
 let currentPackage: DesktopConfigPackage | null = null;
+let pendingServiceAction: PendingServiceActionConfirmation | null = null;
 
 void refresh();
 
@@ -227,7 +233,19 @@ async function handleCheckAction(value: string | undefined): Promise<void> {
 
 async function runServiceActionFromUi(action: WatcherServiceAction, confirmAction: boolean): Promise<void> {
   const projectId = currentProjectId();
-  if (confirmAction && !window.confirm(`Выполнить действие «${actionLabel(action)}» для ${projectId}?`)) return;
+  const confirmation = resolveServiceActionConfirmation({
+    action,
+    confirmAction,
+    nowMs: Date.now(),
+    pending: pendingServiceAction,
+    projectId,
+  });
+  pendingServiceAction = confirmation.pending;
+  setServiceConfirmationHint(serviceButtons, pendingServiceAction);
+  if (!confirmation.confirmed) {
+    if (confirmation.message) writeLog(confirmation.message);
+    return;
+  }
   setServiceBusy(serviceButtons, true);
   writeLog(`Выполняем: ${actionLabel(action)}...`);
   try {
@@ -238,6 +256,7 @@ async function runServiceActionFromUi(action: WatcherServiceAction, confirmActio
     writeLog(errorMessage(error));
   } finally {
     setServiceBusy(serviceButtons, false);
+    setServiceConfirmationHint(serviceButtons, pendingServiceAction);
   }
 }
 

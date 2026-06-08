@@ -6,14 +6,17 @@ import type {
   WatcherPolicyGate,
   WatcherServiceActionRequest,
   WatcherServiceActionResult,
+  WatcherServiceStatus,
 } from './contracts.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { applyMcpConfigToProfile, defaultProfile, readProfiles, type DesktopCorePaths } from './desktop-profile-store.js';
-import { readDesktopServiceToken } from './desktop-service-secret.js';
+import { readDesktopServiceToken, stageDesktopServiceSecret, type DesktopServiceSecretState } from './desktop-service-secret.js';
 import { verifyProjectServerAccess } from './desktop-server-access.js';
 import { readServiceStatus } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.5';
+const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.6';
+const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
+const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 
 export async function runServiceAction(
   paths: DesktopCorePaths,
@@ -25,6 +28,16 @@ export async function runServiceAction(
   );
   if (request.action === 'health') return healthResult(paths);
   const token = profile ? readDesktopServiceToken(profile) : null;
+  const status = readServiceStatus(paths);
+  if (request.action === 'start' && status.running) {
+    return {
+      executed: false,
+      policy: { decision: 'allow', risk: 'low', reasons: ['Watcher уже работает'] },
+      status,
+      exitCode: 0,
+      output: `Watcher уже работает, pid=${status.pid ?? 'нет'}. Повторный запуск не требуется.`,
+    };
+  }
   const policy = servicePolicy(request, profile, token);
   if (policy.decision !== 'allow') {
     return { executed: false, policy, status: readServiceStatus(paths), exitCode: null, output: policy.reasons.join('\n') };
@@ -38,17 +51,37 @@ export async function runServiceAction(
       const denied: WatcherPolicyGate = { decision: 'deny', risk: 'high', reasons: [serverAccess.message] };
       return { executed: false, policy: denied, status: readServiceStatus(paths), exitCode: null, output: serverAccess.message };
     }
+    prepareServiceSecretForLaunch(profile, token);
   }
   const result = await spawnWatcher(defaultNpxExecutable(), buildServiceArgs(request.action, profile), profile.root, token
     ? { [profile.tokenEnv]: token }
     : {});
+  const finalStatus = await waitForServiceActionStatus(paths, request.action);
   return {
     executed: true,
     policy,
-    status: readServiceStatus(paths),
+    status: finalStatus,
     exitCode: result.exitCode,
     output: result.output,
   };
+}
+
+export function prepareServiceSecretForLaunch(
+  profile: SavedProjectProfile,
+  token: string | null,
+): DesktopServiceSecretState {
+  if (!token) throw new Error(`Bearer для ${profile.tokenEnv} не найден`);
+  return stageDesktopServiceSecret(profile, token);
+}
+
+export function isServiceActionSettled(
+  action: WatcherServiceActionRequest['action'],
+  status: WatcherServiceStatus,
+): boolean {
+  if (/PENDING/i.test(status.lastError ?? '')) return false;
+  if (action === 'start' || action === 'restart') return status.running && status.health === 'healthy';
+  if (action === 'stop') return !status.running;
+  return true;
 }
 
 function healthResult(paths: DesktopCorePaths): WatcherServiceActionResult {
@@ -132,6 +165,25 @@ function spawnWatcher(
       clearTimeout(timer);
       resolve({ exitCode: 1, output: error.message });
     });
+  });
+}
+
+async function waitForServiceActionStatus(
+  paths: DesktopCorePaths,
+  action: WatcherServiceActionRequest['action'],
+): Promise<WatcherServiceStatus> {
+  const deadline = Date.now() + SERVICE_ACTION_SETTLE_TIMEOUT_MS;
+  let status = readServiceStatus(paths);
+  while (!isServiceActionSettled(action, status) && Date.now() < deadline) {
+    await delay(SERVICE_ACTION_SETTLE_POLL_MS);
+    status = readServiceStatus(paths);
+  }
+  return status;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
   });
 }
 

@@ -20,9 +20,11 @@ import {
 } from '../../apps/watcher-desktop/src/desktop-core.js';
 import { readDesktopServiceSecret, readDesktopServiceSecretState } from '../../apps/watcher-desktop/src/desktop-service-secret.js';
 import { stageDesktopServiceSecret } from '../../apps/watcher-desktop/src/desktop-service-secret.js';
+import { isServiceActionSettled, prepareServiceSecretForLaunch } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
 import { parseWindowsServiceOutput } from '../../apps/watcher-desktop/src/desktop-service-status.js';
 import { readDesktopUiState, saveDesktopUiState } from '../../apps/watcher-desktop/src/desktop-ui-state.js';
 import { defaultProfile } from '../../apps/watcher-desktop/src/desktop-profile-store.js';
+import type { WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
 
 const tempDirs: string[] = [];
 const VALID_TEST_BEARER = 'valid_test_bearer_12345678901234567890';
@@ -157,6 +159,59 @@ describe('watcher desktop core', () => {
     expect(result.executed).toBe(false);
     expect(result.policy.decision).toBe('deny');
     expect(result.output).toContain('MCP сервер не задан');
+  });
+
+  it('treats start on an already running watcher as a status check', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'repo');
+    mkdirSync(join(root, '.brain'), { recursive: true });
+    writeFileSync(join(root, '.brain', 'watcher-runtime.json'), JSON.stringify({
+      owner: { project_id: 'demo', root, pid: process.pid },
+      updated_at: Date.now(),
+    }), 'utf-8');
+    saveProfile(paths, {
+      id: 'demo',
+      name: 'Demo',
+      root,
+      indexId: 'idx-demo',
+      serverUrl: '',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    const result = await runServiceAction(paths, { action: 'start', projectId: 'demo', confirmed: true });
+
+    expect(result.executed).toBe(false);
+    expect(result.policy.decision).toBe('allow');
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain('Watcher уже работает');
+  });
+
+  it('does not treat pending Windows service transitions as settled', () => {
+    expect(isServiceActionSettled('stop', statusFixture({ running: false, lastError: 'Windows Service STOP_PENDING' }))).toBe(false);
+    expect(isServiceActionSettled('start', statusFixture({ running: false, lastError: 'Windows Service START_PENDING' }))).toBe(false);
+    expect(isServiceActionSettled('restart', statusFixture({ running: false, lastError: 'Windows Service STOP_PENDING' }))).toBe(false);
+    expect(isServiceActionSettled('stop', statusFixture({ running: false, lastError: 'Windows Service STOPPED' }))).toBe(true);
+    expect(isServiceActionSettled('start', statusFixture({ running: true, health: 'healthy', lastError: null }))).toBe(true);
+  });
+
+  it('stages the verified bearer into the service secret before launching the installed service', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'repo');
+    mkdirSync(root, { recursive: true });
+    const profile = saveProfile(paths, {
+      id: 'demo',
+      name: 'Demo',
+      root,
+      indexId: 'idx-demo',
+      serverUrl: 'https://brain.example',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    stageDesktopServiceSecret(profile, STALE_LOCAL_BEARER);
+
+    const state = prepareServiceSecretForLaunch(profile, VALID_ENV_BEARER);
+
+    expect(state.configured).toBe(true);
+    expect(readDesktopServiceSecret(profile)).toBe(VALID_ENV_BEARER);
   });
 
   it('discovers an existing Codex MCP config without reading bearer values', () => {
@@ -754,6 +809,22 @@ function verifiedMcpFetch(): ReturnType<typeof vi.fn> {
     }
     return new Response('unexpected request', { status: 400 });
   });
+}
+
+function statusFixture(overrides: Partial<WatcherServiceStatus>): WatcherServiceStatus {
+  return {
+    health: 'stopped',
+    installed: true,
+    lastError: null,
+    lastSyncAt: null,
+    pid: null,
+    projectId: 'demo',
+    queueDepth: 0,
+    readOnly: true,
+    root: 'C:\\repo',
+    running: false,
+    ...overrides,
+  };
 }
 
 function tempPaths(): DesktopCorePaths {

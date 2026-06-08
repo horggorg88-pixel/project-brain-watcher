@@ -58,6 +58,7 @@ describe('watcher desktop contract', () => {
     expect(rendererSource).toContain("case 'download_config'");
     expect(rendererSource).toContain("case 'import_config'");
     expect(rendererSource).toContain('watcherDesktop.access.logout');
+    expect(rendererSource).not.toContain('window.confirm');
     expect(rendererViewSource).toContain('data-access-logout');
     expect(rendererViewSource).not.toContain('disabled>Выход</button>');
     expect(readFileSync(join(appRoot, 'src', 'desktop-app-paths.ts'), 'utf-8')).toContain("'preload.cjs'");
