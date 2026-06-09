@@ -64,17 +64,19 @@ export function renderOverall(check: DesktopConnectionCheck, element: HTMLElemen
 }
 
 export function renderService(status: WatcherServiceStatus, statusEl: HTMLElement | null, summaryEl: HTMLElement | null): void {
-  setText(summaryEl, status.running ? 'Активен' : status.installed ? 'Остановлен' : 'Не установлен');
+  setText(summaryEl, serviceSummary(status));
   const lines = [
-    `Состояние: ${healthLabel(status.health)}`,
-    `Служба: ${status.installed ? 'установлена' : 'не установлена'} / ${status.running ? 'запущена' : 'остановлена'}`,
+    `Состояние подключения: ${healthLabel(status.health)}`,
+    `Служба: ${status.installed ? 'установлена' : 'не установлена'}`,
+    `Запуск: ${status.running ? 'watcher запущен' : 'watcher остановлен'}`,
     `Проект: ${status.projectId ?? 'не выбран'}`,
-    `Папка: ${status.root ?? 'не выбрана'}`,
-    `PID: ${status.pid ?? 'нет'}`,
+    `Папка проекта: ${status.root ?? 'не выбрана'}`,
+    `Очередь индексации: ${status.queueDepth}`,
     `Последняя синхронизация: ${status.lastSyncAt ?? 'нет данных'}`,
-    `Очередь: ${status.queueDepth}`,
-    `Ошибка: ${status.lastError ?? 'нет'}`,
+    `Следующий шаг: ${serviceNextStep(status)}`,
   ];
+  if (status.pid) lines.push(`PID: ${status.pid}`);
+  if (status.lastError) lines.push(`Сообщение watcher: ${status.lastError}`);
   setText(statusEl, lines.join('\n'));
 }
 
@@ -87,7 +89,7 @@ export function renderConfigPackage(pack: DesktopConfigPackage | null, targets: 
 }, keyVisible: boolean): void {
   setText(targets.configFileEl, pack?.fileName ?? 'Проект не выбран');
   setText(targets.configJsonEl, pack?.configJson ?? 'Сначала выберите проект.');
-  setText(targets.configStatusEl, pack ? `Проект: ${pack.projectId}. Secret: ${pack.secretPath ?? 'нет'}` : 'Пакет не собран');
+  setText(targets.configStatusEl, pack ? `Проект: ${pack.projectId}. ${configKeyStatus(pack)}. Prompt не содержит ключ.` : 'Пакет не собран');
   setText(targets.keyPreviewEl, pack ? keyText(pack, keyVisible) : 'Ключ недоступен');
   setText(targets.promptEl, pack?.prompt ?? 'Сначала выберите проект.');
 }
@@ -175,7 +177,8 @@ export function setText(element: HTMLElement | null, value: string): void {
 }
 
 export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error ? error.message : String(error);
+  return userFacingError(message);
 }
 
 export function sectionFrom(value: string | undefined): DesktopSection | null {
@@ -191,11 +194,11 @@ function renderAccount(state: DesktopAccessState, element: HTMLElement | null): 
 
 function keyText(pack: DesktopConfigPackage, visible: boolean): string {
   if (!pack.tokenAvailable) return pack.tokenPreview;
-  return visible ? pack.tokenValue ?? pack.tokenPreview : pack.tokenPreview;
+  return visible ? `Полный ключ показан временно: ${pack.tokenValue ?? pack.tokenPreview}` : `Ключ скрыт: ${pack.tokenPreview}`;
 }
 
 function healthLabel(value: WatcherServiceStatus['health']): string {
-  const labels = { not_configured: 'Не настроено', healthy: 'Работает', degraded: 'Требует внимания', stopped: 'Остановлена', read_only: 'Только чтение' };
+  const labels = { not_configured: 'Нужно настроить', healthy: 'Работает', degraded: 'Требует внимания', stopped: 'Остановлен', read_only: 'Только чтение' };
   return labels[value];
 }
 
@@ -203,13 +206,40 @@ function accessLabel(value: DesktopAccessState['status']): string {
   const labels = {
     signed_out: 'Вход не выполнен',
     config_missing: 'Нет файла настройки',
-    secret_missing: 'Нет secret-файла',
-    acl_failed: 'ACL не подтверждён',
-    bearer_unverified: 'Bearer не проверен',
-    server_pending: 'Ожидает серверной проверки',
-    local_ready: 'Локально готово',
+    secret_missing: 'Ключ не сохранён',
+    acl_failed: 'Защита ключа требует внимания',
+    bearer_unverified: 'Ключ нужно проверить',
+    server_pending: 'Сервер проверяется',
+    local_ready: 'Пульт готов',
   };
   return labels[value];
+}
+
+function serviceSummary(status: WatcherServiceStatus): string {
+  if (!status.installed) return 'Watcher не установлен';
+  if (!status.running) return 'Watcher остановлен';
+  return status.health === 'healthy' ? 'Watcher работает' : 'Watcher требует внимания';
+}
+
+function serviceNextStep(status: WatcherServiceStatus): string {
+  if (!status.installed) return 'Установите службу watcher';
+  if (!status.running) return 'Запустите watcher';
+  if (status.health !== 'healthy') return 'Откройте диагностику и проверьте MCP-доступ';
+  return 'Можно работать через MCP';
+}
+
+function configKeyStatus(pack: DesktopConfigPackage): string {
+  if (!pack.tokenAvailable) return 'Ключ пока не найден';
+  return `Ключ доступен: ${pack.tokenPreview}`;
+}
+
+function userFacingError(message: string): string {
+  if (/project_route_conflict/i.test(message)) return 'MCP привязан к другому проекту. Переинициализируйте route для текущей папки.';
+  if (/runtime_session_required/i.test(message)) return 'MCP runtime не открыт. Сначала запустите runtime_start через стартовый prompt.';
+  if (/runtime_policy_required|policy/i.test(message)) return 'Policy gate не подтверждён. Повторите проверку MCP-подключения.';
+  if (/unauthorized|forbidden|401|403/i.test(message)) return 'MCP-сервер не принял ключ доступа. Проверьте барьер-ключ и импортированный файл.';
+  if (/failed to fetch|network|econnrefused|etimedout/i.test(message)) return 'Пульт не достучался до MCP-сервера. Проверьте интернет, адрес сервера и watcher.';
+  return message;
 }
 
 function escapeHtml(value: string): string {

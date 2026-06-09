@@ -33,7 +33,7 @@ export function readRestrictedSecretHealth(tokenFilePath: string): RestrictedSec
       acl: {
         restricted: false,
         reason: 'secret_file_missing',
-        repairHint: 'Повторите импорт MCP-конфига из личного кабинета.',
+        repairHint: 'Повторите импорт файла настройки MCP из личного кабинета.',
       },
     };
   }
@@ -46,7 +46,7 @@ export function readRestrictedSecretHealth(tokenFilePath: string): RestrictedSec
     acl: {
       restricted: acl,
       reason: acl ? null : 'acl_restriction_failed',
-      repairHint: acl ? null : 'Запустите импорт конфига повторно или откройте пульт от имени пользователя с правами на файл.',
+      repairHint: acl ? null : 'Запустите импорт файла настройки повторно или откройте пульт от имени пользователя с правами на файл.',
     },
   };
 }

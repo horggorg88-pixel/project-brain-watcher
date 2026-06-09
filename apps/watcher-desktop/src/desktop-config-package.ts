@@ -54,15 +54,17 @@ function resolveProfile(paths: DesktopCorePaths, projectId: string): SavedProjec
 
 function buildStartPrompt(profile: SavedProjectProfile, endpoint: string): string {
   return [
-    'Работай только через MCP Project Brain для этого проекта.',
-    `Проект: ${profile.id}`,
-    `Локальный путь: ${profile.root}`,
-    `MCP endpoint: ${endpoint}`,
+    `BRAIN ON — ${profile.id} — ${profile.root}`,
     '',
-    'Перед любым анализом вызови brain_status по этому project_id и local_path.',
-    'Для файлов используй get_file_summary, для поиска search_code, для контекста get_context.',
-    'Если включается режим wave, idol или другой MCP-режим, сначала подними runtime/policy contract, затем проходи gates и completion без досрочного завершения.',
-    'Если route или session конфликтуют, используй reinitialize_project_route и только после успешного runtime_start продолжай работу.',
+    'Работай с этим проектом только через MCP.',
+    `MCP endpoint: ${endpoint}`,
+    `1. Сначала вызови brain_status(project_id="${profile.id}", local_path="${profile.root}").`,
+    '2. Если MCP привязан к другому проекту или появился project_route_conflict, вызови reinitialize_project_route(project_id, local_path).',
+    '3. После успешного route получи runtime_session_id, policy_session_id, policy_hash и policy_context_pack через runtime_start.',
+    '4. Перед анализом используй project_map, get_context, search_code и dependency_graph.',
+    '5. Не читай файлы напрямую и не продолжай работу, если brain_status, route или runtime/policy gate не прошли.',
+    '',
+    'Если любой шаг не прошёл, остановись и объясни, какое подключение нужно исправить.',
   ].join('\n');
 }
 

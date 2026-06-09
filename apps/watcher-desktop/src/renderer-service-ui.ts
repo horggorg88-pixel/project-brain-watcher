@@ -63,7 +63,7 @@ export function resolveServiceActionConfirmation(
 }
 
 export function actionLabel(action: WatcherServiceAction): string {
-  const labels = { health: 'Проверить', install: 'Установить службу', start: 'Запустить', stop: 'Остановить', restart: 'Перезапустить' };
+  const labels = { health: 'Проверить подключение', install: 'Установить службу', start: 'Запустить watcher', stop: 'Остановить watcher', restart: 'Перезапустить watcher' };
   return labels[action];
 }
 
@@ -74,7 +74,7 @@ export function decisionLabel(decision: WatcherPolicyDecision): string {
 
 function confirmationLabel(action: WatcherServiceAction): string {
   const labels = {
-    health: 'Проверить',
+    health: 'Проверить подключение',
     install: 'Подтвердить установку',
     start: 'Подтвердить запуск',
     stop: 'Подтвердить остановку',

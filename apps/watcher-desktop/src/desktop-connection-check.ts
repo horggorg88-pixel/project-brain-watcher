@@ -55,10 +55,10 @@ function buildNodes(input: {
 }): readonly DesktopCheckNode[] {
   return [
     node('project', 'Проект', Boolean(input.profile), input.profile?.root ?? 'Выберите папку проекта', 'select_project', 'Выбрать папку'),
-    node('config', 'MCP-конфиг', input.configFound, input.configFound ? 'Файл настройки найден' : 'Импортируйте или скачайте конфиг', 'import_config', 'Импортировать'),
-    node('key', 'Барьер-ключ', input.secretConfigured, input.secretConfigured ? 'Ключ сохранён локально' : 'Ключ не найден в secret-файле', 'download_config', 'Скачать пакет'),
-    node('server', 'MCP-сервер', input.serverVerified, input.serverVerified ? 'Сервер подтвердил доступ' : 'Сервер не подтвердил bearer/session', 'verify', 'Проверить'),
-    node('watcher', 'Watcher-служба', input.service.running && input.service.health === 'healthy', serviceDetail(input.service), 'start_service', 'Запустить'),
+    node('config', 'Файл настройки', input.configFound, input.configFound ? 'Файл настройки принят' : 'Импортируйте файл из личного кабинета', 'import_config', 'Импортировать файл'),
+    node('key', 'Ключ доступа', input.secretConfigured, input.secretConfigured ? 'Ключ сохранён локально' : 'Пульт не нашёл локальный ключ', 'download_config', 'Скачать пакет'),
+    node('server', 'MCP-сервер', input.serverVerified, input.serverVerified ? 'Сервер подтвердил доступ' : 'Пульт не может подтвердить доступ к MCP-серверу', 'verify', 'Проверить MCP'),
+    node('watcher', 'Watcher', input.service.running && input.service.health === 'healthy', serviceDetail(input.service), 'start_service', 'Запустить watcher'),
   ];
 }
 
@@ -80,13 +80,14 @@ function resolveOverall(nodes: readonly DesktopCheckNode[]): DesktopConnectionCh
 }
 
 function statusMessage(overall: DesktopConnectionCheck['overall']): string {
-  if (overall === 'ready') return 'Готово';
-  if (overall === 'error') return 'Ошибка';
-  return 'Требуется действие';
+  if (overall === 'ready') return 'Подключение готово';
+  if (overall === 'error') return 'Нужно выбрать проект или импортировать настройку';
+  return 'Остался шаг подключения';
 }
 
 function serviceDetail(service: WatcherServiceStatus): string {
-  if (!service.installed) return 'Служба не установлена';
-  if (!service.running) return 'Служба остановлена';
-  return service.lastError ?? 'Служба работает';
+  if (!service.installed) return 'Watcher не установлен';
+  if (!service.running) return 'Watcher остановлен';
+  if (service.lastError) return `Watcher сообщает: ${service.lastError}`;
+  return 'Watcher работает';
 }

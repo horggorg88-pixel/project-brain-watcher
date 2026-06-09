@@ -347,7 +347,11 @@ describe('watcher desktop core', () => {
     expect(pack.tokenAvailable).toBe(true);
     expect(pack.tokenValue).toBe(VALID_TEST_BEARER);
     expect(pack.configJson).toContain(`Bearer ${VALID_TEST_BEARER}`);
-    expect(pack.prompt).toContain('Работай только через MCP Project Brain');
+    expect(pack.prompt).toContain(`BRAIN ON — mcp-monorepo — ${join(paths.homePath, 'repo')}`);
+    expect(pack.prompt).toContain('brain_status(project_id="mcp-monorepo"');
+    expect(pack.prompt).toContain('reinitialize_project_route');
+    expect(pack.prompt).toContain('policy_context_pack');
+    expect(pack.prompt).not.toContain(VALID_TEST_BEARER);
   });
 
   it('builds the connection checklist from config, key, server and service state', async () => {
@@ -373,7 +377,9 @@ describe('watcher desktop core', () => {
     const check = await buildDesktopConnectionCheck(paths, 'mcp-monorepo');
 
     expect(check.nodes.map(node => node.id)).toEqual(['project', 'config', 'key', 'server', 'watcher']);
+    expect(check.nodes.map(node => node.label)).toEqual(['Проект', 'Файл настройки', 'Ключ доступа', 'MCP-сервер', 'Watcher']);
     expect(check.nodes.find(node => node.id === 'server')?.status).toBe('active');
+    expect(check.nodes.find(node => node.id === 'watcher')?.actionLabel).toBe('Запустить watcher');
     expect(check.overall).toBe('action_required');
   });
 

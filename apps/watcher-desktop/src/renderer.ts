@@ -90,7 +90,7 @@ void refresh();
 authForm?.addEventListener('submit', event => {
   event.preventDefault();
   const form = new FormData(authForm);
-  setText(authStatusEl, 'Проверяем доступ и локальный MCP-конфиг...');
+  setText(authStatusEl, 'Проверяем доступ и локальный файл настройки MCP...');
   void window.watcherDesktop.access.login({
     email: String(form.get('email') ?? ''),
     password: String(form.get('password') ?? ''),
@@ -151,13 +151,13 @@ downloadConfigButton?.addEventListener('click', () => {
 
 copyConfigButton?.addEventListener('click', () => {
   void copyText(currentPackage?.configJson ?? '')
-    .then(() => writeLog('MCP-конфиг скопирован'))
+    .then(() => writeLog('Файл настройки MCP скопирован'))
     .catch(error => writeLog(errorMessage(error)));
 });
 
 copyPromptButton?.addEventListener('click', () => {
   void copyText(currentPackage?.prompt ?? '')
-    .then(() => writeLog('Стартовый промт скопирован'))
+    .then(() => writeLog('Стартовый prompt скопирован'))
     .catch(error => writeLog(errorMessage(error)));
 });
 
@@ -220,7 +220,7 @@ async function handleCheckAction(value: string | undefined): Promise<void> {
       await runServiceActionFromUi('start', true);
       return;
     case 'verify':
-      writeLog('Проверяем MCP-сервер, bearer/session и службу...');
+      writeLog('Проверяем MCP-сервер, ключ доступа и watcher...');
       await refresh();
       writeLog('Проверка завершена. Результат обновлён в чеклисте и диагностике.');
       return;
@@ -262,13 +262,13 @@ async function runServiceActionFromUi(action: WatcherServiceAction, confirmActio
 
 async function saveCurrentConfigPackage(): Promise<void> {
   const path = await window.watcherDesktop.projects.saveConfigPackage(currentProjectId());
-  writeLog(path ? `MCP-конфиг сохранён: ${path}` : 'Скачивание отменено');
+  writeLog(path ? `Файл настройки MCP сохранён: ${path}` : 'Скачивание отменено');
 }
 
 async function importConfigFromDialog(): Promise<void> {
   const result = await window.watcherDesktop.projects.importConfig();
   if (!result) {
-    writeLog('Импорт MCP-конфига отменён');
+    writeLog('Импорт файла настройки MCP отменён');
     return;
   }
   await saveUiState({ ...uiState, lastProjectId: result.profile.id, activeSection: 'start' });
@@ -426,10 +426,10 @@ function fallbackCheck(message: string): DesktopConnectionCheck {
   const diagnostics = fallbackDiagnostics(message);
   return {
     overall: 'error',
-    message: 'Ошибка',
+    message: 'Проверка подключения не завершена',
     projectId: null,
     checkedAt: new Date().toISOString(),
-    nodes: [{ id: 'runtime', label: 'Проверка', status: 'error', detail: message, action: 'open_logs', actionLabel: 'Открыть лог' }],
+    nodes: [{ id: 'runtime', label: 'Проверка подключения', status: 'error', detail: message, action: 'open_logs', actionLabel: 'Показать диагностику' }],
     service: fallbackStatus(message),
     diagnostics,
   };
@@ -472,7 +472,7 @@ function serviceActionLog(result: WatcherServiceActionResult): string {
 
 function importResultLog(result: ProjectImportResult): string {
   const warnings = result.warnings.length ? `\n${result.warnings.join('\n')}` : '';
-  return `MCP-конфиг импортирован: ${result.profile.name}${warnings}`;
+  return `Файл настройки MCP импортирован: ${result.profile.name}${warnings}`;
 }
 
 function checkActionFrom(value: string | undefined): DesktopCheckAction | null {

@@ -53,7 +53,7 @@ export function readDesktopServiceSecretState(profile: SavedProjectProfile | nul
       acl: {
         restricted: false,
         reason: 'profile_missing',
-        repairHint: 'Сначала импортируйте MCP-конфиг проекта.',
+        repairHint: 'Сначала импортируйте файл настройки MCP проекта.',
       },
     };
   }
