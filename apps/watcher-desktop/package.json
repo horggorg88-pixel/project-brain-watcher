@@ -1,6 +1,6 @@
 {
   "name": "@project-brain/watcher-desktop",
-  "version": "1.4.10",
+  "version": "1.4.11",
   "description": "Desktop control panel for Project Brain Watcher service",
   "author": "Project Brain",
   "private": true,
@@ -9,7 +9,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "npm run build && electron dist/main.js",
-    "dist": "npm run build && electron-builder --win portable --x64"
+    "dist": "npm run build && electron-builder --win portable --x64",
+    "test:e2e": "npm run build && playwright test -c playwright.e2e.config.ts"
   },
   "build": {
     "appId": "com.projectbrain.watcher",
@@ -33,6 +34,7 @@
     }
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/node": "^20.19.0",
     "electron": "^42.3.0",
     "electron-builder": "^26.8.1",

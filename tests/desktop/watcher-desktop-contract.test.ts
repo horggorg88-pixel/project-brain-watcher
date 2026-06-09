@@ -21,6 +21,7 @@ describe('watcher desktop contract', () => {
     expect(mainSource).toContain("process.env.PROJECT_BRAIN_DESKTOP_DEBUG === '1'");
     expect(mainSource).toContain("process.env.PROJECT_BRAIN_DESKTOP_DEVTOOLS === '1'");
     expect(mainSource).toContain('PROJECT_BRAIN_DESKTOP_USER_DATA_DIR');
+    expect(mainSource).toContain("app.setPath('userData', desktopUserDataPath)");
     expect(mainSource).not.toContain('nativeImage.createEmpty()');
     expect(mainSource).toContain('if (!existsSync(iconPath)) return null');
   });

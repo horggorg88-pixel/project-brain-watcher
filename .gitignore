@@ -3,6 +3,8 @@ release/
 apps/watcher-desktop/node_modules/
 apps/watcher-desktop/dist/
 apps/watcher-desktop/release/
+apps/watcher-desktop/playwright-report/
+apps/watcher-desktop/test-results/
 *.tgz
 .codex-*.log
 apps/watcher-desktop/.codex-*.log

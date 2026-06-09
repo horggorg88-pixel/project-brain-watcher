@@ -1,12 +1,13 @@
 {
   "name": "project-brain-watcher",
-  "version": "1.4.10",
+  "version": "1.4.11",
   "description": "Smart Local Watcher & SOLID Refactorer for Project Brain MCP Server",
   "license": "MIT",
   "type": "module",
   "scripts": {
     "test": "vitest run",
     "desktop:build": "npm --prefix apps/watcher-desktop run build",
+    "desktop:e2e": "npm --prefix apps/watcher-desktop run test:e2e",
     "desktop:dist": "npm --prefix apps/watcher-desktop run dist",
     "verify-release": "node scripts/verify-release.mjs"
   },

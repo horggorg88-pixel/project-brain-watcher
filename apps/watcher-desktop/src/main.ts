@@ -30,6 +30,10 @@ const desktopDebugEnabled = process.env.PROJECT_BRAIN_DESKTOP_DEBUG === '1';
 const desktopDevToolsEnabled = process.env.PROJECT_BRAIN_DESKTOP_DEVTOOLS === '1';
 const desktopUserDataPath = process.env.PROJECT_BRAIN_DESKTOP_USER_DATA_DIR?.trim();
 
+if (desktopUserDataPath) {
+  app.setPath('userData', desktopUserDataPath);
+}
+
 if (desktopDebugEnabled) {
   app.commandLine.appendSwitch('remote-debugging-port', DEBUG_PORT);
 }
