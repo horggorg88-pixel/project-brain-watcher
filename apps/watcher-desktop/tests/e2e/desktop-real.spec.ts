@@ -38,22 +38,34 @@ test('opens the real desktop control panel and proves the dry service rail', asy
     await expect(page.locator('[data-section="mcp"]')).toBeVisible();
     await expect(page.locator('[data-config-json]')).toContainText('project-brain');
     await expect(page.locator('[data-config-json]')).toContainText(`Bearer ${fakeBearer}`);
+    await page.locator('[data-copy-config]').click();
+    await expect(page.locator('[data-service-output]')).toContainText('Файл настройки MCP скопирован');
+    expect(await readClipboard(app)).toContain(`Bearer ${fakeBearer}`);
+
+    await page.locator('[data-project-select]').selectOption('client-project');
+    await expect(page.locator('[data-config-json]')).toContainText('client-project');
+    await expect(page.locator('[data-start-prompt]')).toContainText('brain_status(project_id="client-project"');
 
     await page.getByRole('button', { name: 'Промт' }).click();
     await expect(page.locator('[data-start-prompt]')).toContainText('BRAIN ON — Brain MCP bootstrap');
     await expect(page.locator('[data-start-prompt]')).toContainText('MCP-конфиг является единственным источником');
-    await expect(page.locator('[data-start-prompt]')).toContainText('brain_status(project_id="mcp-monorepo"');
+    await expect(page.locator('[data-start-prompt]')).toContainText('brain_status(project_id="client-project"');
     await expect(page.locator('[data-start-prompt]')).toContainText('reinitialize_project_route');
     await expect(page.locator('[data-start-prompt]')).toContainText('policy_workflow / operator_workflow');
     await expect(page.locator('[data-start-prompt]')).toContainText('policy_context_pack');
     await expect(page.locator('[data-start-prompt]')).not.toContainText(fakeBearer);
+    await page.locator('[data-copy-prompt]').click();
+    await expect(page.locator('[data-service-output]')).toContainText('Стартовый prompt скопирован');
+    expect(await readClipboard(app)).toContain('brain_status(project_id="client-project"');
 
     await page.getByRole('button', { name: 'Watcher' }).click();
     await expect(page.locator('[data-section="watcher"]')).toBeVisible();
     await page.locator('[data-service-action="health"]').click();
     await expect(page.locator('[data-service-output]')).toContainText('Проверка не пройдена');
-    await page.locator('[data-service-action="start"]').click();
-    await expect(page.locator('[data-service-output]')).toContainText('нажмите эту же кнопку ещё раз');
+    for (const action of ['install', 'start', 'restart', 'stop'] as const) {
+      await page.locator(`[data-service-action="${action}"]`).click();
+      await expect(page.locator('[data-service-output]')).toContainText('нажмите эту же кнопку ещё раз');
+    }
 
     const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     expect(hasHorizontalOverflow).toBe(false);
@@ -115,8 +127,10 @@ function createFixture(serverUrl: string): { readonly rootPath: string; readonly
   const rootPath = mkdtempSync(join(tmpdir(), 'watcher-desktop-e2e-'));
   const userDataPath = join(rootPath, 'user-data');
   const projectRoot = join(rootPath, 'MCP');
+  const clientProjectRoot = join(rootPath, 'Client Project');
   mkdirSync(userDataPath, { recursive: true });
   mkdirSync(join(projectRoot, '.brain'), { recursive: true });
+  mkdirSync(clientProjectRoot, { recursive: true });
   writeFileSync(join(userDataPath, 'project-profiles.json'), JSON.stringify([{
     id: 'mcp-monorepo',
     name: 'MCP Monorepo',
@@ -125,6 +139,14 @@ function createFixture(serverUrl: string): { readonly rootPath: string; readonly
     serverUrl,
     tokenEnv: 'MCP_BEARER_TOKEN',
     createdAt: new Date(0).toISOString(),
+  }, {
+    id: 'client-project',
+    name: 'Client Project',
+    root: clientProjectRoot,
+    indexId: 'idx-client-project',
+    serverUrl,
+    tokenEnv: 'MCP_BEARER_TOKEN',
+    createdAt: new Date(1).toISOString(),
   }], null, 2), 'utf-8');
   return { rootPath, userDataPath, projectRoot };
 }
@@ -160,4 +182,8 @@ function collectMainErrors(app: ElectronApplication): string[] {
     if (value) errors.push(value);
   });
   return errors;
+}
+
+async function readClipboard(app: ElectronApplication): Promise<string> {
+  return app.evaluate(({ clipboard }) => clipboard.readText());
 }

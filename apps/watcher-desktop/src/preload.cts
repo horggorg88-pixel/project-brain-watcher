@@ -69,6 +69,11 @@ const api: WatcherDesktopApi = {
       ipcRenderer.invoke('diagnostics:preview-export') as Promise<DiagnosticsPreview>
     ),
   },
+  clipboard: {
+    writeText: (value: string) => (
+      ipcRenderer.invoke('clipboard:write-text', value) as Promise<void>
+    ),
+  },
 };
 
 contextBridge.exposeInMainWorld('watcherDesktop', api);

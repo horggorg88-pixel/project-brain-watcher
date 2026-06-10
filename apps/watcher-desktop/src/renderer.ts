@@ -458,7 +458,7 @@ function fallbackStatus(message: string): WatcherServiceStatus {
 
 async function copyText(value: string): Promise<void> {
   if (!value) throw new Error('Нечего копировать');
-  await navigator.clipboard.writeText(value);
+  await window.watcherDesktop.clipboard.writeText(value);
 }
 
 function writeLog(value: string): void {

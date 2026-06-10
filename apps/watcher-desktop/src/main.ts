@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, dialog, clipboard } from 'electron';
 import { existsSync, writeFileSync } from 'node:fs';
 import type {
   AccessLoginRequest,
@@ -147,6 +147,9 @@ function registerIpcHandlers(): void {
   ));
   ipcMain.handle('modes:list', () => listDesktopModeSummaries(corePaths()));
   ipcMain.handle('diagnostics:preview-export', () => previewDiagnostics(corePaths()));
+  ipcMain.handle('clipboard:write-text', (_event, value: string) => {
+    clipboard.writeText(value);
+  });
 }
 
 function corePaths(): DesktopCorePaths {

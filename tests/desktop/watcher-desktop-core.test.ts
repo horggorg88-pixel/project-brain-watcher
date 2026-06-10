@@ -543,6 +543,28 @@ describe('watcher desktop core', () => {
     expect(diagnostics.findings).not.toContain('Профиль проекта не импортирован');
   });
 
+  it('exports diagnostics with secret fingerprints but without raw bearer values', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'repo');
+    mkdirSync(root, { recursive: true });
+    const profile = saveProfile(paths, {
+      id: 'demo',
+      name: 'Demo',
+      root,
+      indexId: 'idx-demo',
+      serverUrl: 'https://brain.example',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    stageDesktopServiceSecret(profile, VALID_TEST_BEARER);
+
+    const diagnostics = previewDiagnostics(paths);
+    const serialized = JSON.stringify(diagnostics);
+
+    expect(diagnostics.included.some(item => item.startsWith('Secret fingerprint: sha256:'))).toBe(true);
+    expect(serialized).not.toContain(VALID_TEST_BEARER);
+    expect(serialized).toContain('Bearer-токен');
+  });
+
   it('keeps the desktop session signed in after the renderer refreshes access status', async () => {
     const paths = tempPaths();
     const source = join(paths.homePath, 'mcp-monorepo-mcp-config.json');

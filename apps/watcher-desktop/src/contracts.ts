@@ -217,4 +217,7 @@ export interface WatcherDesktopApi {
   readonly diagnostics: {
     previewExport(): Promise<DiagnosticsPreview>;
   };
+  readonly clipboard: {
+    writeText(value: string): Promise<void>;
+  };
 }

@@ -74,4 +74,31 @@ describe('watcher desktop service UI confirmation', () => {
     expect(decision.pending).toBeNull();
     expect(decision.message).toBeNull();
   });
+
+  it('requires a same-action second click for every mutating service action', () => {
+    const actions = ['install', 'start', 'stop', 'restart'] as const;
+
+    for (const action of actions) {
+      const firstClick = resolveServiceActionConfirmation({
+        action,
+        confirmAction: true,
+        nowMs: 1_000,
+        pending: null,
+        projectId: 'demo',
+      });
+      const secondClick = resolveServiceActionConfirmation({
+        action,
+        confirmAction: true,
+        nowMs: 2_000,
+        pending: firstClick.pending,
+        projectId: 'demo',
+      });
+
+      expect(firstClick.confirmed).toBe(false);
+      expect(firstClick.pending).toEqual({ action, projectId: 'demo', expiresAt: 16_000 });
+      expect(firstClick.message).toContain('нажмите эту же кнопку ещё раз');
+      expect(secondClick.confirmed).toBe(true);
+      expect(secondClick.pending).toBeNull();
+    }
+  });
 });
