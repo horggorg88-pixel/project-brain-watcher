@@ -347,7 +347,8 @@ describe('watcher desktop core', () => {
     expect(pack.tokenAvailable).toBe(true);
     expect(pack.tokenValue).toBe(VALID_TEST_BEARER);
     expect(pack.configJson).toContain(`Bearer ${VALID_TEST_BEARER}`);
-    expect(pack.prompt).toContain(`BRAIN ON — mcp-monorepo — ${join(paths.homePath, 'repo')}`);
+    expect(pack.prompt).toContain('BRAIN ON — Brain MCP bootstrap');
+    expect(pack.prompt).toContain(`Текущий local_path из MCP-файла: ${join(paths.homePath, 'repo')}`);
     expect(pack.prompt).toContain('brain_status(project_id="mcp-monorepo"');
     expect(pack.prompt).toContain('reinitialize_project_route');
     expect(pack.prompt).toContain('policy_context_pack');
