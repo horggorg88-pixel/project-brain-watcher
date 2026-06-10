@@ -21,6 +21,7 @@ export interface ShellRenderTargets {
 
 export function renderShellAccess(state: DesktopAccessState, targets: ShellRenderTargets): void {
   document.body.dataset.access = state.signedIn ? 'signed-in' : 'signed-out';
+  document.body.dataset.serverVerified = state.serverVerified ? 'true' : 'false';
   setText(targets.authStatusEl, state.message);
   targets.loginScreenEl?.toggleAttribute('hidden', state.signedIn);
   targets.appShellEl?.toggleAttribute('hidden', !state.signedIn);
@@ -86,12 +87,12 @@ export function renderConfigPackage(pack: DesktopConfigPackage | null, targets: 
   readonly configStatusEl: HTMLElement | null;
   readonly keyPreviewEl: HTMLElement | null;
   readonly promptEl: HTMLElement | null;
-}, keyVisible: boolean): void {
+}, keyVisible: boolean, serverVerified: boolean): void {
   setText(targets.configFileEl, pack?.fileName ?? 'Проект не выбран');
   setText(targets.configJsonEl, pack?.configJson ?? 'Сначала выберите проект.');
-  setText(targets.configStatusEl, pack ? `Проект: ${pack.projectId}. ${configKeyStatus(pack)}. Prompt не содержит ключ.` : 'Пакет не собран');
+  setText(targets.configStatusEl, pack ? configPackageStatus(pack, serverVerified) : 'Пакет не собран');
   setText(targets.keyPreviewEl, pack ? keyText(pack, keyVisible) : 'Ключ недоступен');
-  setText(targets.promptEl, pack?.prompt ?? 'Сначала выберите проект.');
+  setText(targets.promptEl, pack ? promptText(pack, serverVerified) : 'Сначала выберите проект.');
 }
 
 export function renderProjects(projects: readonly SavedProjectProfile[], element: HTMLElement | null): void {
@@ -231,6 +232,16 @@ function serviceNextStep(status: WatcherServiceStatus): string {
 function configKeyStatus(pack: DesktopConfigPackage): string {
   if (!pack.tokenAvailable) return 'Ключ пока не найден';
   return `Ключ доступен: ${pack.tokenPreview}`;
+}
+
+function configPackageStatus(pack: DesktopConfigPackage, serverVerified: boolean): string {
+  const promptStatus = serverVerified ? 'Стартовый промт готов и не содержит ключ.' : 'Стартовый промт откроется после проверки MCP-сервера.';
+  return `Проект: ${pack.projectId}. ${configKeyStatus(pack)}. ${promptStatus}`;
+}
+
+function promptText(pack: DesktopConfigPackage, serverVerified: boolean): string {
+  if (serverVerified) return pack.prompt;
+  return 'Сначала подтвердите MCP-сервер и барьер-ключ в разделе «Проверка контура». После успешной проверки пульт покажет стартовый Brain MCP bootstrap-промт.';
 }
 
 function userFacingError(message: string): string {

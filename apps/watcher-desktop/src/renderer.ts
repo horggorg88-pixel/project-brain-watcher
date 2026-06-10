@@ -384,7 +384,12 @@ function renderUiState(): void {
 }
 
 function renderCurrentPackage(): void {
-  renderConfigPackage(currentPackage, { configFileEl, configJsonEl, configStatusEl, keyPreviewEl, promptEl }, uiState.keyVisible);
+  renderConfigPackage(
+    currentPackage,
+    { configFileEl, configJsonEl, configStatusEl, keyPreviewEl, promptEl },
+    uiState.keyVisible,
+    accessState?.serverVerified === true,
+  );
   setText(toggleKeyButton, uiState.keyVisible ? 'Скрыть' : 'Показать');
 }
 

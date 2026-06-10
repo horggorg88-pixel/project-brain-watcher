@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { _electron as electron, type ElectronApplication } from 'playwright';
 import { createRequire } from 'node:module';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -11,7 +12,8 @@ const appRoot = process.cwd();
 const fakeBearer = 'pb_e2e_real_token_1234567890';
 
 test('opens the real desktop control panel and proves the dry service rail', async ({}, testInfo) => {
-  const fixture = createFixture();
+  const mcpServer = await startMockMcpServer();
+  const fixture = createFixture(mcpServer.url);
   const app = await launchDesktop(fixture.userDataPath, fixture.projectRoot);
   const page = await app.firstWindow();
   const rendererErrors = collectRendererErrors(page);
@@ -24,9 +26,11 @@ test('opens the real desktop control panel and proves the dry service rail', asy
     await page.getByRole('button', { name: 'Войти' }).click();
 
     await expect(page.locator('body')).toHaveAttribute('data-access', 'signed-in');
+    await expect(page.locator('body')).toHaveAttribute('data-server-verified', 'true');
     await expect(page.locator('[data-app-shell]')).toBeVisible();
     await expect(page.locator('[data-login-screen]')).toBeHidden();
     await expect(page.locator('[data-profile-card]')).toContainText('client@example.com');
+    await expect(page.locator('[data-profile-card]')).toContainText('Пульт готов');
     await expect(page.getByRole('heading', { name: 'Проверка контура' })).toBeVisible();
     await expect(page.locator('[data-overall-status]')).not.toHaveText('Проверяем...');
 
@@ -36,8 +40,11 @@ test('opens the real desktop control panel and proves the dry service rail', asy
     await expect(page.locator('[data-config-json]')).toContainText(`Bearer ${fakeBearer}`);
 
     await page.getByRole('button', { name: 'Промт' }).click();
+    await expect(page.locator('[data-start-prompt]')).toContainText('BRAIN ON — Brain MCP bootstrap');
+    await expect(page.locator('[data-start-prompt]')).toContainText('MCP-конфиг является единственным источником');
     await expect(page.locator('[data-start-prompt]')).toContainText('brain_status(project_id="mcp-monorepo"');
     await expect(page.locator('[data-start-prompt]')).toContainText('reinitialize_project_route');
+    await expect(page.locator('[data-start-prompt]')).toContainText('policy_workflow / operator_workflow');
     await expect(page.locator('[data-start-prompt]')).toContainText('policy_context_pack');
     await expect(page.locator('[data-start-prompt]')).not.toContainText(fakeBearer);
 
@@ -55,11 +62,56 @@ test('opens the real desktop control panel and proves the dry service rail', asy
     await page.screenshot({ path: testInfo.outputPath('desktop-control-panel.png'), fullPage: true });
   } finally {
     await app.close();
+    await stopServer(mcpServer.server);
     rmSync(fixture.rootPath, { recursive: true, force: true });
   }
 });
 
-function createFixture(): { readonly rootPath: string; readonly userDataPath: string; readonly projectRoot: string } {
+async function startMockMcpServer(): Promise<{ readonly server: Server; readonly url: string }> {
+  const server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on('data', chunk => chunks.push(Buffer.from(chunk)));
+    request.on('end', () => {
+      const body = Buffer.concat(chunks).toString('utf-8');
+      const payload = parseJsonRpc(body);
+      response.setHeader('content-type', 'application/json');
+      if (request.headers.authorization !== `Bearer ${fakeBearer}`) {
+        response.writeHead(401);
+        response.end(JSON.stringify({ jsonrpc: '2.0', id: payload.id, error: { code: -32001, message: 'Unauthorized' } }));
+        return;
+      }
+      if (payload.method === 'initialize') {
+        response.setHeader('mcp-session-id', 'e2e-session');
+        response.end(JSON.stringify({ jsonrpc: '2.0', id: payload.id, result: { protocolVersion: '2024-11-05', capabilities: {}, serverInfo: { name: 'mock-project-brain', version: '1.0.0' } } }));
+        return;
+      }
+      if (payload.method === 'tools/list') {
+        response.end(JSON.stringify({ jsonrpc: '2.0', id: payload.id, result: { tools: [] } }));
+        return;
+      }
+      response.end(JSON.stringify({ jsonrpc: '2.0', id: payload.id, result: {} }));
+    });
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Mock MCP server did not expose a TCP port.');
+  return { server, url: `http://127.0.0.1:${address.port}` };
+}
+
+function stopServer(server: Server): Promise<void> {
+  return new Promise(resolve => server.close(() => resolve()));
+}
+
+function parseJsonRpc(body: string): { readonly id: unknown; readonly method: string } {
+  try {
+    const parsed = JSON.parse(body) as { readonly id?: unknown; readonly method?: unknown };
+    return { id: parsed.id ?? null, method: typeof parsed.method === 'string' ? parsed.method : '' };
+  } catch {
+    return { id: null, method: '' };
+  }
+}
+
+function createFixture(serverUrl: string): { readonly rootPath: string; readonly userDataPath: string; readonly projectRoot: string } {
   const rootPath = mkdtempSync(join(tmpdir(), 'watcher-desktop-e2e-'));
   const userDataPath = join(rootPath, 'user-data');
   const projectRoot = join(rootPath, 'MCP');
@@ -70,7 +122,7 @@ function createFixture(): { readonly rootPath: string; readonly userDataPath: st
     name: 'MCP Monorepo',
     root: projectRoot,
     indexId: 'idx-mcp-monorepo',
-    serverUrl: 'http://127.0.0.1:1',
+    serverUrl,
     tokenEnv: 'MCP_BEARER_TOKEN',
     createdAt: new Date(0).toISOString(),
   }], null, 2), 'utf-8');
