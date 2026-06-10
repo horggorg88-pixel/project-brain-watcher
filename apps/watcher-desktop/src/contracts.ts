@@ -1,5 +1,5 @@
 export type WatcherHealth = 'not_configured' | 'healthy' | 'degraded' | 'stopped' | 'read_only';
-export type WatcherServiceAction = 'health' | 'install' | 'start' | 'stop' | 'restart';
+export type WatcherServiceAction = 'health' | 'install' | 'start' | 'stop' | 'restart' | 'update';
 export type WatcherPolicyDecision = 'allow' | 'prompt' | 'deny';
 export type WatcherPolicyRisk = 'low' | 'medium' | 'high';
 export type McpConfigSource = 'codex' | 'claude' | 'cursor' | 'generic' | 'none';

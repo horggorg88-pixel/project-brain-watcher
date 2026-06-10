@@ -105,6 +105,7 @@ describe('watcher desktop contract', () => {
     expect(html).toContain('data-checklist');
     expect(html).toContain('data-download-config');
     expect(html).toContain('data-start-prompt');
+    expect(html).toContain('data-service-action="update"');
     expect(html).toContain('data-bottom-console');
     expect(html).toContain('data-modes');
     expect(html).toContain('autocomplete="current-password"');
@@ -173,6 +174,9 @@ describe('watcher desktop contract', () => {
     };
 
     expect(serviceRunnerSource).toContain(`project-brain-watcher#v${watcherPackage.version}`);
+    expect(serviceRunnerSource).toContain("'desktop', 'update'");
+    expect(serviceRunnerSource).toContain("'service', 'install'");
+    expect(serviceRunnerSource).toContain("'service', 'restart'");
     expect(serviceRunnerSource).not.toContain('project-brain-watcher#v1.4.4');
     expect(serviceRunnerSource).toContain("'cmd.exe'");
     expect(serviceRunnerSource).toContain("'/d', '/s', '/c'");

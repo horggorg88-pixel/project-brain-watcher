@@ -76,7 +76,7 @@ describe('watcher desktop service UI confirmation', () => {
   });
 
   it('requires a same-action second click for every mutating service action', () => {
-    const actions = ['install', 'start', 'stop', 'restart'] as const;
+    const actions = ['install', 'start', 'stop', 'restart', 'update'] as const;
 
     for (const action of actions) {
       const firstClick = resolveServiceActionConfirmation({

@@ -11,10 +11,16 @@ import type {
 import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { applyMcpConfigToProfile, defaultProfile, readProfiles, type DesktopCorePaths } from './desktop-profile-store.js';
 import { readDesktopServiceToken, stageDesktopServiceSecret, type DesktopServiceSecretState } from './desktop-service-secret.js';
+import {
+  fetchReleaseVersionCheck,
+  formatReleaseVersionCheck,
+  readLocalDesktopVersion,
+  watcherPackageVersion,
+} from './desktop-release-update.js';
 import { verifyProjectServerAccess } from './desktop-server-access.js';
 import { readServiceStatus } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.14';
+const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.15';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 
@@ -53,6 +59,7 @@ export async function runServiceAction(
     }
     prepareServiceSecretForLaunch(profile, token);
   }
+  if (request.action === 'update') return runUpdateAction(paths, profile, token, policy);
   const result = await spawnWatcher(defaultNpxExecutable(), buildServiceArgs(request.action, profile), profile.root, token
     ? { [profile.tokenEnv]: token }
     : {});
@@ -82,6 +89,69 @@ export function isServiceActionSettled(
   if (action === 'start' || action === 'restart') return status.running && status.health === 'healthy';
   if (action === 'stop') return !status.running;
   return true;
+}
+
+async function runUpdateAction(
+  paths: DesktopCorePaths,
+  profile: SavedProjectProfile,
+  token: string | null,
+  policy: WatcherPolicyGate,
+): Promise<WatcherServiceActionResult> {
+  const versionReport = await updateVersionReport();
+  const env = token ? { [profile.tokenEnv]: token } : {};
+  const command = defaultNpxExecutable();
+  const desktop = await spawnWatcher(command, buildDesktopUpdateArgs(), profile.root, env);
+  if (desktop.exitCode !== 0) return updateResult(paths, policy, desktop.exitCode, versionReport, ['Пульт не обновлён', desktop.output]);
+  const install = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env);
+  if (install.exitCode !== 0) return updateResult(paths, policy, install.exitCode, versionReport, ['Пульт обновлён', install.output]);
+  const restart = await spawnWatcher(command, buildServiceRestartArgs(profile), profile.root, env);
+  const status = await waitForServiceActionStatus(paths, 'restart');
+  return {
+    executed: true,
+    policy,
+    status,
+    exitCode: restart.exitCode,
+    output: [
+      versionReport,
+      'Пульт: команда обновления выполнена.',
+      compactOutput(desktop.output),
+      'Watcher: служба переустановлена через текущий release.',
+      compactOutput(install.output),
+      'Watcher: служба перезапущена.',
+      compactOutput(restart.output),
+    ].filter(Boolean).join('\n\n'),
+  };
+}
+
+function updateResult(
+  paths: DesktopCorePaths,
+  policy: WatcherPolicyGate,
+  exitCode: number,
+  versionReport: string,
+  output: readonly string[],
+): WatcherServiceActionResult {
+  return {
+    executed: true,
+    policy,
+    status: readServiceStatus(paths),
+    exitCode,
+    output: [versionReport, ...output.map(compactOutput)].filter(Boolean).join('\n\n'),
+  };
+}
+
+async function updateVersionReport(): Promise<string> {
+  try {
+    return formatReleaseVersionCheck(
+      await fetchReleaseVersionCheck(readLocalDesktopVersion(), watcherPackageVersion(WATCHER_PACKAGE)),
+    );
+  } catch (error) {
+    return [
+      `Проверка версий не завершена: ${errorMessage(error)}`,
+      `Пульт: ${safeLocalDesktopVersion()}`,
+      `Watcher: ${watcherPackageVersion(WATCHER_PACKAGE)}`,
+      'Принудительное обновление продолжается.',
+    ].join('\n');
+  }
 }
 
 function healthResult(paths: DesktopCorePaths): WatcherServiceActionResult {
@@ -118,7 +188,7 @@ function servicePolicy(
   if (request.action !== 'stop' && !token) {
     return { decision: 'deny', risk: 'high', reasons: [`Bearer для ${profile.tokenEnv} не найден. Импортируйте конфиг из личного кабинета.`] };
   }
-  return { decision: 'allow', risk: request.action === 'install' ? 'high' : 'medium', reasons: ['Действие подтверждено пользователем'] };
+  return { decision: 'allow', risk: request.action === 'install' || request.action === 'update' ? 'high' : 'medium', reasons: ['Действие подтверждено пользователем'] };
 }
 
 function buildServiceArgs(action: WatcherServiceActionRequest['action'], profile: SavedProjectProfile): string[] {
@@ -127,6 +197,31 @@ function buildServiceArgs(action: WatcherServiceActionRequest['action'], profile
     WATCHER_PACKAGE,
     'service',
     action,
+    '--path',
+    profile.root,
+    '--server',
+    profile.serverUrl,
+    '--token-env',
+    profile.tokenEnv,
+    '--project',
+    profile.id,
+  ];
+}
+
+function buildDesktopUpdateArgs(): string[] {
+  return ['--yes', WATCHER_PACKAGE, 'desktop', 'update'];
+}
+
+function buildServiceInstallArgs(profile: SavedProjectProfile): string[] {
+  return ['--yes', WATCHER_PACKAGE, 'service', 'install', ...serviceArgs(profile)];
+}
+
+function buildServiceRestartArgs(profile: SavedProjectProfile): string[] {
+  return ['--yes', WATCHER_PACKAGE, 'service', 'restart', ...serviceArgs(profile)];
+}
+
+function serviceArgs(profile: SavedProjectProfile): string[] {
+  return [
     '--path',
     profile.root,
     '--server',
@@ -201,6 +296,22 @@ function defaultNpxExecutable(): string {
 }
 
 function actionLabel(action: WatcherServiceActionRequest['action']): string {
-  const labels = { health: 'Проверить', install: 'Установить службу', start: 'Запустить', stop: 'Остановить', restart: 'Перезапустить' };
+  const labels = { health: 'Проверить', install: 'Установить службу', start: 'Запустить', stop: 'Остановить', restart: 'Перезапустить', update: 'Обновить пульт и watcher' };
   return labels[action];
+}
+
+function compactOutput(value: string): string {
+  return value.trim();
+}
+
+function safeLocalDesktopVersion(): string {
+  try {
+    return readLocalDesktopVersion();
+  } catch {
+    return 'не определена';
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
