@@ -40,6 +40,20 @@ jobs:
       - name: Build desktop portable
         run: npm run desktop:dist
 
+      - name: Pack desktop unpacked zip
+        shell: pwsh
+        run: |
+          $desktopVersion = (Get-Content -LiteralPath apps/watcher-desktop/package.json | ConvertFrom-Json).version
+          $source = "apps/watcher-desktop/release/win-unpacked"
+          $destination = "apps/watcher-desktop/release/ProjectBrainWatcher-$desktopVersion-x64.zip"
+          if (-not (Test-Path -LiteralPath $source)) {
+            throw "Desktop unpacked output not found: $source"
+          }
+          if (Test-Path -LiteralPath $destination) {
+            Remove-Item -LiteralPath $destination -Force
+          }
+          Compress-Archive -Path "$source/*" -DestinationPath $destination -Force
+
       - name: Pack watcher npm package
         shell: pwsh
         run: |
