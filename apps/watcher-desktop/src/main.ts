@@ -45,12 +45,25 @@ if (!singleInstance) app.quit();
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let isQuitting = false;
 
 app.whenReady().then(() => {
   registerIpcHandlers();
   Menu.setApplicationMenu(null);
   mainWindow = createMainWindow();
   tray = createTray(mainWindow);
+});
+
+app.on('second-instance', () => {
+  showMainWindow();
+});
+
+app.on('activate', () => {
+  showMainWindow();
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
 });
 
 app.on('window-all-closed', () => {
@@ -76,6 +89,11 @@ function createMainWindow(): BrowserWindow {
       sandbox: true,
     },
   });
+  window.on('close', event => {
+    if (isQuitting) return;
+    event.preventDefault();
+    window.hide();
+  });
   window.loadFile(assetPaths.indexHtmlPath);
   window.webContents.once('did-finish-load', () => {
     window.show();
@@ -93,14 +111,27 @@ function createTray(window: BrowserWindow): Tray | null {
   if (!existsSync(iconPath)) return null;
   const appTray = new Tray(iconPath);
   appTray.setToolTip('Project Brain Watcher');
+  appTray.on('click', () => showMainWindow());
+  appTray.on('double-click', () => showMainWindow());
   appTray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Статус: открыть пульт', click: () => window.show() },
-    { label: 'Проверить подключение', click: () => { window.show(); window.webContents.reloadIgnoringCache(); } },
-    { label: 'Перезапустить окно', click: () => { window.show(); window.webContents.reloadIgnoringCache(); } },
+    { label: 'Статус: открыть пульт', click: () => showMainWindow() },
+    { label: 'Проверить подключение', click: () => { showMainWindow(); window.webContents.reloadIgnoringCache(); } },
+    { label: 'Перезапустить окно', click: () => { showMainWindow(); window.webContents.reloadIgnoringCache(); } },
     { type: 'separator' },
-    { label: 'Закрыть', click: () => app.quit() },
+    { label: 'Закрыть', click: () => { isQuitting = true; app.quit(); } },
   ]));
   return appTray;
+}
+
+function showMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    mainWindow = createMainWindow();
+    if (!tray) tray = createTray(mainWindow);
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
 }
 
 function registerIpcHandlers(): void {

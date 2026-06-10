@@ -24,6 +24,15 @@ describe('watcher desktop contract', () => {
     expect(mainSource).toContain("process.env.PROJECT_BRAIN_DESKTOP_DEVTOOLS === '1'");
     expect(mainSource).toContain('PROJECT_BRAIN_DESKTOP_USER_DATA_DIR');
     expect(mainSource).toContain("app.setPath('userData', desktopUserDataPath)");
+    expect(mainSource).toContain("app.on('second-instance'");
+    expect(mainSource).toContain("app.on('activate'");
+    expect(mainSource).toContain("app.on('before-quit'");
+    expect(mainSource).toContain('function showMainWindow()');
+    expect(mainSource).toContain('mainWindow.isMinimized()');
+    expect(mainSource).toContain("appTray.on('click'");
+    expect(mainSource).toContain("appTray.on('double-click'");
+    expect(mainSource).toContain("event.preventDefault()");
+    expect(mainSource).toContain("window.hide()");
     expect(mainSource).not.toContain('nativeImage.createEmpty()');
     expect(mainSource).toContain('if (!existsSync(iconPath)) return null');
   });
@@ -134,7 +143,10 @@ describe('watcher desktop contract', () => {
 
     expect(packageJson.scripts?.build).toBe('tsc -p tsconfig.json');
     expect(packageJson.scripts?.start).toContain('electron dist/main.js');
-    expect(packageJson.scripts?.dist).toContain('electron-builder');
+    expect(packageJson.scripts?.dist).toContain('electron-builder --win nsis --x64');
+    expect(JSON.stringify(packageJson)).toContain('"nsis"');
+    expect(JSON.stringify(packageJson)).toContain('"runAfterFinish":true');
+    expect(JSON.stringify(packageJson)).not.toContain('"portable"');
     expect(JSON.stringify(packageJson)).toContain('src/styles/**/*');
     expect(JSON.stringify(packageJson)).toContain('src/app-icon.png');
     expect(JSON.stringify(packageJson)).toContain('build/icon.png');

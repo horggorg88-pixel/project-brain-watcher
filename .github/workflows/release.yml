@@ -37,7 +37,7 @@ jobs:
       - name: Desktop E2E
         run: npm --prefix apps/watcher-desktop run test:e2e
 
-      - name: Build desktop portable
+      - name: Build desktop installer
         run: npm run desktop:dist
 
       - name: Pack watcher npm package

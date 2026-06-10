@@ -67,6 +67,13 @@ test('opens the real desktop control panel and proves the dry service rail', asy
       await expect(page.locator('[data-service-output]')).toContainText('нажмите эту же кнопку ещё раз');
     }
 
+    await page.getByLabel('Закрыть').click();
+    await expect.poll(() => windowVisible(app)).toBe(false);
+    await app.evaluate(({ app: electronApp }) => {
+      electronApp.emit('second-instance', {}, [], process.cwd());
+    });
+    await expect.poll(() => windowVisible(app)).toBe(true);
+
     const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     expect(hasHorizontalOverflow).toBe(false);
     expect(rendererErrors).toEqual([]);
@@ -186,4 +193,8 @@ function collectMainErrors(app: ElectronApplication): string[] {
 
 async function readClipboard(app: ElectronApplication): Promise<string> {
   return app.evaluate(({ clipboard }) => clipboard.readText());
+}
+
+async function windowVisible(app: ElectronApplication): Promise<boolean> {
+  return app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible() === true);
 }
