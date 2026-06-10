@@ -78,6 +78,7 @@ const projectListEl = document.querySelector<HTMLElement>('[data-projects]');
 const modesEl = document.querySelector<HTMLElement>('[data-modes]');
 const diagnosticsEl = document.querySelector<HTMLElement>('[data-diagnostics]');
 const diffEl = document.querySelector<HTMLElement>('[data-mcp-diff]');
+const windowTitlebarEl = document.querySelector<HTMLElement>('[data-window-titlebar]');
 
 let accessState: DesktopAccessState | null = null;
 let uiState: DesktopUiState = defaultUiState();
@@ -172,6 +173,18 @@ toggleKeyButton?.addEventListener('click', () => {
 
 consoleToggleButton?.addEventListener('click', () => {
   void saveUiState({ ...uiState, consoleOpen: !uiState.consoleOpen }).then(() => renderUiState());
+});
+
+windowTitlebarEl?.addEventListener('click', event => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest<HTMLButtonElement>('[data-window-control]');
+  const control = button?.dataset.windowControl;
+  if (!button || !control) return;
+  button.blur();
+  if (control === 'minimize') void window.watcherDesktop.windowControls.minimize();
+  if (control === 'maximize') void window.watcherDesktop.windowControls.toggleMaximize();
+  if (control === 'close') void window.watcherDesktop.windowControls.close();
 });
 
 runFullCheckButton?.addEventListener('click', () => {

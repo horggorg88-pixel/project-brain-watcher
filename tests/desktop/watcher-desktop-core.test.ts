@@ -46,7 +46,8 @@ describe('watcher desktop core', () => {
     expect(paths.rootPath).toBe(appRoot);
     expect(paths.indexHtmlPath).toBe(join(appRoot, 'src', 'index.html'));
     expect(paths.preloadPath).toBe(join(appRoot, 'dist', 'preload.cjs'));
-    expect(paths.trayIconPath).toBe(join(appRoot, 'src', 'tray.ico'));
+    expect(paths.appIconPath).toBe(join(appRoot, 'src', 'app-icon.png'));
+    expect(paths.trayIconPath).toBe(join(appRoot, 'src', 'app-icon.png'));
   });
 
   it('keeps packaged Electron app paths rooted at the packaged app path', () => {
@@ -56,7 +57,8 @@ describe('watcher desktop core', () => {
     expect(paths.rootPath).toBe(appRoot);
     expect(paths.indexHtmlPath).toBe(join(appRoot, 'src', 'index.html'));
     expect(paths.preloadPath).toBe(join(appRoot, 'dist', 'preload.cjs'));
-    expect(paths.trayIconPath).toBe(join(appRoot, 'src', 'tray.ico'));
+    expect(paths.appIconPath).toBe(join(appRoot, 'src', 'app-icon.png'));
+    expect(paths.trayIconPath).toBe(join(appRoot, 'src', 'app-icon.png'));
   });
 
   it('saves normalized project profiles without storing bearer values', () => {

@@ -29,6 +29,13 @@ body {
   background-size: 36px 36px;
 }
 
+body,
+.window-titlebar,
+.login-screen,
+.app-shell {
+  min-width: 0;
+}
+
 button,
 input,
 select {

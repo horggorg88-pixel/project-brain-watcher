@@ -220,4 +220,9 @@ export interface WatcherDesktopApi {
   readonly clipboard: {
     writeText(value: string): Promise<void>;
   };
+  readonly windowControls: {
+    minimize(): Promise<void>;
+    toggleMaximize(): Promise<boolean>;
+    close(): Promise<void>;
+  };
 }

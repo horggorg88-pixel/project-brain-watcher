@@ -67,6 +67,8 @@ function createMainWindow(): BrowserWindow {
     minHeight: 640,
     title: 'Project Brain Watcher',
     show: false,
+    frame: false,
+    icon: assetPaths.appIconPath,
     webPreferences: {
       preload: assetPaths.preloadPath,
       contextIsolation: true,
@@ -149,6 +151,19 @@ function registerIpcHandlers(): void {
   ipcMain.handle('diagnostics:preview-export', () => previewDiagnostics(corePaths()));
   ipcMain.handle('clipboard:write-text', (_event, value: string) => {
     clipboard.writeText(value);
+  });
+  ipcMain.handle('window:minimize', event => {
+    BrowserWindow.fromWebContents(event.sender)?.minimize();
+  });
+  ipcMain.handle('window:toggle-maximize', event => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) return false;
+    if (window.isMaximized()) window.unmaximize();
+    else window.maximize();
+    return window.isMaximized();
+  });
+  ipcMain.handle('window:close', event => {
+    BrowserWindow.fromWebContents(event.sender)?.hide();
   });
 }
 

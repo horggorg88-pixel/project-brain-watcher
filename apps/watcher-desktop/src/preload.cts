@@ -74,6 +74,11 @@ const api: WatcherDesktopApi = {
       ipcRenderer.invoke('clipboard:write-text', value) as Promise<void>
     ),
   },
+  windowControls: {
+    minimize: () => ipcRenderer.invoke('window:minimize') as Promise<void>,
+    toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize') as Promise<boolean>,
+    close: () => ipcRenderer.invoke('window:close') as Promise<void>,
+  },
 };
 
 contextBridge.exposeInMainWorld('watcherDesktop', api);

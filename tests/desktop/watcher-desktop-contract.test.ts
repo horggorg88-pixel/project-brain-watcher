@@ -14,6 +14,8 @@ describe('watcher desktop contract', () => {
     expect(mainSource).toContain('app.enableSandbox()');
     expect(mainSource).toContain("app.commandLine.appendSwitch('remote-debugging-port'");
     expect(mainSource).toContain('show: false');
+    expect(mainSource).toContain('frame: false');
+    expect(mainSource).toContain('icon: assetPaths.appIconPath');
     expect(mainSource).toContain('window.show()');
     expect(mainSource).toContain('window.focus()');
     expect(mainSource).toContain("window.webContents.openDevTools({ mode: 'detach' })");
@@ -47,8 +49,15 @@ describe('watcher desktop contract', () => {
     expect(preloadSource).not.toContain('ipcRenderer.on');
     expect(preloadSource).not.toContain('send: ipcRenderer.send');
     expect(mainSource).toContain("ipcMain.handle('access:logout'");
+    expect(mainSource).toContain("ipcMain.handle('window:minimize'");
+    expect(mainSource).toContain("ipcMain.handle('window:toggle-maximize'");
+    expect(mainSource).toContain("ipcMain.handle('window:close'");
     expect(contractsSource).not.toContain('readonly serverVerified?: boolean');
     expect(contractsSource).toContain('logout(): Promise<DesktopAccessState>');
+    expect(contractsSource).toContain('windowControls');
+    expect(preloadSource).toContain("ipcRenderer.invoke('window:minimize'");
+    expect(preloadSource).toContain("ipcRenderer.invoke('window:toggle-maximize'");
+    expect(preloadSource).toContain("ipcRenderer.invoke('window:close'");
     expect(contractsSource).toContain('buildConfigPackage(projectId: string)');
     expect(contractsSource).toContain('fullCheck(projectId: string)');
     expect(rendererSource).toContain('service.fullCheck');
@@ -77,6 +86,10 @@ describe('watcher desktop contract', () => {
     const html = readFileSync(join(appRoot, 'src', 'index.html'), 'utf-8');
 
     expect(html).toContain('data-auth-form');
+    expect(html).toContain('data-window-titlebar');
+    expect(html).toContain('data-window-control="minimize"');
+    expect(html).toContain('data-window-control="maximize"');
+    expect(html).toContain('data-window-control="close"');
     expect(html).toContain('data-login-screen');
     expect(html).toContain('data-app-shell hidden');
     expect(html).toContain('data-nav-section="start"');
@@ -103,8 +116,13 @@ describe('watcher desktop contract', () => {
     expect(layoutCss).toContain('margin-bottom: 0;');
     expect(layoutCss).toContain('.topbar-actions > button');
     expect(layoutCss).toContain('.topbar-actions .overall-badge');
+    expect(layoutCss).toContain('.window-titlebar');
+    expect(layoutCss).toContain('-webkit-app-region: drag;');
+    expect(layoutCss).toContain('-webkit-app-region: no-drag;');
     expect(layoutCss).toContain('align-items: end;');
     expect(componentsCss).toContain('width: 100%;');
+    expect(componentsCss).toContain('.window-logo');
+    expect(componentsCss).toContain('repeat(auto-fit, minmax(210px, 1fr))');
   });
 
   it('declares an isolated package for the desktop application', () => {
@@ -118,6 +136,8 @@ describe('watcher desktop contract', () => {
     expect(packageJson.scripts?.start).toContain('electron dist/main.js');
     expect(packageJson.scripts?.dist).toContain('electron-builder');
     expect(JSON.stringify(packageJson)).toContain('src/styles/**/*');
+    expect(JSON.stringify(packageJson)).toContain('src/app-icon.png');
+    expect(JSON.stringify(packageJson)).toContain('build/icon.png');
     expect(packageJson.dependencies?.electron).toBeUndefined();
     expect(packageJson.dependencies?.['project-brain-mcp']).toBeUndefined();
     expect(packageJson.devDependencies?.electron).toBeDefined();

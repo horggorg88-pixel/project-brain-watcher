@@ -22,11 +22,14 @@
     "files": [
       "dist/**/*",
       "src/index.html",
+      "src/app-icon.png",
+      "src/app-icon.svg",
       "src/styles.css",
       "src/styles/**/*",
       "package.json"
     ],
     "win": {
+      "icon": "build/icon.png",
       "target": [
         "portable"
       ],

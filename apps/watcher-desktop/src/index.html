@@ -7,6 +7,21 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body data-access="signed-out" data-theme="light">
+    <header class="window-titlebar" data-window-titlebar>
+      <div class="window-brand">
+        <span class="window-logo" aria-hidden="true">M</span>
+        <div>
+          <strong>MCP-пульт</strong>
+          <span>Project Brain Watcher</span>
+        </div>
+      </div>
+      <div class="window-controls" aria-label="Управление окном">
+        <button type="button" title="Свернуть" aria-label="Свернуть" data-window-control="minimize">-</button>
+        <button type="button" title="Развернуть" aria-label="Развернуть" data-window-control="maximize">□</button>
+        <button type="button" title="Закрыть" aria-label="Закрыть" data-window-control="close">×</button>
+      </div>
+    </header>
+
     <main class="login-screen" data-login-screen>
       <form class="login-card" data-auth-form novalidate>
         <p class="eyebrow">MCP-пульт</p>

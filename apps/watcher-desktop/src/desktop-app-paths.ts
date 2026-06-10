@@ -4,6 +4,7 @@ export interface DesktopAppAssetPaths {
   readonly rootPath: string;
   readonly indexHtmlPath: string;
   readonly preloadPath: string;
+  readonly appIconPath: string;
   readonly trayIconPath: string;
 }
 
@@ -17,6 +18,7 @@ export function resolveDesktopAppAssetPaths(appPath: string): DesktopAppAssetPat
     rootPath,
     indexHtmlPath: join(rootPath, 'src', 'index.html'),
     preloadPath: join(rootPath, 'dist', 'preload.cjs'),
-    trayIconPath: join(rootPath, 'src', 'tray.ico'),
+    appIconPath: join(rootPath, 'src', 'app-icon.png'),
+    trayIconPath: join(rootPath, 'src', 'app-icon.png'),
   };
 }

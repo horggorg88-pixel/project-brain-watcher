@@ -40,20 +40,6 @@ jobs:
       - name: Build desktop portable
         run: npm run desktop:dist
 
-      - name: Pack desktop unpacked zip
-        shell: pwsh
-        run: |
-          $desktopVersion = (Get-Content -LiteralPath apps/watcher-desktop/package.json | ConvertFrom-Json).version
-          $source = "apps/watcher-desktop/release/win-unpacked"
-          $destination = "apps/watcher-desktop/release/ProjectBrainWatcher-$desktopVersion-x64.zip"
-          if (-not (Test-Path -LiteralPath $source)) {
-            throw "Desktop unpacked output not found: $source"
-          }
-          if (Test-Path -LiteralPath $destination) {
-            Remove-Item -LiteralPath $destination -Force
-          }
-          Compress-Archive -Path "$source/*" -DestinationPath $destination -Force
-
       - name: Pack watcher npm package
         shell: pwsh
         run: |
@@ -65,7 +51,7 @@ jobs:
         run: |
           $files = @()
           $files += Get-ChildItem -LiteralPath release -File
-          $files += Get-ChildItem -LiteralPath apps/watcher-desktop/release -File | Where-Object { $_.Name -match '^ProjectBrainWatcher-.+-x64\.(exe|zip)$' }
+          $files += Get-ChildItem -LiteralPath apps/watcher-desktop/release -File | Where-Object { $_.Name -match '^ProjectBrainWatcher-.+-x64\.exe$' }
           $lines = foreach ($file in $files) {
             $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $($file.Name)"
@@ -84,7 +70,7 @@ jobs:
           }
           $watcherVersion = (Get-Content -LiteralPath package.json | ConvertFrom-Json).version
           $desktopVersion = (Get-Content -LiteralPath apps/watcher-desktop/package.json | ConvertFrom-Json).version
-          $desktopAssetPattern = "^ProjectBrainWatcher-$([regex]::Escape($desktopVersion))-x64\.(exe|zip)$"
+          $desktopAssetPattern = "^ProjectBrainWatcher-$([regex]::Escape($desktopVersion))-x64\.exe$"
           $assets = @()
           $assets += Get-ChildItem -LiteralPath release -File | Where-Object { $_.Name -eq "project-brain-watcher-$watcherVersion.tgz" }
           $assets += Get-ChildItem -LiteralPath apps/watcher-desktop/release -File | Where-Object { $_.Name -match $desktopAssetPattern }

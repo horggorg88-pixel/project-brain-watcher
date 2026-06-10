@@ -36,3 +36,12 @@ body[data-theme="dark"] .bottom-console {
   background: #050505;
   color: #f4f4f0;
 }
+
+body[data-theme="dark"] .window-titlebar {
+  background: rgba(18, 18, 18, 0.96);
+}
+
+body[data-theme="dark"] .window-controls button {
+  background: transparent;
+  color: var(--ink);
+}
