@@ -1,4 +1,5 @@
 import type { SavedProjectProfile } from './contracts.js';
+import { buildProjectMcpEndpoint } from './desktop-mcp-endpoint.js';
 
 export interface DesktopServerAccessVerification {
   readonly verified: boolean;
@@ -12,7 +13,7 @@ export async function verifyProjectServerAccess(
   profile: SavedProjectProfile,
   token: string | null,
 ): Promise<DesktopServerAccessVerification> {
-  const endpoint = projectMcpEndpoint(profile);
+  const endpoint = buildProjectMcpEndpoint(profile.serverUrl, profile.id);
   if (!token) {
     return { verified: false, endpoint, message: 'Сервер MCP не подтвердил доступ: bearer secret не найден.' };
   }
@@ -79,12 +80,4 @@ async function fetchWithTimeout(endpoint: string, init: RequestInit): Promise<Re
   } finally {
     clearTimeout(timer);
   }
-}
-
-function projectMcpEndpoint(profile: SavedProjectProfile): string {
-  const base = profile.serverUrl.trim().replace(/\/$/, '');
-  const projectId = encodeURIComponent(profile.id);
-  if (/\/mcp\/p\/[^/]+$/.test(base)) return base;
-  if (base.endsWith('/mcp')) return `${base}/p/${projectId}`;
-  return `${base}/mcp/p/${projectId}`;
 }

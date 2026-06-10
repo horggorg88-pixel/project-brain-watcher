@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -78,6 +78,24 @@ describe('watcher desktop core', () => {
     expect(saved.id).toBe('demo');
     expect(saved.serverUrl).toBe('https://brain.example');
     expect(JSON.stringify(readProfiles(paths))).not.toContain('Bearer ');
+  });
+
+  it('stores base MCP server URL when a new profile starts from an existing project route', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'HyinahiTEst');
+    mkdirSync(root, { recursive: true });
+
+    const saved = saveProfile(paths, {
+      id: 'hyinahitest',
+      name: 'HyinahiTEst',
+      root,
+      indexId: 'idx-hyinahitest',
+      serverUrl: 'http://149.33.14.250/mcp/p/mcp-monorepo',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    expect(saved.serverUrl).toBe('http://149.33.14.250');
+    expect(readProfiles(paths)[0]?.serverUrl).toBe('http://149.33.14.250');
   });
 
   it('requires explicit confirmation before service actions', async () => {
@@ -230,7 +248,7 @@ describe('watcher desktop core', () => {
 
     expect(config.found).toBe(true);
     expect(config.source).toBe('codex');
-    expect(config.serverUrl).toBe('http://149.33.14.250/mcp');
+    expect(config.serverUrl).toBe('http://149.33.14.250');
     expect(JSON.stringify(config)).not.toContain('pb_');
   });
 
@@ -355,6 +373,48 @@ describe('watcher desktop core', () => {
     expect(pack.prompt).toContain('reinitialize_project_route');
     expect(pack.prompt).toContain('policy_context_pack');
     expect(pack.prompt).not.toContain(VALID_TEST_BEARER);
+  });
+
+  it('builds a new project package from base server and stages project .brain files', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'HyinahiTEst');
+    mkdirSync(root, { recursive: true });
+    vi.stubEnv('MCP_BEARER_TOKEN', VALID_ENV_BEARER);
+    saveProfile(paths, {
+      id: 'hyinahitest',
+      name: 'HyinahiTEst',
+      root,
+      indexId: 'idx-hyinahitest',
+      serverUrl: 'http://149.33.14.250/mcp/p/mcp-monorepo',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    const pack = buildDesktopConfigPackage(paths, 'hyinahitest', { bootstrap: true });
+    const brainConfigPath = join(root, '.brain', 'config.json');
+    const brainMcpPath = join(root, '.brain', 'mcp.json');
+
+    expect(pack.fileName).toBe('hyinahitest-mcp-config.json');
+    expect(pack.configJson).toContain('"url": "http://149.33.14.250/mcp/p/hyinahitest"');
+    expect(pack.configJson).not.toContain('/mcp/p/mcp-monorepo');
+    expect(pack.prompt).toContain('MCP endpoint: http://149.33.14.250/mcp/p/hyinahitest');
+    expect(pack.prompt).toContain(`brain_status(project_id="hyinahitest", local_path="${root}")`);
+    expect(existsSync(brainConfigPath)).toBe(true);
+    expect(existsSync(brainMcpPath)).toBe(true);
+
+    const brainConfig = JSON.parse(readFileSync(brainConfigPath, 'utf-8')) as Record<string, unknown>;
+    const brainMcp = JSON.parse(readFileSync(brainMcpPath, 'utf-8')) as {
+      project_id?: string;
+      endpoint?: string;
+      mcpServers?: Record<string, { url?: string; headers?: Record<string, string> }>;
+    };
+    expect(brainConfig.project_id).toBe('hyinahitest');
+    expect(brainConfig.server).toBe('http://149.33.14.250');
+    expect(brainConfig.mcp_endpoint).toBe('http://149.33.14.250/mcp/p/hyinahitest');
+    expect(brainConfig.mcp_config_path).toBe('.brain/mcp.json');
+    expect(brainMcp.project_id).toBe('hyinahitest');
+    expect(brainMcp.endpoint).toBe('http://149.33.14.250/mcp/p/hyinahitest');
+    expect(brainMcp.mcpServers?.['project-brain']?.url).toBe('http://149.33.14.250/mcp/p/hyinahitest');
+    expect(brainMcp.mcpServers?.['project-brain']?.headers?.Authorization).toBe('Bearer ${MCP_BEARER_TOKEN}');
   });
 
   it('builds the connection checklist from config, key, server and service state', async () => {
@@ -524,7 +584,7 @@ describe('watcher desktop core', () => {
 
     expect(projects).toHaveLength(1);
     expect(projects[0]?.id).toBe('mcp-monorepo');
-    expect(projects[0]?.serverUrl).toBe('http://149.33.14.250/mcp/p/mcp-monorepo');
+    expect(projects[0]?.serverUrl).toBe('http://149.33.14.250');
   });
 
   it('treats the default Codex-backed profile as a configured project in diagnostics', () => {

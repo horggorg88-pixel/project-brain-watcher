@@ -165,7 +165,7 @@ function registerIpcHandlers(): void {
     buildDesktopConfigPackage(corePaths(), projectId)
   ));
   ipcMain.handle('projects:save-config-package', async (_event, projectId: string): Promise<string | null> => {
-    const pack = buildDesktopConfigPackage(corePaths(), projectId);
+    const pack = buildDesktopConfigPackage(corePaths(), projectId, { bootstrap: true });
     const result = await dialog.showSaveDialog({
       defaultPath: pack.fileName,
       filters: [{ name: 'MCP config package', extensions: ['json'] }],

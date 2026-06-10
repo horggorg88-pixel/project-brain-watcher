@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { McpConfigDiscovery, ProjectDraft, SavedProjectProfile } from './contracts.js';
+import { stageProjectBrainFiles } from './desktop-brain-bootstrap.js';
+import { normalizeMcpServerUrl } from './desktop-mcp-endpoint.js';
 
 export interface DesktopCorePaths {
   readonly homePath: string;
@@ -24,6 +26,7 @@ export function saveProfile(paths: DesktopCorePaths, project: ProjectDraft): Sav
   const saved = { ...normalized, createdAt: new Date().toISOString() };
   mkdirSync(paths.userDataPath, { recursive: true });
   writeFileSync(profilesPath(paths), JSON.stringify([...profiles, saved], null, 2), 'utf-8');
+  stageProjectBrainFiles(saved);
   return saved;
 }
 
@@ -48,7 +51,7 @@ export function applyMcpConfigToProfile(
   if (!profile) return null;
   return {
     ...profile,
-    serverUrl: profile.serverUrl || config.serverUrl || '',
+    serverUrl: profile.serverUrl || normalizeMcpServerUrl(config.serverUrl ?? ''),
     tokenEnv: profile.tokenEnv || config.tokenEnv || 'MCP_BEARER_TOKEN',
   };
 }
@@ -72,7 +75,7 @@ function normalizeProject(project: ProjectDraft): ProjectDraft {
     name: project.name.trim(),
     root: project.root.trim(),
     indexId: project.indexId.trim(),
-    serverUrl: project.serverUrl.trim().replace(/\/$/, ''),
+    serverUrl: normalizeMcpServerUrl(project.serverUrl),
     tokenEnv: project.tokenEnv.trim() || 'MCP_BEARER_TOKEN',
   };
   if (!normalized.id || !normalized.name || !normalized.root || !normalized.indexId) {

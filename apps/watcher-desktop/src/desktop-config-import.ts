@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import type { ProjectDraft, ProjectImportResult } from './contracts.js';
+import { normalizeMcpServerUrl } from './desktop-mcp-endpoint.js';
 import { saveProfile, type DesktopCorePaths } from './desktop-profile-store.js';
 import { isConcreteBearerToken, stageDesktopServiceSecret } from './desktop-service-secret.js';
 
@@ -82,6 +83,8 @@ function readBearerToken(file: HandoffFile): string | null {
 
 function endpointToServer(endpoint: string | null, projectId: string | null): string | null {
   if (!endpoint) return null;
+  const normalized = normalizeMcpServerUrl(endpoint);
+  if (normalized) return normalized;
   const suffix = projectId ? `/mcp/p/${encodeURIComponent(projectId)}` : '/mcp';
   return endpoint.endsWith(suffix) ? endpoint.slice(0, -suffix.length) : endpoint.replace(/\/+$/, '');
 }

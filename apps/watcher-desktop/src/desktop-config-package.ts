@@ -1,17 +1,24 @@
 import { basename } from 'node:path';
 import type { DesktopConfigPackage, SavedProjectProfile } from './contracts.js';
+import { stageProjectBrainFiles } from './desktop-brain-bootstrap.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
+import { buildProjectMcpEndpoint } from './desktop-mcp-endpoint.js';
 import { applyMcpConfigToProfile, defaultProfile, readProfiles, type DesktopCorePaths } from './desktop-profile-store.js';
 import {
   readDesktopServiceToken,
   readDesktopServiceSecretState,
 } from './desktop-service-secret.js';
 
-export function buildDesktopConfigPackage(paths: DesktopCorePaths, projectId: string): DesktopConfigPackage {
+export function buildDesktopConfigPackage(
+  paths: DesktopCorePaths,
+  projectId: string,
+  options: { readonly bootstrap?: boolean } = {},
+): DesktopConfigPackage {
   const profile = resolveProfile(paths, projectId);
+  if (options.bootstrap) stageProjectBrainFiles(profile);
   const token = readDesktopServiceToken(profile);
   const secret = readDesktopServiceSecretState(profile);
-  const endpoint = projectMcpEndpoint(profile);
+  const endpoint = buildProjectMcpEndpoint(profile.serverUrl, profile.id);
   const prompt = buildStartPrompt(profile, endpoint);
   const payload = {
     mcpServers: {
@@ -69,14 +76,6 @@ function buildStartPrompt(profile: SavedProjectProfile, endpoint: string): strin
     '',
     'Если любой gate не прошёл, остановись и объясни, какое подключение нужно исправить. Не используй локальные правила как источник истины вместо MCP-контракта.',
   ].join('\n');
-}
-
-function projectMcpEndpoint(profile: SavedProjectProfile): string {
-  const base = profile.serverUrl.trim().replace(/\/$/, '');
-  const projectId = encodeURIComponent(profile.id);
-  if (/\/mcp\/p\/[^/]+$/.test(base)) return base;
-  if (base.endsWith('/mcp')) return `${base}/p/${projectId}`;
-  return `${base}/mcp/p/${projectId}`;
 }
 
 function maskToken(token: string): string {

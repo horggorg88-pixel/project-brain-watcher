@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse as parseToml } from 'smol-toml';
 import type { McpConfigDiscovery, McpConfigSource } from './contracts.js';
+import { normalizeMcpServerUrl } from './desktop-mcp-endpoint.js';
 import { readProfiles, type DesktopCorePaths } from './desktop-profile-store.js';
 
 const CODEX_CONFIG = join('.codex', 'config.toml');
@@ -47,7 +48,7 @@ function readCodexConfig(path: string): McpConfigDiscovery {
     found: true,
     source: 'codex',
     configPath: path,
-    serverUrl: server.url,
+    serverUrl: normalizeServerUrl(server.url),
     tokenEnv: server.tokenEnv,
     projectId: null,
     localPath: null,
@@ -69,7 +70,7 @@ function readJsonConfig(source: Exclude<McpConfigSource, 'codex' | 'generic' | '
     found: true,
     source,
     configPath: path,
-    serverUrl: server.url,
+    serverUrl: normalizeServerUrl(server.url),
     tokenEnv: server.tokenEnv,
     projectId: server.projectId,
     localPath: server.localPath,
@@ -141,6 +142,12 @@ function readTomlProjectBrainServer(content: string): { readonly url: string | n
     url: typeof server.url === 'string' ? server.url : null,
     tokenEnv: typeof server.bearer_token_env_var === 'string' ? server.bearer_token_env_var : null,
   };
+}
+
+function normalizeServerUrl(value: string | null): string | null {
+  if (!value) return null;
+  const normalized = normalizeMcpServerUrl(value);
+  return normalized || null;
 }
 
 function findArgValue(args: readonly string[], key: string): string | null {
