@@ -98,6 +98,54 @@ describe('watcher desktop core', () => {
     expect(readProfiles(paths)[0]?.serverUrl).toBe('http://149.33.14.250');
   });
 
+  it('uses the authorized account bearer when creating a project config from the desktop control panel', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'Client Project');
+    mkdirSync(root, { recursive: true });
+    const requestedUrls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      requestedUrls.push(String(input));
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : {};
+      if (String(input) === 'http://149.33.14.250/api/auth/access') {
+        expect(body.email).toBe('client@example.com');
+        expect(body.password).toBe('password123');
+        return new Response(JSON.stringify({
+          ok: true,
+          profile: { firstName: 'Client', lastName: 'User', email: 'client@example.com', role: 'user' },
+          serverConfig: {
+            projectPath: '',
+            projectId: '',
+            serverUrl: 'http://149.33.14.250',
+            bearerToken: VALID_TEST_BEARER,
+            tokenEnv: 'MCP_BEARER_TOKEN',
+          },
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return verifiedMcpFetch()(input, init);
+    }));
+
+    const state = await loginAccess(paths, { email: 'client@example.com', password: 'password123' });
+    const saved = saveProfile(paths, {
+      id: 'client-project',
+      name: 'Client Project',
+      root,
+      indexId: 'idx-client-project',
+      serverUrl: '',
+      tokenEnv: '',
+    });
+    const pack = buildDesktopConfigPackage(paths, 'client-project', { bootstrap: true });
+    const brainMcp = JSON.parse(readFileSync(join(root, '.brain', 'mcp.json'), 'utf-8')) as {
+      readonly mcpServers?: Record<string, { readonly headers?: Record<string, string> }>;
+    };
+
+    expect(state.signedIn).toBe(true);
+    expect(requestedUrls).toContain('http://149.33.14.250/api/auth/access');
+    expect(saved.serverUrl).toBe('http://149.33.14.250');
+    expect(readDesktopServiceSecret(saved)).toBe(VALID_TEST_BEARER);
+    expect(pack.configJson).toContain(`Bearer ${VALID_TEST_BEARER}`);
+    expect(brainMcp.mcpServers?.['project-brain']?.headers?.Authorization).toBe(`Bearer ${VALID_TEST_BEARER}`);
+  });
+
   it('requires explicit confirmation before service actions', async () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'repo');
@@ -465,7 +513,7 @@ describe('watcher desktop core', () => {
     expect(brainMcp.project_id).toBe('hyinahitest');
     expect(brainMcp.endpoint).toBe('http://149.33.14.250/mcp/p/hyinahitest');
     expect(brainMcp.mcpServers?.['project-brain']?.url).toBe('http://149.33.14.250/mcp/p/hyinahitest');
-    expect(brainMcp.mcpServers?.['project-brain']?.headers?.Authorization).toBe('Bearer ${MCP_BEARER_TOKEN}');
+    expect(brainMcp.mcpServers?.['project-brain']?.headers?.Authorization).toBe(`Bearer ${VALID_ENV_BEARER}`);
   });
 
   it('builds the connection checklist from config, key, server and service state', async () => {

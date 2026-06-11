@@ -1,22 +1,12 @@
-import type {
-  AccessLoginRequest,
-  DesktopAccessState,
-  McpConfigDiscovery,
-  SavedProjectProfile,
-  WatcherPolicyGate,
-} from './contracts.js';
+import type { AccessLoginRequest, DesktopAccessState, McpConfigDiscovery, SavedProjectProfile, WatcherPolicyGate } from './contracts.js';
 import type { DesktopCorePaths } from './desktop-profile-store.js';
 import { applyMcpConfigToProfile, defaultProfile, readProfiles } from './desktop-profile-store.js';
+import { authorizeDesktopAccount } from './desktop-account-auth.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
-import {
-  readDesktopEnvServiceToken,
-  readDesktopServiceSecretState,
-  readDesktopServiceToken,
-  stageDesktopServiceSecret,
-} from './desktop-service-secret.js';
+import { saveDesktopAccessHandoff } from './desktop-access-handoff.js';
+import { readDesktopEnvServiceToken, readDesktopServiceSecretState, readDesktopServiceToken, stageDesktopServiceSecret } from './desktop-service-secret.js';
 import { verifyProjectServerAccess } from './desktop-server-access.js';
 import { clearDesktopAccessSession, readDesktopAccessSession, saveDesktopAccessSession } from './desktop-access-session.js';
-
 export function readAccessState(paths: DesktopCorePaths): DesktopAccessState {
   const config = discoverMcpConfig(paths);
   const secretState = readDesktopServiceSecretState(resolveConfiguredProfile(paths, config));
@@ -58,24 +48,49 @@ export async function loginAccess(paths: DesktopCorePaths, request: AccessLoginR
     });
   }
   const enteredBarrierKey = barrierTokenFromLogin(password);
-  if (profile && enteredBarrierKey) secretState = stageDesktopServiceSecret(profile, enteredBarrierKey);
-  const token = profile ? enteredBarrierKey ?? readDesktopServiceToken(profile) : null;
+  let activeProfile = profile;
+  if (activeProfile && enteredBarrierKey) secretState = stageDesktopServiceSecret(activeProfile, enteredBarrierKey);
+  let token = activeProfile ? enteredBarrierKey ?? readDesktopServiceToken(activeProfile) : null;
   let verifiedToken = token;
-  let serverAccess = config.found && token !== null && profile
-    ? await verifyProjectServerAccess(profile, token)
+  let serverAccess = config.found && token !== null && activeProfile
+    ? await verifyProjectServerAccess(activeProfile, token)
     : { verified: false, message: '' };
-  if (profile && !serverAccess.verified && !enteredBarrierKey) {
-    const envToken = readDesktopEnvServiceToken(profile);
+  if (activeProfile && !serverAccess.verified && !enteredBarrierKey) {
+    const envToken = readDesktopEnvServiceToken(activeProfile);
     if (envToken && envToken !== token) {
-      const envAccess = await verifyProjectServerAccess(profile, envToken);
+      const envAccess = await verifyProjectServerAccess(activeProfile, envToken);
       if (envAccess.verified) {
         serverAccess = envAccess;
         verifiedToken = envToken;
       }
     }
   }
-  if (profile && serverAccess.verified && verifiedToken && !enteredBarrierKey) {
-    secretState = stageDesktopServiceSecret(profile, verifiedToken);
+  let accountAccess: Awaited<ReturnType<typeof authorizeDesktopAccount>> | null = null;
+  if (!enteredBarrierKey && (!activeProfile || !config.found || !serverAccess.verified)) {
+    accountAccess = await authorizeDesktopAccount({ email, password }, config, activeProfile);
+  }
+  if (accountAccess?.ok && accountAccess.serverUrl && accountAccess.bearerToken) {
+    saveDesktopAccessHandoff(paths, {
+      serverUrl: accountAccess.serverUrl,
+      tokenEnv: accountAccess.tokenEnv,
+      token: accountAccess.bearerToken,
+    });
+    if (profile) {
+      activeProfile = {
+        ...profile,
+        serverUrl: profile.serverUrl || accountAccess.serverUrl,
+        tokenEnv: profile.tokenEnv || accountAccess.tokenEnv,
+      };
+      secretState = stageDesktopServiceSecret(activeProfile, accountAccess.bearerToken);
+    }
+  }
+  token = activeProfile ? enteredBarrierKey ?? accountAccess?.bearerToken ?? readDesktopServiceToken(activeProfile) : null;
+  if (config.found && token !== null && activeProfile && accountAccess?.ok) {
+    serverAccess = await verifyProjectServerAccess(activeProfile, token);
+    verifiedToken = token;
+  }
+  if (activeProfile && serverAccess.verified && verifiedToken && !enteredBarrierKey) {
+    secretState = stageDesktopServiceSecret(activeProfile, verifiedToken);
   }
   const serviceSecretReady = secretState.configured && secretState.acl.restricted;
   const serverVerified = serverAccess.verified;
@@ -94,8 +109,10 @@ export async function loginAccess(paths: DesktopCorePaths, request: AccessLoginR
       : config.found && secretState.configured
       ? `Локальный пульт открыт, но ACL secret-файла службы не подтверждён. ${secretState.acl.repairHint ?? ''}`.trim()
       : config.found
-      ? 'Локальный пульт открыт, но bearer для службы не найден. Импортируйте конфиг из личного кабинета.'
-      : 'Учётные данные приняты локально, но файл настройки MCP не найден. Откройте личный кабинет и скачайте настройку.',
+      ? `Локальный пульт открыт, но bearer для службы не найден. ${accountAccess?.message ?? 'Войдите по данным личного кабинета.'}`
+      : accountAccess?.ok
+      ? 'Учётные данные приняты. Теперь выберите папку проекта: пульт сам создаст .brain с вашим bearer.'
+      : `Учётные данные приняты локально, но файл настройки MCP не найден. ${accountAccess?.message ?? 'Выберите папку проекта в пульте.'}`,
     extraGates: [authGate],
   });
 }

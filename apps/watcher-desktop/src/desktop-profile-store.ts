@@ -4,6 +4,7 @@ import type { McpConfigDiscovery, ProjectDraft, SavedProjectProfile } from './co
 import { readDesktopAccessHandoff, stageDesktopAccessHandoffForProfile } from './desktop-access-handoff.js';
 import { stageProjectBrainFiles } from './desktop-brain-bootstrap.js';
 import { normalizeMcpServerUrl } from './desktop-mcp-endpoint.js';
+import { readDesktopServiceToken } from './desktop-service-secret.js';
 
 export interface DesktopCorePaths {
   readonly homePath: string;
@@ -34,8 +35,8 @@ export function saveProfile(paths: DesktopCorePaths, project: ProjectDraft): Sav
   const saved = { ...normalized, createdAt: new Date().toISOString() };
   mkdirSync(paths.userDataPath, { recursive: true });
   writeFileSync(profilesPath(paths), JSON.stringify([...profiles, saved], null, 2), 'utf-8');
-  stageProjectBrainFiles(saved);
   stageDesktopAccessHandoffForProfile(paths, saved);
+  stageProjectBrainFiles(saved, { bearerToken: readDesktopServiceToken(saved) });
   return saved;
 }
 

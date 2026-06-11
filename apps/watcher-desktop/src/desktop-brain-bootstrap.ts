@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SavedProjectProfile } from './contracts.js';
 import { buildProjectMcpEndpoint } from './desktop-mcp-endpoint.js';
+import { isConcreteBearerToken } from './desktop-service-secret.js';
 
 const BRAIN_DIR = '.brain';
 const BRAIN_CONFIG_FILE = 'config.json';
@@ -17,7 +18,10 @@ export interface DesktopBrainBootstrapResult {
   readonly reason: string | null;
 }
 
-export function stageProjectBrainFiles(profile: SavedProjectProfile): DesktopBrainBootstrapResult {
+export function stageProjectBrainFiles(
+  profile: SavedProjectProfile,
+  options: { readonly bearerToken?: string | null } = {},
+): DesktopBrainBootstrapResult {
   const endpoint = buildProjectMcpEndpoint(profile.serverUrl, profile.id);
   const brainDir = join(profile.root, BRAIN_DIR);
   const configPath = join(brainDir, BRAIN_CONFIG_FILE);
@@ -28,7 +32,7 @@ export function stageProjectBrainFiles(profile: SavedProjectProfile): DesktopBra
   mkdirSync(brainDir, { recursive: true });
   writeGitignore(brainDir);
   writeFileSync(configPath, `${JSON.stringify(buildBrainConfig(configPath, profile, endpoint), null, 2)}\n`, 'utf-8');
-  writeFileSync(mcpPath, `${JSON.stringify(buildProjectMcpConfig(profile, endpoint), null, 2)}\n`, 'utf-8');
+  writeFileSync(mcpPath, `${JSON.stringify(buildProjectMcpConfig(profile, endpoint, options.bearerToken), null, 2)}\n`, 'utf-8');
   return { staged: true, endpoint, configPath, mcpPath, reason: null };
 }
 
@@ -66,7 +70,12 @@ function buildBrainConfig(
   };
 }
 
-function buildProjectMcpConfig(profile: SavedProjectProfile, endpoint: string): Record<string, unknown> {
+function buildProjectMcpConfig(
+  profile: SavedProjectProfile,
+  endpoint: string,
+  bearerToken: string | null | undefined,
+): Record<string, unknown> {
+  const token = isConcreteBearerToken(bearerToken) ? bearerToken.trim() : null;
   return {
     project_id: profile.id,
     endpoint,
@@ -74,7 +83,7 @@ function buildProjectMcpConfig(profile: SavedProjectProfile, endpoint: string): 
       'project-brain': {
         url: endpoint,
         headers: {
-          Authorization: `Bearer \${${profile.tokenEnv}}`,
+          Authorization: token ? `Bearer ${token}` : `Bearer \${${profile.tokenEnv}}`,
         },
       },
     },

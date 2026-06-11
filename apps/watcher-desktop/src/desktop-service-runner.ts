@@ -186,7 +186,7 @@ function servicePolicy(
     return { decision: 'prompt', risk: 'high', reasons: [`Подтвердите действие: ${actionLabel(request.action)}`] };
   }
   if (request.action !== 'stop' && !token) {
-    return { decision: 'deny', risk: 'high', reasons: [`Bearer для ${profile.tokenEnv} не найден. Импортируйте конфиг из личного кабинета.`] };
+    return { decision: 'deny', risk: 'high', reasons: [`Bearer для ${profile.tokenEnv} не найден. Войдите в пульт и выберите папку проекта повторно.`] };
   }
   return { decision: 'allow', risk: request.action === 'install' || request.action === 'update' ? 'high' : 'medium', reasons: ['Действие подтверждено пользователем'] };
 }

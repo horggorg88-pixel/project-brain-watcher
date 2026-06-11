@@ -15,8 +15,8 @@ export function buildDesktopConfigPackage(
   options: { readonly bootstrap?: boolean } = {},
 ): DesktopConfigPackage {
   const profile = resolveProfile(paths, projectId);
-  if (options.bootstrap) stageProjectBrainFiles(profile);
   const token = readDesktopServiceToken(profile);
+  if (options.bootstrap) stageProjectBrainFiles(profile, { bearerToken: token });
   const secret = readDesktopServiceSecretState(profile);
   const endpoint = buildProjectMcpEndpoint(profile.serverUrl, profile.id);
   const prompt = buildStartPrompt(profile, endpoint);

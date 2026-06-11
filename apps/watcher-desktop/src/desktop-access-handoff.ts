@@ -29,8 +29,8 @@ export function saveDesktopAccessHandoff(
 ): DesktopAccessHandoff {
   const tokenEnv = normalizeTokenEnv(input.tokenEnv);
   const serverUrl = normalizeMcpServerUrl(input.serverUrl);
-  if (!serverUrl) throw new Error('Личный access-config должен содержать MCP server_url.');
-  if (!isConcreteBearerToken(input.token)) throw new Error('Личный access-config должен содержать реальный Bearer-токен.');
+  if (!serverUrl) throw new Error('Личный MCP-доступ должен содержать server_url.');
+  if (!isConcreteBearerToken(input.token)) throw new Error('Личный MCP-доступ должен содержать реальный Bearer-токен.');
   const handoff = {
     serverUrl,
     tokenEnv,
@@ -81,7 +81,7 @@ export function discoverDesktopAccessHandoff(paths: DesktopCorePaths): McpConfig
     tokenEnv: handoff.tokenEnv,
     projectId: null,
     localPath: null,
-    findings: ['Личный access-config MCP найден в локальном пульте'],
+    findings: ['Личный MCP-доступ найден в локальном пульте'],
   };
 }
 

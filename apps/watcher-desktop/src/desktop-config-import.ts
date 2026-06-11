@@ -21,8 +21,8 @@ export function importProjectConfig(paths: DesktopCorePaths, sourcePath: string)
   const bearerToken = readBearerToken(parsed);
   if (isAccessConfig(parsed)) {
     const serverUrl = readAccessServerUrl(parsed);
-    if (!serverUrl) throw new Error('Личный access-config должен содержать server_url или mcpServers.project-brain.url.');
-    if (!bearerToken) throw new Error('Личный access-config должен содержать реальный Bearer-токен.');
+    if (!serverUrl) throw new Error('Файл MCP-доступа должен содержать server_url или mcpServers.project-brain.url.');
+    if (!bearerToken) throw new Error('Файл MCP-доступа должен содержать реальный Bearer-токен.');
     saveDesktopAccessHandoff(paths, {
       serverUrl,
       tokenEnv: readString(parsed.token_env) ?? 'MCP_BEARER_TOKEN',
@@ -31,7 +31,7 @@ export function importProjectConfig(paths: DesktopCorePaths, sourcePath: string)
     return {
       profile: null,
       sourcePath,
-      warnings: ['Личный access-config импортирован. Теперь выберите папку проекта, чтобы пульт создал проектный MCP-конфиг.'],
+      warnings: ['Личный MCP-доступ импортирован. Теперь выберите папку проекта, чтобы пульт создал проектный MCP-конфиг.'],
       tokenDetected: true,
       secretStaged: false,
       accessConfigImported: true,

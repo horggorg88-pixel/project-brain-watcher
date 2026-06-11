@@ -494,7 +494,7 @@ function serviceActionLog(result: WatcherServiceActionResult): string {
 
 function importResultLog(result: ProjectImportResult): string {
   const warnings = result.warnings.length ? `\n${result.warnings.join('\n')}` : '';
-  if (!result.profile) return `Личный access-config импортирован${warnings}`;
+  if (!result.profile) return `Личный MCP-доступ импортирован${warnings}`;
   return `Файл настройки MCP импортирован: ${result.profile.name}${warnings}`;
 }
 
