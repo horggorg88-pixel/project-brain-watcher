@@ -23,7 +23,7 @@ import { stageDesktopServiceSecret } from '../../apps/watcher-desktop/src/deskto
 import { isServiceActionSettled, prepareServiceSecretForLaunch } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
 import { parseWindowsServiceOutput } from '../../apps/watcher-desktop/src/desktop-service-status.js';
 import { readDesktopUiState, saveDesktopUiState } from '../../apps/watcher-desktop/src/desktop-ui-state.js';
-import { defaultProfile } from '../../apps/watcher-desktop/src/desktop-profile-store.js';
+import { defaultProfile, serviceName } from '../../apps/watcher-desktop/src/desktop-profile-store.js';
 import type { WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
 
 const tempDirs: string[] = [];
@@ -332,7 +332,7 @@ describe('watcher desktop core', () => {
   it('reads watcher service state for the selected project instead of the first profile', () => {
     const paths = tempPaths();
     const monorepoRoot = join(paths.homePath, 'MCP');
-    const clientRoot = join(paths.homePath, 'HyinahiTEst');
+    const clientRoot = join(paths.homePath, 'Isolated Client Project');
     mkdirSync(join(monorepoRoot, '.brain'), { recursive: true });
     mkdirSync(clientRoot, { recursive: true });
     writeFileSync(join(monorepoRoot, '.brain', 'watcher-runtime.json'), JSON.stringify({
@@ -400,6 +400,34 @@ describe('watcher desktop core', () => {
     expect(result.output).toContain('Подтвердите действие');
     expect(result.output).not.toContain('Watcher уже работает');
     expect(result.status.projectId).toBe('hyinahitest');
+  });
+
+  it('includes selected project service log tails without terminal escape noise', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'HyinahiTEst');
+    const serviceDir = join(root, '.brain', 'service');
+    mkdirSync(serviceDir, { recursive: true });
+    const profile = saveProfile(paths, {
+      id: 'hyinahitest',
+      name: 'HyinahiTEst',
+      root,
+      indexId: 'idx-hyinahitest',
+      serverUrl: 'https://brain.example',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const base = join(serviceDir, serviceName(profile.id));
+    writeFileSync(`${base}.out.log`, '\u001B[92m✓\u001B[0m WATCH MODE\nLight audit: без изменений\n', 'utf-8');
+    writeFileSync(`${base}.err.log`, 'npm warn deprecated prebuild-install\n', 'utf-8');
+    writeFileSync(`${base}.wrapper.log`, 'Service started successfully.\nStarted process 24872\n', 'utf-8');
+
+    const status = readServiceStatus(paths, 'hyinahitest');
+
+    expect(status.logs?.out).toContain('WATCH MODE');
+    expect(status.logs?.out).toContain('Light audit');
+    expect(status.logs?.out).not.toContain('\u001B');
+    expect(status.logs?.err).toContain('npm warn deprecated');
+    expect(status.logs?.wrapper).toContain('Service started successfully');
+    expect(status.logs?.wrapperPath).toBe(`${base}.wrapper.log`);
   });
 
   it('does not treat pending Windows service transitions as settled', () => {
@@ -801,20 +829,20 @@ describe('watcher desktop core', () => {
       tokenEnv: 'MCP_BEARER_TOKEN',
     });
     const clientProfile = saveProfile(paths, {
-      id: 'hyinahitest',
-      name: 'HyinahiTEst',
+      id: 'isolated-client-project',
+      name: 'Isolated Client Project',
       root: clientRoot,
-      indexId: 'idx-hyinahitest',
+      indexId: 'idx-isolated-client-project',
       serverUrl: 'http://149.33.14.250',
       tokenEnv: 'MCP_BEARER_TOKEN',
     });
     stageDesktopServiceSecret(clientProfile, VALID_TEST_BEARER);
     vi.stubGlobal('fetch', verifiedMcpFetch());
 
-    const check = await buildDesktopConnectionCheck(paths, 'hyinahitest');
+    const check = await buildDesktopConnectionCheck(paths, 'isolated-client-project');
     const watcherNode = check.nodes.find(node => node.id === 'watcher');
 
-    expect(check.service.projectId).toBe('hyinahitest');
+    expect(check.service.projectId).toBe('isolated-client-project');
     expect(check.service.running).toBe(false);
     expect(watcherNode?.action).toBe('install_service');
     expect(watcherNode?.actionLabel).toBe('Установить службу');
@@ -1291,6 +1319,7 @@ function statusFixture(overrides: Partial<WatcherServiceStatus>): WatcherService
     readOnly: true,
     root: 'C:\\repo',
     running: false,
+    logs: null,
     ...overrides,
   };
 }

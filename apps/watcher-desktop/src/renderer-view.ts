@@ -78,6 +78,8 @@ export function renderService(status: WatcherServiceStatus, statusEl: HTMLElemen
   ];
   if (status.pid) lines.push(`PID: ${status.pid}`);
   if (status.lastError) lines.push(`Сообщение watcher: ${status.lastError}`);
+  const logLines = serviceLogLines(status);
+  if (logLines.length) lines.push('', ...logLines);
   setText(statusEl, lines.join('\n'));
 }
 
@@ -170,6 +172,7 @@ export function fallbackStatus(message: string): WatcherServiceStatus {
     queueDepth: 0,
     lastSyncAt: null,
     lastError: message,
+    logs: null,
   };
 }
 
@@ -227,6 +230,22 @@ function serviceNextStep(status: WatcherServiceStatus): string {
   if (!status.running) return 'Запустите watcher';
   if (status.health !== 'healthy') return 'Откройте диагностику и проверьте MCP-доступ';
   return 'Можно работать через MCP';
+}
+
+function serviceLogLines(status: WatcherServiceStatus): readonly string[] {
+  const logs = status.logs;
+  if (!logs) return [];
+  const sections = [
+    logSection('Лог работы watcher', logs.out, logs.outPath),
+    logSection('Ошибки watcher', logs.err, logs.errPath),
+    logSection('Лог Windows-службы', logs.wrapper, logs.wrapperPath),
+  ].filter((line): line is string => line !== null);
+  return sections.length ? ['Последние логи:', ...sections] : ['Последние логи: файлов логов пока нет'];
+}
+
+function logSection(title: string, value: string, path: string): string | null {
+  if (!value.trim()) return null;
+  return `${title} (${path}):\n${value}`;
 }
 
 function configKeyStatus(pack: DesktopConfigPackage): string {

@@ -13,6 +13,7 @@ import type {
   SavedProjectProfile,
   WatcherServiceAction,
   WatcherServiceActionResult,
+  WatcherServiceLogTail,
   WatcherServiceStatus,
 } from './contracts.js';
 import {
@@ -499,7 +500,24 @@ function serviceActionLog(result: WatcherServiceActionResult): string {
   if (result.status.lastError && !output.includes(result.status.lastError)) {
     lines.push(`Статус службы: ${result.status.lastError}`);
   }
+  const logs = serviceLogSummary(result.status.logs);
+  if (logs) lines.push('', logs);
   return lines.join('\n');
+}
+
+function serviceLogSummary(logs: WatcherServiceLogTail | null): string | null {
+  if (!logs) return null;
+  const sections = [
+    logSummarySection('Лог работы watcher', logs.out),
+    logSummarySection('Ошибки watcher', logs.err),
+    logSummarySection('Лог Windows-службы', logs.wrapper),
+  ].filter((line): line is string => line !== null);
+  return sections.length ? ['Последние логи:', ...sections].join('\n') : 'Последние логи: файлов логов пока нет';
+}
+
+function logSummarySection(title: string, value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed ? `${title}:\n${trimmed}` : null;
 }
 
 function importResultLog(result: ProjectImportResult): string {

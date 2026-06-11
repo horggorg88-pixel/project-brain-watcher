@@ -43,6 +43,16 @@ export interface WatcherServiceStatus {
   readonly queueDepth: number;
   readonly lastSyncAt: string | null;
   readonly lastError: string | null;
+  readonly logs: WatcherServiceLogTail | null;
+}
+
+export interface WatcherServiceLogTail {
+  readonly wrapperPath: string;
+  readonly outPath: string;
+  readonly errPath: string;
+  readonly wrapper: string;
+  readonly out: string;
+  readonly err: string;
 }
 
 export interface ProjectDraft {

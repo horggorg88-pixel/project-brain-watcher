@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import type { SavedProjectProfile, WatcherServiceStatus } from './contracts.js';
+import type { SavedProjectProfile, WatcherServiceLogTail, WatcherServiceStatus } from './contracts.js';
 import {
   defaultProfile,
   readProfiles,
@@ -11,6 +11,8 @@ import {
 } from './desktop-profile-store.js';
 
 const WATCHER_LOCK_TTL_MS = 90_000;
+const SERVICE_LOG_TAIL_BYTES = 16_384;
+const SERVICE_LOG_TAIL_LINES = 80;
 
 interface RuntimeLockFile {
   readonly owner: {
@@ -31,15 +33,16 @@ export function readServiceStatus(paths: DesktopCorePaths, projectId?: string): 
   const profile = resolveServiceProfile(paths, projectId);
   if (!profile) return stoppedStatus(false, 'Проект watcher не настроен');
   const runtimePath = join(profile.root, '.brain', 'watcher-runtime.json');
+  const logs = readServiceLogTail(profile);
   const serviceState = readWindowsServiceState(profile);
   const installed = existsSync(serviceExePath(profile)) || serviceState.installed;
   if (serviceState.installed && !serviceState.running) {
-    return stoppedStatus(true, serviceState.lastError ?? 'Служба Watcher остановлена', profile);
+    return stoppedStatus(true, serviceState.lastError ?? 'Служба Watcher остановлена', profile, logs);
   }
-  if (!existsSync(runtimePath)) return stoppedStatus(installed, 'Служба Watcher не запущена', profile);
+  if (!existsSync(runtimePath)) return stoppedStatus(installed, 'Служба Watcher не запущена', profile, logs);
   try {
     const parsed = parseRuntimeLock(JSON.parse(readFileSync(runtimePath, 'utf-8')));
-    if (!parsed) return { ...stoppedStatus(installed, 'Файл состояния службы повреждён', profile), readOnly: true, health: 'read_only' };
+    if (!parsed) return { ...stoppedStatus(installed, 'Файл состояния службы повреждён', profile, logs), readOnly: true, health: 'read_only' };
     const stale = Date.now() - parsed.updated_at > WATCHER_LOCK_TTL_MS || (!serviceState.running && !processAlive(parsed.owner.pid));
     return {
       installed,
@@ -52,9 +55,10 @@ export function readServiceStatus(paths: DesktopCorePaths, projectId?: string): 
       queueDepth: 0,
       lastSyncAt: new Date(parsed.updated_at).toISOString(),
       lastError: stale ? 'Файл состояния службы устарел или процесс недоступен' : null,
+      logs,
     };
   } catch (error) {
-    return { ...stoppedStatus(installed, errorMessage(error), profile), readOnly: true, health: 'read_only' };
+    return { ...stoppedStatus(installed, errorMessage(error), profile, logs), readOnly: true, health: 'read_only' };
   }
 }
 
@@ -71,6 +75,7 @@ function stoppedStatus(
   installed: boolean,
   lastError: string,
   profile?: SavedProjectProfile,
+  logs: WatcherServiceLogTail | null = profile ? readServiceLogTail(profile) : null,
 ): WatcherServiceStatus {
   return {
     installed,
@@ -83,6 +88,22 @@ function stoppedStatus(
     queueDepth: 0,
     lastSyncAt: null,
     lastError,
+    logs,
+  };
+}
+
+export function readServiceLogTail(profile: SavedProjectProfile): WatcherServiceLogTail {
+  const base = join(profile.root, '.brain', 'service', serviceName(profile.id));
+  const wrapperPath = `${base}.wrapper.log`;
+  const outPath = `${base}.out.log`;
+  const errPath = `${base}.err.log`;
+  return {
+    wrapperPath,
+    outPath,
+    errPath,
+    wrapper: readTail(wrapperPath),
+    out: readTail(outPath),
+    err: readTail(errPath),
   };
 }
 
@@ -139,6 +160,27 @@ function processAlive(pid: number): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function readTail(path: string): string {
+  if (!existsSync(path)) return '';
+  try {
+    const size = statSync(path).size;
+    const content = readFileSync(path, 'utf-8');
+    const tail = size > SERVICE_LOG_TAIL_BYTES ? content.slice(-SERVICE_LOG_TAIL_BYTES) : content;
+    return lastLines(stripAnsi(tail), SERVICE_LOG_TAIL_LINES);
+  } catch (error) {
+    return `Лог недоступен: ${errorMessage(error)}`;
+  }
+}
+
+function stripAnsi(value: string): string {
+  return value.replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '').replace(/\r/g, '');
+}
+
+function lastLines(value: string, limit: number): string {
+  const lines = value.split('\n').map(line => line.trimEnd()).filter(line => line.trim().length > 0);
+  return lines.slice(-limit).join('\n');
 }
 
 function errorMessage(error: unknown): string {
