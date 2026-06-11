@@ -755,16 +755,16 @@ describe('watcher desktop core', () => {
 
   it('builds the connection checklist from config, key, server and service state', async () => {
     const paths = tempPaths();
-    const source = join(paths.homePath, 'mcp-monorepo-mcp-config.json');
+    const source = join(paths.homePath, 'checklist-project-mcp-config.json');
     mkdirSync(paths.homePath, { recursive: true });
     writeFileSync(source, JSON.stringify({
-      project_id: 'mcp-monorepo',
-      endpoint: 'http://149.33.14.250/mcp/p/mcp-monorepo',
+      project_id: 'checklist-project',
+      endpoint: 'http://149.33.14.250/mcp/p/checklist-project',
       local_path: join(paths.homePath, 'repo'),
       token_env: 'MCP_BEARER_TOKEN',
       mcpServers: {
         'project-brain': {
-          url: 'http://149.33.14.250/mcp/p/mcp-monorepo',
+          url: 'http://149.33.14.250/mcp/p/checklist-project',
           headers: { Authorization: `Bearer ${VALID_TEST_BEARER}` },
         },
       },
@@ -773,12 +773,12 @@ describe('watcher desktop core', () => {
     importProjectConfig(paths, source);
     vi.stubGlobal('fetch', verifiedMcpFetch());
 
-    const check = await buildDesktopConnectionCheck(paths, 'mcp-monorepo');
+    const check = await buildDesktopConnectionCheck(paths, 'checklist-project');
 
     expect(check.nodes.map(node => node.id)).toEqual(['project', 'config', 'key', 'server', 'watcher']);
     expect(check.nodes.map(node => node.label)).toEqual(['Проект', 'Файл настройки', 'Ключ доступа', 'MCP-сервер', 'Watcher']);
     expect(check.nodes.find(node => node.id === 'server')?.status).toBe('active');
-    expect(check.nodes.find(node => node.id === 'watcher')?.actionLabel).toBe('Запустить watcher');
+    expect(check.nodes.find(node => node.id === 'watcher')?.actionLabel).toBe('Установить службу');
     expect(check.overall).toBe('action_required');
   });
 
