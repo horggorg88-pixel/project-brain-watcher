@@ -230,6 +230,9 @@ async function handleCheckAction(value: string | undefined): Promise<void> {
     case 'download_config':
       await saveCurrentConfigPackage();
       return;
+    case 'install_service':
+      await runServiceActionFromUi('install', true);
+      return;
     case 'start_service':
       await runServiceActionFromUi('start', true);
       return;
@@ -277,6 +280,7 @@ async function runServiceActionFromUi(action: WatcherServiceAction, confirmActio
 async function saveCurrentConfigPackage(): Promise<void> {
   const result = await window.watcherDesktop.projects.saveConfigPackage(currentProjectId());
   writeLog(result ? configSaveLog(result) : 'Скачивание отменено');
+  if (result) await refresh();
 }
 
 async function importConfigFromDialog(): Promise<void> {
@@ -370,7 +374,7 @@ async function safeConfigPackage(): Promise<DesktopConfigPackage | null> {
 
 async function safeModes() {
   try {
-    return await window.watcherDesktop.modes.list();
+    return await window.watcherDesktop.modes.list(currentProjectId());
   } catch (error) {
     writeLog(errorMessage(error));
     return [];
@@ -486,7 +490,12 @@ function writeLog(value: string): void {
 
 function serviceActionLog(result: WatcherServiceActionResult): string {
   const output = result.output.trim() || 'Команда завершилась без вывода';
-  const lines = [`${decisionLabel(result.policy.decision)}: код=${result.exitCode ?? 'нет'}`, output];
+  const lines = [
+    `${decisionLabel(result.policy.decision)}: код=${result.exitCode ?? 'нет'}`,
+    `Проект: ${result.status.projectId ?? currentProjectId()}`,
+    `Папка: ${result.status.root ?? selectedProject()?.root ?? 'не определена'}`,
+    output,
+  ];
   if (result.status.lastError && !output.includes(result.status.lastError)) {
     lines.push(`Статус службы: ${result.status.lastError}`);
   }
@@ -514,6 +523,7 @@ function checkActionFrom(value: string | undefined): DesktopCheckAction | null {
     'select_project',
     'import_config',
     'download_config',
+    'install_service',
     'start_service',
     'open_logs',
     'verify',

@@ -329,6 +329,79 @@ describe('watcher desktop core', () => {
     expect(result.output).toContain('Watcher уже работает');
   });
 
+  it('reads watcher service state for the selected project instead of the first profile', () => {
+    const paths = tempPaths();
+    const monorepoRoot = join(paths.homePath, 'MCP');
+    const clientRoot = join(paths.homePath, 'HyinahiTEst');
+    mkdirSync(join(monorepoRoot, '.brain'), { recursive: true });
+    mkdirSync(clientRoot, { recursive: true });
+    writeFileSync(join(monorepoRoot, '.brain', 'watcher-runtime.json'), JSON.stringify({
+      owner: { project_id: 'alpha-running', root: monorepoRoot, pid: process.pid },
+      updated_at: Date.now(),
+    }), 'utf-8');
+    saveProfile(paths, {
+      id: 'alpha-running',
+      name: 'Alpha Running',
+      root: monorepoRoot,
+      indexId: 'idx-mcp-monorepo',
+      serverUrl: 'https://brain.example',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    saveProfile(paths, {
+      id: 'hyinahitest',
+      name: 'HyinahiTEst',
+      root: clientRoot,
+      indexId: 'idx-hyinahitest',
+      serverUrl: 'https://brain.example',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    const defaultStatus = readServiceStatus(paths);
+    const clientStatus = readServiceStatus(paths, 'hyinahitest');
+
+    expect(defaultStatus.running).toBe(true);
+    expect(defaultStatus.projectId).toBe('alpha-running');
+    expect(clientStatus.running).toBe(false);
+    expect(clientStatus.projectId).toBe('hyinahitest');
+    expect(clientStatus.root).toBe(clientRoot);
+  });
+
+  it('does not skip selected-project start just because another profile is already running', async () => {
+    const paths = tempPaths();
+    const monorepoRoot = join(paths.homePath, 'MCP');
+    const clientRoot = join(paths.homePath, 'HyinahiTEst');
+    mkdirSync(join(monorepoRoot, '.brain'), { recursive: true });
+    mkdirSync(clientRoot, { recursive: true });
+    writeFileSync(join(monorepoRoot, '.brain', 'watcher-runtime.json'), JSON.stringify({
+      owner: { project_id: 'alpha-running', root: monorepoRoot, pid: process.pid },
+      updated_at: Date.now(),
+    }), 'utf-8');
+    saveProfile(paths, {
+      id: 'alpha-running',
+      name: 'Alpha Running',
+      root: monorepoRoot,
+      indexId: 'idx-mcp-monorepo',
+      serverUrl: 'https://brain.example',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    saveProfile(paths, {
+      id: 'hyinahitest',
+      name: 'HyinahiTEst',
+      root: clientRoot,
+      indexId: 'idx-hyinahitest',
+      serverUrl: '',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    const result = await runServiceAction(paths, { action: 'start', projectId: 'hyinahitest', confirmed: false });
+
+    expect(result.executed).toBe(false);
+    expect(result.policy.decision).toBe('prompt');
+    expect(result.output).toContain('Подтвердите действие');
+    expect(result.output).not.toContain('Watcher уже работает');
+    expect(result.status.projectId).toBe('hyinahitest');
+  });
+
   it('does not treat pending Windows service transitions as settled', () => {
     expect(isServiceActionSettled('stop', statusFixture({ running: false, lastError: 'Windows Service STOP_PENDING' }))).toBe(false);
     expect(isServiceActionSettled('start', statusFixture({ running: false, lastError: 'Windows Service START_PENDING' }))).toBe(false);
@@ -707,6 +780,44 @@ describe('watcher desktop core', () => {
     expect(check.nodes.find(node => node.id === 'server')?.status).toBe('active');
     expect(check.nodes.find(node => node.id === 'watcher')?.actionLabel).toBe('Запустить watcher');
     expect(check.overall).toBe('action_required');
+  });
+
+  it('offers service installation for a selected project that has config but no watcher service', async () => {
+    const paths = tempPaths();
+    const monorepoRoot = join(paths.homePath, 'MCP');
+    const clientRoot = join(paths.homePath, 'HyinahiTEst');
+    mkdirSync(join(monorepoRoot, '.brain'), { recursive: true });
+    mkdirSync(clientRoot, { recursive: true });
+    writeFileSync(join(monorepoRoot, '.brain', 'watcher-runtime.json'), JSON.stringify({
+      owner: { project_id: 'mcp-monorepo', root: monorepoRoot, pid: process.pid },
+      updated_at: Date.now(),
+    }), 'utf-8');
+    saveProfile(paths, {
+      id: 'mcp-monorepo',
+      name: 'MCP Monorepo',
+      root: monorepoRoot,
+      indexId: 'idx-mcp-monorepo',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const clientProfile = saveProfile(paths, {
+      id: 'hyinahitest',
+      name: 'HyinahiTEst',
+      root: clientRoot,
+      indexId: 'idx-hyinahitest',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    stageDesktopServiceSecret(clientProfile, VALID_TEST_BEARER);
+    vi.stubGlobal('fetch', verifiedMcpFetch());
+
+    const check = await buildDesktopConnectionCheck(paths, 'hyinahitest');
+    const watcherNode = check.nodes.find(node => node.id === 'watcher');
+
+    expect(check.service.projectId).toBe('hyinahitest');
+    expect(check.service.running).toBe(false);
+    expect(watcherNode?.action).toBe('install_service');
+    expect(watcherNode?.actionLabel).toBe('Установить службу');
   });
 
   it('lists MCP mode rails for the desktop readiness screen', () => {

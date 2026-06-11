@@ -76,6 +76,7 @@ describe('watcher desktop contract', () => {
     expect(rendererSource).toContain('service.fullCheck');
     expect(rendererSource).toContain('data-check-action');
     expect(rendererSource).toContain('handleCheckAction');
+    expect(rendererSource).toContain("case 'install_service'");
     expect(rendererSource).toContain("case 'start_service'");
     expect(rendererSource).toContain("case 'verify'");
     expect(rendererSource).toContain("case 'download_config'");

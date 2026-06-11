@@ -13,7 +13,7 @@ import {
 } from './desktop-profile-store.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { readDesktopServiceSecretState } from './desktop-service-secret.js';
-import { readServiceStatus } from './desktop-service-status.js';
+import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 export { readProfiles, saveProfile, type DesktopCorePaths } from './desktop-profile-store.js';
 export { readServiceStatus } from './desktop-service-status.js';
 export { runServiceAction } from './desktop-service-runner.js';
@@ -40,12 +40,12 @@ export function previewMcpDiff(paths: DesktopCorePaths, client: McpDiffPreview['
   };
 }
 
-export function previewDiagnostics(paths: DesktopCorePaths): DiagnosticsPreview {
+export function previewDiagnostics(paths: DesktopCorePaths, projectId?: string): DiagnosticsPreview {
   const profiles = readProfiles(paths);
   const config = discoverMcpConfig(paths);
-  const profile = applyMcpConfigToProfile(profiles[0] ?? defaultProfile(paths), config);
+  const profile = applyMcpConfigToProfile(resolveServiceProfile(paths, projectId), config);
   const secret = readDesktopServiceSecretState(profile);
-  const service = readServiceStatus(paths);
+  const service = readServiceStatus(paths, profile?.id ?? projectId);
   const checks = diagnosticChecks({
     profileConfigured: profile !== null,
     configFound: config.found,

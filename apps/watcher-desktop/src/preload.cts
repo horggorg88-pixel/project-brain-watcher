@@ -33,7 +33,7 @@ const api: WatcherDesktopApi = {
     ),
   },
   service: {
-    status: () => ipcRenderer.invoke('service:status') as Promise<WatcherServiceStatus>,
+    status: (projectId?: string) => ipcRenderer.invoke('service:status', projectId) as Promise<WatcherServiceStatus>,
     run: (request: WatcherServiceActionRequest) => (
       ipcRenderer.invoke('service:run', request) as Promise<WatcherServiceActionResult>
     ),
@@ -63,11 +63,11 @@ const api: WatcherDesktopApi = {
     ),
   },
   modes: {
-    list: () => ipcRenderer.invoke('modes:list') as Promise<readonly DesktopModeSummary[]>,
+    list: (projectId?: string) => ipcRenderer.invoke('modes:list', projectId) as Promise<readonly DesktopModeSummary[]>,
   },
   diagnostics: {
-    previewExport: () => (
-      ipcRenderer.invoke('diagnostics:preview-export') as Promise<DiagnosticsPreview>
+    previewExport: (projectId?: string) => (
+      ipcRenderer.invoke('diagnostics:preview-export', projectId) as Promise<DiagnosticsPreview>
     ),
   },
   clipboard: {

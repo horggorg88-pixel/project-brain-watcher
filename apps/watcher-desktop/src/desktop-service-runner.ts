@@ -9,7 +9,7 @@ import type {
   WatcherServiceStatus,
 } from './contracts.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
-import { applyMcpConfigToProfile, defaultProfile, readProfiles, type DesktopCorePaths } from './desktop-profile-store.js';
+import { applyMcpConfigToProfile, type DesktopCorePaths } from './desktop-profile-store.js';
 import { readDesktopServiceToken, stageDesktopServiceSecret, type DesktopServiceSecretState } from './desktop-service-secret.js';
 import {
   fetchReleaseVersionCheck,
@@ -18,7 +18,7 @@ import {
   watcherPackageVersion,
 } from './desktop-release-update.js';
 import { verifyProjectServerAccess } from './desktop-server-access.js';
-import { readServiceStatus } from './desktop-service-status.js';
+import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
 const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.16';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
@@ -29,12 +29,12 @@ export async function runServiceAction(
   request: WatcherServiceActionRequest,
 ): Promise<WatcherServiceActionResult> {
   const profile = applyMcpConfigToProfile(
-    readProfiles(paths).find(item => item.id === request.projectId) ?? defaultProfile(paths),
+    resolveServiceProfile(paths, request.projectId),
     discoverMcpConfig(paths),
   );
-  if (request.action === 'health') return healthResult(paths);
+  if (request.action === 'health') return healthResult(paths, request.projectId);
   const token = profile ? readDesktopServiceToken(profile) : null;
-  const status = readServiceStatus(paths);
+  const status = readServiceStatus(paths, request.projectId);
   if (request.action === 'start' && status.running) {
     return {
       executed: false,
@@ -46,16 +46,16 @@ export async function runServiceAction(
   }
   const policy = servicePolicy(request, profile, token);
   if (policy.decision !== 'allow') {
-    return { executed: false, policy, status: readServiceStatus(paths), exitCode: null, output: policy.reasons.join('\n') };
+    return { executed: false, policy, status: readServiceStatus(paths, request.projectId), exitCode: null, output: policy.reasons.join('\n') };
   }
   if (!profile) {
-    return { executed: false, policy, status: readServiceStatus(paths), exitCode: null, output: 'Проект не найден' };
+    return { executed: false, policy, status: readServiceStatus(paths, request.projectId), exitCode: null, output: 'Проект не найден' };
   }
   if (request.action !== 'stop') {
     const serverAccess = await verifyProjectServerAccess(profile, token);
     if (!serverAccess.verified) {
       const denied: WatcherPolicyGate = { decision: 'deny', risk: 'high', reasons: [serverAccess.message] };
-      return { executed: false, policy: denied, status: readServiceStatus(paths), exitCode: null, output: serverAccess.message };
+      return { executed: false, policy: denied, status: readServiceStatus(paths, profile.id), exitCode: null, output: serverAccess.message };
     }
     prepareServiceSecretForLaunch(profile, token);
   }
@@ -63,7 +63,7 @@ export async function runServiceAction(
   const result = await spawnWatcher(defaultNpxExecutable(), buildServiceArgs(request.action, profile), profile.root, token
     ? { [profile.tokenEnv]: token }
     : {});
-  const finalStatus = await waitForServiceActionStatus(paths, request.action);
+  const finalStatus = await waitForServiceActionStatus(paths, request.action, profile.id);
   return {
     executed: true,
     policy,
@@ -101,11 +101,11 @@ async function runUpdateAction(
   const env = token ? { [profile.tokenEnv]: token } : {};
   const command = defaultNpxExecutable();
   const desktop = await spawnWatcher(command, buildDesktopUpdateArgs(), profile.root, env);
-  if (desktop.exitCode !== 0) return updateResult(paths, policy, desktop.exitCode, versionReport, ['Пульт не обновлён', desktop.output]);
+  if (desktop.exitCode !== 0) return updateResult(paths, profile.id, policy, desktop.exitCode, versionReport, ['Пульт не обновлён', desktop.output]);
   const install = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env);
-  if (install.exitCode !== 0) return updateResult(paths, policy, install.exitCode, versionReport, ['Пульт обновлён', install.output]);
+  if (install.exitCode !== 0) return updateResult(paths, profile.id, policy, install.exitCode, versionReport, ['Пульт обновлён', install.output]);
   const restart = await spawnWatcher(command, buildServiceRestartArgs(profile), profile.root, env);
-  const status = await waitForServiceActionStatus(paths, 'restart');
+  const status = await waitForServiceActionStatus(paths, 'restart', profile.id);
   return {
     executed: true,
     policy,
@@ -125,6 +125,7 @@ async function runUpdateAction(
 
 function updateResult(
   paths: DesktopCorePaths,
+  projectId: string,
   policy: WatcherPolicyGate,
   exitCode: number,
   versionReport: string,
@@ -133,7 +134,7 @@ function updateResult(
   return {
     executed: true,
     policy,
-    status: readServiceStatus(paths),
+    status: readServiceStatus(paths, projectId),
     exitCode,
     output: [versionReport, ...output.map(compactOutput)].filter(Boolean).join('\n\n'),
   };
@@ -154,8 +155,8 @@ async function updateVersionReport(): Promise<string> {
   }
 }
 
-function healthResult(paths: DesktopCorePaths): WatcherServiceActionResult {
-  const status = readServiceStatus(paths);
+function healthResult(paths: DesktopCorePaths, projectId: string): WatcherServiceActionResult {
+  const status = readServiceStatus(paths, projectId);
   const healthy = status.running && status.health === 'healthy';
   return {
     executed: false,
@@ -266,12 +267,13 @@ function spawnWatcher(
 async function waitForServiceActionStatus(
   paths: DesktopCorePaths,
   action: WatcherServiceActionRequest['action'],
+  projectId: string,
 ): Promise<WatcherServiceStatus> {
   const deadline = Date.now() + SERVICE_ACTION_SETTLE_TIMEOUT_MS;
-  let status = readServiceStatus(paths);
+  let status = readServiceStatus(paths, projectId);
   while (!isServiceActionSettled(action, status) && Date.now() < deadline) {
     await delay(SERVICE_ACTION_SETTLE_POLL_MS);
-    status = readServiceStatus(paths);
+    status = readServiceStatus(paths, projectId);
   }
   return status;
 }

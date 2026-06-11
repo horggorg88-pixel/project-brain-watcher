@@ -4,10 +4,10 @@ import { previewDiagnostics } from './desktop-core.js';
 import { type DesktopCorePaths } from './desktop-profile-store.js';
 import { readServiceStatus } from './desktop-service-status.js';
 
-export function listDesktopModeSummaries(paths: DesktopCorePaths): readonly DesktopModeSummary[] {
+export function listDesktopModeSummaries(paths: DesktopCorePaths, projectId?: string): readonly DesktopModeSummary[] {
   const config = discoverMcpConfig(paths);
-  const diagnostics = previewDiagnostics(paths);
-  const service = readServiceStatus(paths);
+  const diagnostics = previewDiagnostics(paths, projectId);
+  const service = readServiceStatus(paths, projectId);
   const runtimeReady = config.found && diagnostics.readiness !== 'deny';
   return [
     mode('brain', 'Brain', 'brain_status', config.found ? 'ready' : 'error', 'Контекст проекта и карта кода', [

@@ -115,7 +115,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle('access:logout', () => logoutAccess(corePaths()));
   ipcMain.handle('ui:load-state', () => readDesktopUiState(corePaths()));
   ipcMain.handle('ui:save-state', (_event, state: DesktopUiState) => saveDesktopUiState(corePaths(), state));
-  ipcMain.handle('service:status', () => readServiceStatus(corePaths()));
+  ipcMain.handle('service:status', (_event, projectId?: string) => readServiceStatus(corePaths(), projectId));
   ipcMain.handle('service:run', (_event, request: WatcherServiceActionRequest) => (
     runServiceAction(corePaths(), request)
   ));
@@ -158,8 +158,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle('mcp:preview-diff', (_event, client: McpDiffPreview['client']) => (
     previewMcpDiff(corePaths(), client)
   ));
-  ipcMain.handle('modes:list', () => listDesktopModeSummaries(corePaths()));
-  ipcMain.handle('diagnostics:preview-export', () => previewDiagnostics(corePaths()));
+  ipcMain.handle('modes:list', (_event, projectId?: string) => listDesktopModeSummaries(corePaths(), projectId));
+  ipcMain.handle('diagnostics:preview-export', (_event, projectId?: string) => previewDiagnostics(corePaths(), projectId));
   ipcMain.handle('clipboard:write-text', (_event, value: string) => {
     clipboard.writeText(value);
   });

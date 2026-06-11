@@ -27,8 +27,8 @@ export interface WindowsServiceState {
   readonly lastError: string | null;
 }
 
-export function readServiceStatus(paths: DesktopCorePaths): WatcherServiceStatus {
-  const profile = readProfiles(paths)[0] ?? defaultProfile(paths);
+export function readServiceStatus(paths: DesktopCorePaths, projectId?: string): WatcherServiceStatus {
+  const profile = resolveServiceProfile(paths, projectId);
   if (!profile) return stoppedStatus(false, 'Проект watcher не настроен');
   const runtimePath = join(profile.root, '.brain', 'watcher-runtime.json');
   const serviceState = readWindowsServiceState(profile);
@@ -56,6 +56,15 @@ export function readServiceStatus(paths: DesktopCorePaths): WatcherServiceStatus
   } catch (error) {
     return { ...stoppedStatus(installed, errorMessage(error), profile), readOnly: true, health: 'read_only' };
   }
+}
+
+export function resolveServiceProfile(paths: DesktopCorePaths, projectId?: string): SavedProjectProfile | null {
+  const profiles = readProfiles(paths);
+  if (!projectId) return profiles[0] ?? defaultProfile(paths);
+  const profile = profiles.find(item => item.id === projectId);
+  if (profile) return profile;
+  const fallback = defaultProfile(paths);
+  return fallback?.id === projectId ? fallback : null;
 }
 
 function stoppedStatus(

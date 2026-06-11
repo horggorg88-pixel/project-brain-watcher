@@ -45,6 +45,12 @@ test('opens the real desktop control panel and proves the dry service rail', asy
     await page.locator('[data-project-select]').selectOption('client-project');
     await expect(page.locator('[data-config-json]')).toContainText('client-project');
     await expect(page.locator('[data-start-prompt]')).toContainText('brain_status(project_id="client-project"');
+    await page.getByRole('button', { name: 'Обзор' }).click();
+    const watcherInstallAction = page.locator('[data-node="watcher"] [data-check-action="install_service"]');
+    await expect(watcherInstallAction).toBeVisible();
+    await expect(watcherInstallAction).toHaveText('Установить службу');
+    await watcherInstallAction.click();
+    await expect(page.locator('[data-service-output]')).toContainText('Подтвердите действие «Установить службу»');
 
     await page.getByRole('button', { name: 'Промт' }).click();
     await expect(page.locator('[data-start-prompt]')).toContainText('BRAIN ON — Brain MCP bootstrap');

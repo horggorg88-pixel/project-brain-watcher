@@ -12,6 +12,7 @@ export type DesktopCheckAction =
   | 'select_project'
   | 'import_config'
   | 'download_config'
+  | 'install_service'
   | 'start_service'
   | 'open_logs'
   | 'verify';
@@ -207,7 +208,7 @@ export interface WatcherDesktopApi {
     saveState(state: DesktopUiState): Promise<DesktopUiState>;
   };
   readonly service: {
-    status(): Promise<WatcherServiceStatus>;
+    status(projectId?: string): Promise<WatcherServiceStatus>;
     run(request: WatcherServiceActionRequest): Promise<WatcherServiceActionResult>;
     fullCheck(projectId: string): Promise<DesktopConnectionCheck>;
   };
@@ -223,10 +224,10 @@ export interface WatcherDesktopApi {
     previewDiff(client: McpDiffPreview['client']): Promise<McpDiffPreview>;
   };
   readonly modes: {
-    list(): Promise<readonly DesktopModeSummary[]>;
+    list(projectId?: string): Promise<readonly DesktopModeSummary[]>;
   };
   readonly diagnostics: {
-    previewExport(): Promise<DiagnosticsPreview>;
+    previewExport(projectId?: string): Promise<DiagnosticsPreview>;
   };
   readonly clipboard: {
     writeText(value: string): Promise<void>;
