@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SavedProjectProfile, SecretAclHealth } from './contracts.js';
 import {
@@ -48,6 +49,13 @@ export function syncDesktopServiceSecretFromEnv(profile: SavedProjectProfile): D
   return stageDesktopServiceSecret(profile, token);
 }
 
+export function syncDesktopServiceSecretFromProjectMcp(profile: SavedProjectProfile): DesktopServiceSecretState | null {
+  const token = readProjectMcpBearerToken(profile);
+  if (!token) return null;
+  if (readDesktopServiceSecret(profile)?.trim() === token) return readDesktopServiceSecretState(profile);
+  return stageDesktopServiceSecret(profile, token);
+}
+
 export function readDesktopServiceSecretState(profile: SavedProjectProfile | null): DesktopServiceSecretState {
   if (!profile) {
     return {
@@ -88,4 +96,30 @@ export function isConcreteBearerToken(token: string | null | undefined): token i
   if (normalized.includes('placeholder') || normalized.includes('replace_me')) return false;
   if (normalized.includes('your_token') || normalized.includes('example_token')) return false;
   return true;
+}
+
+function readProjectMcpBearerToken(profile: SavedProjectProfile): string | null {
+  const path = join(profile.root, '.brain', 'mcp.json');
+  if (!existsSync(path)) return null;
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path, 'utf-8'));
+    if (!isRecord(parsed) || !isRecord(parsed.mcpServers)) return null;
+    const server = parsed.mcpServers['project-brain'];
+    if (!isRecord(server) || !isRecord(server.headers)) return null;
+    const authorization = textValue(server.headers.Authorization) ?? textValue(server.headers.authorization);
+    if (!authorization?.startsWith('Bearer ')) return null;
+    const token = authorization.slice('Bearer '.length).trim();
+    return isConcreteBearerToken(token) ? token : null;
+  } catch (error) {
+    console.warn('Не удалось прочитать .brain/mcp.json для переноса bearer.', error);
+    return null;
+  }
+}
+
+function textValue(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }

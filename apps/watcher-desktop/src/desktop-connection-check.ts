@@ -9,7 +9,11 @@ import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { previewDiagnostics } from './desktop-core.js';
 import { applyMcpConfigToProfile, defaultProfile, readProfiles, type DesktopCorePaths } from './desktop-profile-store.js';
 import { verifyProjectServerAccess } from './desktop-server-access.js';
-import { readDesktopServiceSecretState, readDesktopServiceToken } from './desktop-service-secret.js';
+import {
+  readDesktopServiceSecretState,
+  readDesktopServiceToken,
+  syncDesktopServiceSecretFromProjectMcp,
+} from './desktop-service-secret.js';
 import { readServiceStatus } from './desktop-service-status.js';
 
 export async function buildDesktopConnectionCheck(
@@ -19,6 +23,7 @@ export async function buildDesktopConnectionCheck(
   const profiles = readProfiles(paths);
   const config = discoverMcpConfig(paths);
   const profile = resolveProfile(paths, profiles, projectId, config);
+  if (profile) syncDesktopServiceSecretFromProjectMcp(profile);
   const secret = readDesktopServiceSecretState(profile);
   const token = profile ? readDesktopServiceToken(profile) : null;
   const service = readServiceStatus(paths);

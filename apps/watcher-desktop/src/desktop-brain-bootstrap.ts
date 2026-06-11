@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SavedProjectProfile } from './contracts.js';
 import { buildProjectMcpEndpoint } from './desktop-mcp-endpoint.js';
-import { isConcreteBearerToken } from './desktop-service-secret.js';
+import { isConcreteBearerToken, stageDesktopServiceSecret } from './desktop-service-secret.js';
 
 const BRAIN_DIR = '.brain';
 const BRAIN_CONFIG_FILE = 'config.json';
@@ -36,8 +36,10 @@ export function stageProjectBrainFiles(
 
   mkdirSync(brainDir, { recursive: true });
   writeGitignore(brainDir);
+  const token = isConcreteBearerToken(options.bearerToken) ? options.bearerToken.trim() : null;
   writeFileSync(configPath, `${JSON.stringify(buildBrainConfig(configPath, profile, endpoint), null, 2)}\n`, 'utf-8');
-  writeFileSync(mcpPath, `${JSON.stringify(buildProjectMcpConfig(profile, endpoint, options.bearerToken), null, 2)}\n`, 'utf-8');
+  writeFileSync(mcpPath, `${JSON.stringify(buildProjectMcpConfig(profile, endpoint, token), null, 2)}\n`, 'utf-8');
+  if (token) stageDesktopServiceSecret(profile, token);
   return { staged: true, endpoint, brainDir, configPath, mcpPath, reason: null };
 }
 

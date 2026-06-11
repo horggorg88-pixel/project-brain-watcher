@@ -479,7 +479,7 @@ describe('watcher desktop core', () => {
     const root = join(paths.homePath, 'HyinahiTEst');
     mkdirSync(root, { recursive: true });
     vi.stubEnv('MCP_BEARER_TOKEN', VALID_ENV_BEARER);
-    saveProfile(paths, {
+    const saved = saveProfile(paths, {
       id: 'hyinahitest',
       name: 'HyinahiTEst',
       root,
@@ -517,6 +517,40 @@ describe('watcher desktop core', () => {
     expect(brainMcp.endpoint).toBe('http://149.33.14.250/mcp/p/hyinahitest');
     expect(brainMcp.mcpServers?.['project-brain']?.url).toBe('http://149.33.14.250/mcp/p/hyinahitest');
     expect(brainMcp.mcpServers?.['project-brain']?.headers?.Authorization).toBe(`Bearer ${VALID_ENV_BEARER}`);
+    expect(readDesktopServiceSecret(saved)).toBe(VALID_ENV_BEARER);
+  });
+
+  it('promotes a bearer from project .brain mcp config into the local service secret', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'Client Project');
+    mkdirSync(root, { recursive: true });
+    vi.stubEnv('MCP_BEARER_TOKEN', '');
+    const profile = saveProfile(paths, {
+      id: 'client-project',
+      name: 'Client Project',
+      root,
+      indexId: 'idx-client-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const mcpPath = join(root, '.brain', 'mcp.json');
+    writeFileSync(mcpPath, JSON.stringify({
+      project_id: 'client-project',
+      endpoint: 'http://149.33.14.250/mcp/p/client-project',
+      mcpServers: {
+        'project-brain': {
+          url: 'http://149.33.14.250/mcp/p/client-project',
+          headers: { Authorization: `Bearer ${VALID_TEST_BEARER}` },
+        },
+      },
+    }), 'utf-8');
+    vi.stubGlobal('fetch', verifiedMcpFetch());
+
+    const check = await buildDesktopConnectionCheck(paths, 'client-project');
+
+    expect(readDesktopServiceSecret(profile)).toBe(VALID_TEST_BEARER);
+    expect(check.nodes.find(node => node.id === 'key')?.status).toBe('active');
+    expect(check.nodes.find(node => node.id === 'server')?.status).toBe('active');
   });
 
   it('builds the connection checklist from config, key, server and service state', async () => {
