@@ -499,6 +499,9 @@ describe('watcher desktop core', () => {
     expect(pack.prompt).toContain(`brain_status(project_id="hyinahitest", local_path="${root}")`);
     expect(existsSync(brainConfigPath)).toBe(true);
     expect(existsSync(brainMcpPath)).toBe(true);
+    expect(pack.brainDir).toBe(join(root, '.brain'));
+    expect(pack.brainConfigPath).toBe(brainConfigPath);
+    expect(pack.brainMcpPath).toBe(brainMcpPath);
 
     const brainConfig = JSON.parse(readFileSync(brainConfigPath, 'utf-8')) as Record<string, unknown>;
     const brainMcp = JSON.parse(readFileSync(brainMcpPath, 'utf-8')) as {

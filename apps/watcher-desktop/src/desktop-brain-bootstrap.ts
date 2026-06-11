@@ -13,9 +13,16 @@ const DEFAULT_IGNORE = 'node_modules,dist,.git,.brain,build,out,coverage,__pycac
 export interface DesktopBrainBootstrapResult {
   readonly staged: boolean;
   readonly endpoint: string;
+  readonly brainDir: string;
   readonly configPath: string;
   readonly mcpPath: string;
   readonly reason: string | null;
+}
+
+export interface DesktopBrainFilePaths {
+  readonly brainDir: string;
+  readonly configPath: string;
+  readonly mcpPath: string;
 }
 
 export function stageProjectBrainFiles(
@@ -23,26 +30,34 @@ export function stageProjectBrainFiles(
   options: { readonly bearerToken?: string | null } = {},
 ): DesktopBrainBootstrapResult {
   const endpoint = buildProjectMcpEndpoint(profile.serverUrl, profile.id);
-  const brainDir = join(profile.root, BRAIN_DIR);
-  const configPath = join(brainDir, BRAIN_CONFIG_FILE);
-  const mcpPath = join(brainDir, BRAIN_MCP_FILE);
-  if (!endpoint) return skipped(endpoint, configPath, mcpPath, 'mcp_server_missing');
-  if (!existsSync(profile.root)) return skipped(endpoint, configPath, mcpPath, 'project_root_missing');
+  const { brainDir, configPath, mcpPath } = projectBrainFilePaths(profile);
+  if (!endpoint) return skipped(endpoint, brainDir, configPath, mcpPath, 'mcp_server_missing');
+  if (!existsSync(profile.root)) return skipped(endpoint, brainDir, configPath, mcpPath, 'project_root_missing');
 
   mkdirSync(brainDir, { recursive: true });
   writeGitignore(brainDir);
   writeFileSync(configPath, `${JSON.stringify(buildBrainConfig(configPath, profile, endpoint), null, 2)}\n`, 'utf-8');
   writeFileSync(mcpPath, `${JSON.stringify(buildProjectMcpConfig(profile, endpoint, options.bearerToken), null, 2)}\n`, 'utf-8');
-  return { staged: true, endpoint, configPath, mcpPath, reason: null };
+  return { staged: true, endpoint, brainDir, configPath, mcpPath, reason: null };
+}
+
+export function projectBrainFilePaths(profile: SavedProjectProfile): DesktopBrainFilePaths {
+  const brainDir = join(profile.root, BRAIN_DIR);
+  return {
+    brainDir,
+    configPath: join(brainDir, BRAIN_CONFIG_FILE),
+    mcpPath: join(brainDir, BRAIN_MCP_FILE),
+  };
 }
 
 function skipped(
   endpoint: string,
+  brainDir: string,
   configPath: string,
   mcpPath: string,
   reason: string,
 ): DesktopBrainBootstrapResult {
-  return { staged: false, endpoint, configPath, mcpPath, reason };
+  return { staged: false, endpoint, brainDir, configPath, mcpPath, reason };
 }
 
 function buildBrainConfig(

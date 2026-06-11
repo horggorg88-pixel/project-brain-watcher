@@ -1,13 +1,6 @@
 import { app, BrowserWindow, Tray, Menu, ipcMain, dialog, clipboard } from 'electron';
 import { existsSync, writeFileSync } from 'node:fs';
-import type {
-  AccessLoginRequest,
-  DesktopUiState,
-  McpDiffPreview,
-  ProjectDraft,
-  ProjectImportResult,
-  WatcherServiceActionRequest,
-} from './contracts.js';
+import type { AccessLoginRequest, DesktopConfigSaveResult, DesktopUiState, McpDiffPreview, ProjectDraft, ProjectImportResult, WatcherServiceActionRequest } from './contracts.js';
 import { loginAccess, logoutAccess, readAccessState } from './desktop-access.js';
 import { resolveDesktopAppAssetPaths } from './desktop-app-paths.js';
 import { buildDesktopConfigPackage } from './desktop-config-package.js';
@@ -15,28 +8,16 @@ import { buildDesktopConnectionCheck } from './desktop-connection-check.js';
 import { importProjectConfig } from './desktop-config-import.js';
 import { listDesktopModeSummaries } from './desktop-mode-summary.js';
 import { readDesktopUiState, saveDesktopUiState } from './desktop-ui-state.js';
-import {
-  previewDiagnostics,
-  previewMcpDiff,
-  listDesktopProjectProfiles,
-  readServiceStatus,
-  runServiceAction,
-  saveProfile,
-  type DesktopCorePaths,
-} from './desktop-core.js';
+import { previewDiagnostics, previewMcpDiff, listDesktopProjectProfiles, readServiceStatus, runServiceAction, saveProfile, type DesktopCorePaths } from './desktop-core.js';
 
 const DEBUG_PORT = '9223';
 const desktopDebugEnabled = process.env.PROJECT_BRAIN_DESKTOP_DEBUG === '1';
 const desktopDevToolsEnabled = process.env.PROJECT_BRAIN_DESKTOP_DEVTOOLS === '1';
 const desktopUserDataPath = process.env.PROJECT_BRAIN_DESKTOP_USER_DATA_DIR?.trim();
 
-if (desktopUserDataPath) {
-  app.setPath('userData', desktopUserDataPath);
-}
+if (desktopUserDataPath) app.setPath('userData', desktopUserDataPath);
 
-if (desktopDebugEnabled) {
-  app.commandLine.appendSwitch('remote-debugging-port', DEBUG_PORT);
-}
+if (desktopDebugEnabled) app.commandLine.appendSwitch('remote-debugging-port', DEBUG_PORT);
 
 app.enableSandbox();
 
@@ -54,17 +35,11 @@ app.whenReady().then(() => {
   tray = createTray(mainWindow);
 });
 
-app.on('second-instance', () => {
-  showMainWindow();
-});
+app.on('second-instance', () => showMainWindow());
 
-app.on('activate', () => {
-  showMainWindow();
-});
+app.on('activate', () => showMainWindow());
 
-app.on('before-quit', () => {
-  isQuitting = true;
-});
+app.on('before-quit', () => { isQuitting = true; });
 
 app.on('window-all-closed', () => {
   if (tray) mainWindow?.hide();
@@ -164,7 +139,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle('projects:build-config-package', (_event, projectId: string) => (
     buildDesktopConfigPackage(corePaths(), projectId)
   ));
-  ipcMain.handle('projects:save-config-package', async (_event, projectId: string): Promise<string | null> => {
+  ipcMain.handle('projects:save-config-package', async (_event, projectId: string): Promise<DesktopConfigSaveResult | null> => {
     const pack = buildDesktopConfigPackage(corePaths(), projectId, { bootstrap: true });
     const result = await dialog.showSaveDialog({
       defaultPath: pack.fileName,
@@ -173,7 +148,12 @@ function registerIpcHandlers(): void {
     const targetPath = result.canceled ? null : result.filePath ?? null;
     if (!targetPath) return null;
     writeFileSync(targetPath, pack.configJson, 'utf-8');
-    return targetPath;
+    return {
+      packagePath: targetPath,
+      brainDir: pack.brainDir,
+      brainConfigPath: pack.brainConfigPath,
+      brainMcpPath: pack.brainMcpPath,
+    };
   });
   ipcMain.handle('mcp:preview-diff', (_event, client: McpDiffPreview['client']) => (
     previewMcpDiff(corePaths(), client)

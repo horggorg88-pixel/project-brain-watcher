@@ -68,6 +68,10 @@ describe('watcher desktop contract', () => {
     expect(preloadSource).toContain("ipcRenderer.invoke('window:toggle-maximize'");
     expect(preloadSource).toContain("ipcRenderer.invoke('window:close'");
     expect(contractsSource).toContain('buildConfigPackage(projectId: string)');
+    expect(contractsSource).toContain('saveConfigPackage(projectId: string): Promise<DesktopConfigSaveResult | null>');
+    expect(contractsSource).toContain('brainMcpPath');
+    expect(rendererSource).toContain('Папка Brain-конфигов обновлена');
+    expect(rendererSource).toContain('.brain/mcp.json с bearer');
     expect(contractsSource).toContain('fullCheck(projectId: string)');
     expect(rendererSource).toContain('service.fullCheck');
     expect(rendererSource).toContain('data-check-action');

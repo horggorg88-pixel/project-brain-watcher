@@ -1,6 +1,6 @@
 import { basename } from 'node:path';
 import type { DesktopConfigPackage, SavedProjectProfile } from './contracts.js';
-import { stageProjectBrainFiles } from './desktop-brain-bootstrap.js';
+import { projectBrainFilePaths, stageProjectBrainFiles } from './desktop-brain-bootstrap.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { buildProjectMcpEndpoint } from './desktop-mcp-endpoint.js';
 import { applyMcpConfigToProfile, defaultProfile, readProfiles, type DesktopCorePaths } from './desktop-profile-store.js';
@@ -16,6 +16,7 @@ export function buildDesktopConfigPackage(
 ): DesktopConfigPackage {
   const profile = resolveProfile(paths, projectId);
   const token = readDesktopServiceToken(profile);
+  const brainPaths = projectBrainFilePaths(profile);
   if (options.bootstrap) stageProjectBrainFiles(profile, { bearerToken: token });
   const secret = readDesktopServiceSecretState(profile);
   const endpoint = buildProjectMcpEndpoint(profile.serverUrl, profile.id);
@@ -41,6 +42,9 @@ export function buildDesktopConfigPackage(
   return {
     projectId: profile.id,
     fileName: `${profile.id}-mcp-config.json`,
+    brainDir: brainPaths.brainDir,
+    brainConfigPath: brainPaths.configPath,
+    brainMcpPath: brainPaths.mcpPath,
     configJson: JSON.stringify(payload, null, 2),
     prompt,
     tokenEnv: profile.tokenEnv,

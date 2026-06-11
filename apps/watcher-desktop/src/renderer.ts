@@ -2,6 +2,7 @@ import type {
   DesktopAccessState,
   DesktopCheckAction,
   DesktopConfigPackage,
+  DesktopConfigSaveResult,
   DesktopConnectionCheck,
   DesktopSection,
   DesktopUiState,
@@ -274,8 +275,8 @@ async function runServiceActionFromUi(action: WatcherServiceAction, confirmActio
 }
 
 async function saveCurrentConfigPackage(): Promise<void> {
-  const path = await window.watcherDesktop.projects.saveConfigPackage(currentProjectId());
-  writeLog(path ? `Файл настройки MCP сохранён: ${path}` : 'Скачивание отменено');
+  const result = await window.watcherDesktop.projects.saveConfigPackage(currentProjectId());
+  writeLog(result ? configSaveLog(result) : 'Скачивание отменено');
 }
 
 async function importConfigFromDialog(): Promise<void> {
@@ -496,6 +497,15 @@ function importResultLog(result: ProjectImportResult): string {
   const warnings = result.warnings.length ? `\n${result.warnings.join('\n')}` : '';
   if (!result.profile) return `Личный MCP-доступ импортирован${warnings}`;
   return `Файл настройки MCP импортирован: ${result.profile.name}${warnings}`;
+}
+
+function configSaveLog(result: DesktopConfigSaveResult): string {
+  return [
+    `Файл настройки MCP сохранён: ${result.packagePath}`,
+    `Папка Brain-конфигов обновлена: ${result.brainDir}`,
+    `.brain/config.json: ${result.brainConfigPath}`,
+    `.brain/mcp.json с bearer: ${result.brainMcpPath}`,
+  ].join('\n');
 }
 
 function checkActionFrom(value: string | undefined): DesktopCheckAction | null {

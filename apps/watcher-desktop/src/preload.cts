@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type {
   AccessLoginRequest,
   DesktopConfigPackage,
+  DesktopConfigSaveResult,
   DesktopConnectionCheck,
   DesktopAccessState,
   DesktopModeSummary,
@@ -53,7 +54,7 @@ const api: WatcherDesktopApi = {
       ipcRenderer.invoke('projects:build-config-package', projectId) as Promise<DesktopConfigPackage>
     ),
     saveConfigPackage: (projectId: string) => (
-      ipcRenderer.invoke('projects:save-config-package', projectId) as Promise<string | null>
+      ipcRenderer.invoke('projects:save-config-package', projectId) as Promise<DesktopConfigSaveResult | null>
     ),
   },
   mcp: {

@@ -160,6 +160,9 @@ export interface DesktopConnectionCheck {
 export interface DesktopConfigPackage {
   readonly projectId: string;
   readonly fileName: string;
+  readonly brainDir: string;
+  readonly brainConfigPath: string;
+  readonly brainMcpPath: string;
   readonly configJson: string;
   readonly prompt: string;
   readonly tokenEnv: string;
@@ -167,6 +170,13 @@ export interface DesktopConfigPackage {
   readonly tokenPreview: string;
   readonly tokenValue: string | null;
   readonly secretPath: string | null;
+}
+
+export interface DesktopConfigSaveResult {
+  readonly packagePath: string;
+  readonly brainDir: string;
+  readonly brainConfigPath: string;
+  readonly brainMcpPath: string;
 }
 
 export interface DesktopModeRailStage {
@@ -207,7 +217,7 @@ export interface WatcherDesktopApi {
     selectRoot(): Promise<string | null>;
     importConfig(): Promise<ProjectImportResult | null>;
     buildConfigPackage(projectId: string): Promise<DesktopConfigPackage>;
-    saveConfigPackage(projectId: string): Promise<string | null>;
+    saveConfigPackage(projectId: string): Promise<DesktopConfigSaveResult | null>;
   };
   readonly mcp: {
     previewDiff(client: McpDiffPreview['client']): Promise<McpDiffPreview>;
