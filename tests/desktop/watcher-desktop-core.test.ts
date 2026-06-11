@@ -146,6 +146,81 @@ describe('watcher desktop core', () => {
     expect(brainMcp.mcpServers?.['project-brain']?.headers?.Authorization).toBe(`Bearer ${VALID_TEST_BEARER}`);
   });
 
+  it('blocks project package bootstrap when no concrete bearer is available', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'Client Project');
+    mkdirSync(root, { recursive: true });
+    vi.stubEnv('MCP_BEARER_TOKEN', '');
+
+    const profile = saveProfile(paths, {
+      id: 'client-project',
+      name: 'Client Project',
+      root,
+      indexId: 'idx-client-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const pack = buildDesktopConfigPackage(paths, 'client-project');
+
+    expect(pack.tokenAvailable).toBe(false);
+    expect(existsSync(join(root, '.brain', 'mcp.json'))).toBe(false);
+    expect(() => buildDesktopConfigPackage(paths, 'client-project', { bootstrap: true }))
+      .toThrow(/Bearer для MCP_BEARER_TOKEN не найден/);
+  });
+
+  it('repairs a stale placeholder project package after account login returns a bearer', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'HyinahiTEst');
+    mkdirSync(join(root, '.brain'), { recursive: true });
+    vi.stubEnv('MCP_BEARER_TOKEN', '');
+    const profile = saveProfile(paths, {
+      id: 'hyinahitest',
+      name: 'HyinahiTEst',
+      root,
+      indexId: 'idx-hyinahitest',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    writeFileSync(join(root, '.brain', 'mcp.json'), JSON.stringify({
+      project_id: 'hyinahitest',
+      endpoint: 'http://149.33.14.250/mcp/p/hyinahitest',
+      mcpServers: {
+        'project-brain': {
+          url: 'http://149.33.14.250/mcp/p/hyinahitest',
+          headers: { Authorization: 'Bearer ${MCP_BEARER_TOKEN}' },
+        },
+      },
+    }), 'utf-8');
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === 'http://149.33.14.250/api/auth/access') {
+        const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : {};
+        expect(body.email).toBe('client@example.com');
+        expect(body.password).toBe('password123');
+        return new Response(JSON.stringify({
+          ok: true,
+          serverConfig: {
+            serverUrl: 'http://149.33.14.250',
+            bearerToken: VALID_TEST_BEARER,
+            tokenEnv: 'MCP_BEARER_TOKEN',
+          },
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return verifiedMcpFetch()(input, init);
+    }));
+
+    const state = await loginAccess(paths, { email: 'client@example.com', password: 'password123' });
+    const pack = buildDesktopConfigPackage(paths, 'hyinahitest', { bootstrap: true });
+    const brainMcp = JSON.parse(readFileSync(join(root, '.brain', 'mcp.json'), 'utf-8')) as {
+      readonly mcpServers?: Record<string, { readonly headers?: Record<string, string> }>;
+    };
+
+    expect(state.serverVerified).toBe(true);
+    expect(readDesktopServiceSecret(profile)).toBe(VALID_TEST_BEARER);
+    expect(pack.tokenAvailable).toBe(true);
+    expect(pack.configJson).toContain(`Bearer ${VALID_TEST_BEARER}`);
+    expect(brainMcp.mcpServers?.['project-brain']?.headers?.Authorization).toBe(`Bearer ${VALID_TEST_BEARER}`);
+  });
+
   it('requires explicit confirmation before service actions', async () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'repo');
@@ -534,6 +609,7 @@ describe('watcher desktop core', () => {
       tokenEnv: 'MCP_BEARER_TOKEN',
     });
     const mcpPath = join(root, '.brain', 'mcp.json');
+    mkdirSync(join(root, '.brain'), { recursive: true });
     writeFileSync(mcpPath, JSON.stringify({
       project_id: 'client-project',
       endpoint: 'http://149.33.14.250/mcp/p/client-project',
@@ -551,6 +627,57 @@ describe('watcher desktop core', () => {
     expect(readDesktopServiceSecret(profile)).toBe(VALID_TEST_BEARER);
     expect(check.nodes.find(node => node.id === 'key')?.status).toBe('active');
     expect(check.nodes.find(node => node.id === 'server')?.status).toBe('active');
+  });
+
+  it('promotes a bearer from the saved project package when .brain mcp still has a placeholder', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'HyinahiTEst');
+    mkdirSync(join(root, '.brain'), { recursive: true });
+    vi.stubEnv('MCP_BEARER_TOKEN', '');
+    const profile = saveProfile(paths, {
+      id: 'hyinahitest',
+      name: 'HyinahiTEst',
+      root,
+      indexId: 'idx-hyinahitest',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    writeFileSync(join(root, '.brain', 'mcp.json'), JSON.stringify({
+      project_id: 'hyinahitest',
+      endpoint: 'http://149.33.14.250/mcp/p/hyinahitest',
+      mcpServers: {
+        'project-brain': {
+          url: 'http://149.33.14.250/mcp/p/hyinahitest',
+          headers: { Authorization: 'Bearer ${MCP_BEARER_TOKEN}' },
+        },
+      },
+    }), 'utf-8');
+    writeFileSync(join(root, 'hyinahitest-mcp-config.json'), JSON.stringify({
+      projectBrain: {
+        projectId: 'hyinahitest',
+        localPath: root,
+        tokenEnv: 'MCP_BEARER_TOKEN',
+      },
+      mcpServers: {
+        'project-brain': {
+          url: 'http://149.33.14.250/mcp/p/hyinahitest',
+          headers: { Authorization: `Bearer ${VALID_TEST_BEARER}` },
+        },
+      },
+    }), 'utf-8');
+    vi.stubGlobal('fetch', verifiedMcpFetch());
+
+    const check = await buildDesktopConnectionCheck(paths, 'hyinahitest');
+    const pack = buildDesktopConfigPackage(paths, 'hyinahitest', { bootstrap: true });
+    const brainMcp = JSON.parse(readFileSync(join(root, '.brain', 'mcp.json'), 'utf-8')) as {
+      readonly mcpServers?: Record<string, { readonly headers?: Record<string, string> }>;
+    };
+
+    expect(readDesktopServiceSecret(profile)).toBe(VALID_TEST_BEARER);
+    expect(check.nodes.find(node => node.id === 'key')?.status).toBe('active');
+    expect(check.nodes.find(node => node.id === 'server')?.status).toBe('active');
+    expect(pack.tokenAvailable).toBe(true);
+    expect(brainMcp.mcpServers?.['project-brain']?.headers?.Authorization).toBe(`Bearer ${VALID_TEST_BEARER}`);
   });
 
   it('builds the connection checklist from config, key, server and service state', async () => {

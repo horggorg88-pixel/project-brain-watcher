@@ -50,7 +50,7 @@ export function syncDesktopServiceSecretFromEnv(profile: SavedProjectProfile): D
 }
 
 export function syncDesktopServiceSecretFromProjectMcp(profile: SavedProjectProfile): DesktopServiceSecretState | null {
-  const token = readProjectMcpBearerToken(profile);
+  const token = readProjectMcpBearerToken(profile) ?? readProjectConfigPackageBearerToken(profile);
   if (!token) return null;
   if (readDesktopServiceSecret(profile)?.trim() === token) return readDesktopServiceSecretState(profile);
   return stageDesktopServiceSecret(profile, token);
@@ -100,6 +100,15 @@ export function isConcreteBearerToken(token: string | null | undefined): token i
 
 function readProjectMcpBearerToken(profile: SavedProjectProfile): string | null {
   const path = join(profile.root, '.brain', 'mcp.json');
+  return readMcpConfigBearerToken(path);
+}
+
+function readProjectConfigPackageBearerToken(profile: SavedProjectProfile): string | null {
+  const path = join(profile.root, `${profile.id}-mcp-config.json`);
+  return readMcpConfigBearerToken(path);
+}
+
+function readMcpConfigBearerToken(path: string): string | null {
   if (!existsSync(path)) return null;
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, 'utf-8'));
@@ -111,7 +120,7 @@ function readProjectMcpBearerToken(profile: SavedProjectProfile): string | null 
     const token = authorization.slice('Bearer '.length).trim();
     return isConcreteBearerToken(token) ? token : null;
   } catch (error) {
-    console.warn('Не удалось прочитать .brain/mcp.json для переноса bearer.', error);
+    console.warn(`Не удалось прочитать MCP config для переноса bearer: ${path}`, error);
     return null;
   }
 }

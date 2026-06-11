@@ -1,5 +1,6 @@
 import { basename } from 'node:path';
 import type { DesktopConfigPackage, SavedProjectProfile } from './contracts.js';
+import { readDesktopAccessHandoffToken } from './desktop-access-handoff.js';
 import { projectBrainFilePaths, stageProjectBrainFiles } from './desktop-brain-bootstrap.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { buildProjectMcpEndpoint } from './desktop-mcp-endpoint.js';
@@ -7,6 +8,8 @@ import { applyMcpConfigToProfile, defaultProfile, readProfiles, type DesktopCore
 import {
   readDesktopServiceToken,
   readDesktopServiceSecretState,
+  stageDesktopServiceSecret,
+  syncDesktopServiceSecretFromProjectMcp,
 } from './desktop-service-secret.js';
 
 export function buildDesktopConfigPackage(
@@ -15,9 +18,12 @@ export function buildDesktopConfigPackage(
   options: { readonly bootstrap?: boolean } = {},
 ): DesktopConfigPackage {
   const profile = resolveProfile(paths, projectId);
-  const token = readDesktopServiceToken(profile);
+  const token = resolvePackageToken(paths, profile);
   const brainPaths = projectBrainFilePaths(profile);
-  if (options.bootstrap) stageProjectBrainFiles(profile, { bearerToken: token });
+  if (options.bootstrap) {
+    if (!token) throw new Error(`Bearer для ${profile.tokenEnv} не найден. Войдите в пульт заново, затем скачайте пакет подключения.`);
+    stageProjectBrainFiles(profile, { bearerToken: token });
+  }
   const secret = readDesktopServiceSecretState(profile);
   const endpoint = buildProjectMcpEndpoint(profile.serverUrl, profile.id);
   const prompt = buildStartPrompt(profile, endpoint);
@@ -89,4 +95,16 @@ function maskToken(token: string): string {
 
 export function readableProjectName(root: string): string {
   return basename(root.trim()) || 'MCP project';
+}
+
+function resolvePackageToken(paths: DesktopCorePaths, profile: SavedProjectProfile): string | null {
+  const serviceToken = readDesktopServiceToken(profile);
+  if (serviceToken) return serviceToken;
+  syncDesktopServiceSecretFromProjectMcp(profile);
+  const packageToken = readDesktopServiceToken(profile);
+  if (packageToken) return packageToken;
+  const handoffToken = readDesktopAccessHandoffToken(paths);
+  if (!handoffToken) return null;
+  stageDesktopServiceSecret(profile, handoffToken);
+  return handoffToken;
 }

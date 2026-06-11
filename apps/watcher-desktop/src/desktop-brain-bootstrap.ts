@@ -34,12 +34,14 @@ export function stageProjectBrainFiles(
   if (!endpoint) return skipped(endpoint, brainDir, configPath, mcpPath, 'mcp_server_missing');
   if (!existsSync(profile.root)) return skipped(endpoint, brainDir, configPath, mcpPath, 'project_root_missing');
 
+  const token = isConcreteBearerToken(options.bearerToken) ? options.bearerToken.trim() : null;
+  if (!token) return skipped(endpoint, brainDir, configPath, mcpPath, 'bearer_missing');
+
   mkdirSync(brainDir, { recursive: true });
   writeGitignore(brainDir);
-  const token = isConcreteBearerToken(options.bearerToken) ? options.bearerToken.trim() : null;
   writeFileSync(configPath, `${JSON.stringify(buildBrainConfig(configPath, profile, endpoint), null, 2)}\n`, 'utf-8');
   writeFileSync(mcpPath, `${JSON.stringify(buildProjectMcpConfig(profile, endpoint, token), null, 2)}\n`, 'utf-8');
-  if (token) stageDesktopServiceSecret(profile, token);
+  stageDesktopServiceSecret(profile, token);
   return { staged: true, endpoint, brainDir, configPath, mcpPath, reason: null };
 }
 
