@@ -190,13 +190,68 @@ h3 {
 }
 
 .check-row p,
-.mode-card p,
 .diagnostic-row p,
 .project-row p {
   margin: 4px 0 0;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
+}
+
+.mode-card {
+  display: grid;
+  gap: 10px;
+}
+
+.mode-card h4 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.mode-card p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.mode-summary {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mode-description,
+.mode-facts {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mode-facts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.mode-facts div {
+  min-width: 0;
+}
+
+.mode-facts dt {
+  margin-bottom: 3px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.mode-facts dd {
+  margin: 0;
+}
+
+.mode-facts ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
 }
 
 .code-block {

@@ -5,9 +5,7 @@ import type {
   DesktopModeSummary,
   DesktopSection,
   DesktopUiState,
-  DiagnosticsPreview,
   McpConfigDiscovery,
-  McpDiffPreview,
   SavedProjectProfile,
   WatcherServiceStatus,
 } from './contracts.js';
@@ -112,32 +110,37 @@ export function renderProjects(projects: readonly SavedProjectProfile[], element
 
 export function renderModes(modes: readonly DesktopModeSummary[], element: HTMLElement | null): void {
   if (!element) return;
-  element.innerHTML = modes.map(mode => (
-    `<article class="mode-card" data-status="${mode.status}">
-      <div class="panel-head">
-        <div><h3>${escapeHtml(mode.title)}</h3><span>${escapeHtml(mode.technicalName)}</span></div>
-        <strong>${escapeHtml(mode.status === 'ready' ? 'Готов' : mode.status === 'error' ? 'Ошибка' : 'Действие')}</strong>
+  const groups = [...new Set(modes.map(mode => mode.group))];
+  element.innerHTML = groups.map(group => (
+    `<section class="mode-group">
+      <div class="mode-group-head">
+        <h3>${escapeHtml(group)}</h3>
+        <span>${modes.filter(mode => mode.group === group).length} режимов</span>
       </div>
-      <p>${escapeHtml(mode.summary)}</p>
-      <div class="rail-line">${mode.rails.map(stage => `<span class="${stage.active ? 'active' : ''}" title="${escapeHtml(stage.detail)}">${escapeHtml(stage.label)}</span>`).join('')}</div>
-    </article>`
+      <div class="mode-grid">
+        ${modes.filter(mode => mode.group === group).map(renderModeCard).join('')}
+      </div>
+    </section>`
   )).join('');
 }
 
-export function renderDiagnostics(diagnostics: DiagnosticsPreview, element: HTMLElement | null): void {
-  if (!element) return;
-  const findings = diagnostics.findings.length ? diagnostics.findings : ['Проблем не найдено'];
-  element.innerHTML = findings.map((finding, index) => (
-    `<article class="diagnostic-row">
-      <strong>${index + 1}. ${escapeHtml(finding)}</strong>
-      <p>Влияние: ${diagnostics.blocked ? 'контур требует исправления' : 'можно продолжать работу'}</p>
-      <button type="button" class="ghost" data-nav-section="start">Открыть чеклист</button>
-    </article>`
-  )).join('');
-}
-
-export function renderDiff(diff: McpDiffPreview, element: HTMLElement | null): void {
-  setText(element, `${diff.configPath}\nРезервная копия: ${diff.backupRequired ? 'да' : 'нет'}\n${diff.changes.join('\n')}`);
+function renderModeCard(mode: DesktopModeSummary): string {
+  return `<article class="mode-card" data-status="${mode.status}">
+    <div class="panel-head">
+      <div>
+        <h4>${escapeHtml(mode.title)}</h4>
+        <span>${escapeHtml(mode.technicalName)}</span>
+      </div>
+      <strong>${escapeHtml(mode.status === 'ready' ? 'Готов' : mode.status === 'error' ? 'Ошибка' : 'Действие')}</strong>
+    </div>
+    <p class="mode-summary">${escapeHtml(mode.summary)}</p>
+    <p class="mode-description">${escapeHtml(mode.description)}</p>
+    <dl class="mode-facts">
+      <div><dt>Когда применять</dt><dd>${escapeHtml(mode.whenToUse)}</dd></div>
+      <div><dt>Кейсы</dt><dd><ul>${mode.useCases.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></dd></div>
+    </dl>
+    <div class="rail-line">${mode.rails.map(stage => `<span class="${stage.active ? 'active' : ''}" title="${escapeHtml(stage.detail)}">${escapeHtml(stage.label)}</span>`).join('')}</div>
+  </article>`;
 }
 
 export function hydrateProjectForm(
@@ -186,7 +189,7 @@ export function errorMessage(error: unknown): string {
 }
 
 export function sectionFrom(value: string | undefined): DesktopSection | null {
-  const sections: readonly DesktopSection[] = ['start', 'mcp', 'prompt', 'watcher', 'projects', 'modes', 'diagnostics', 'settings'];
+  const sections: readonly DesktopSection[] = ['start', 'prompt', 'watcher', 'projects', 'modes'];
   return typeof value === 'string' && sections.includes(value as DesktopSection) ? value as DesktopSection : null;
 }
 
@@ -228,7 +231,7 @@ function serviceSummary(status: WatcherServiceStatus): string {
 function serviceNextStep(status: WatcherServiceStatus): string {
   if (!status.installed) return 'Установите службу watcher';
   if (!status.running) return 'Запустите watcher';
-  if (status.health !== 'healthy') return 'Откройте диагностику и проверьте MCP-доступ';
+  if (status.health !== 'healthy') return 'Проверьте обзорный чеклист и MCP-доступ';
   return 'Можно работать через MCP';
 }
 

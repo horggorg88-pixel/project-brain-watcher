@@ -7,7 +7,6 @@ import type {
   DesktopSection,
   DesktopUiState,
   DiagnosticsPreview,
-  McpDiffPreview,
   ProjectDraft,
   ProjectImportResult,
   SavedProjectProfile,
@@ -23,8 +22,6 @@ import {
   hydrateProjectForm,
   renderConfigPackage,
   renderConnectionCheck,
-  renderDiagnostics,
-  renderDiff,
   renderModes,
   renderOverall,
   renderProjectSelect,
@@ -58,10 +55,8 @@ const sections = document.querySelectorAll<HTMLElement>('[data-section]');
 const projectSelect = document.querySelector<HTMLSelectElement>('[data-project-select]');
 const selectRootButton = document.querySelector<HTMLButtonElement>('[data-select-root]');
 const downloadConfigButton = document.querySelector<HTMLButtonElement>('[data-download-config]');
-const copyConfigButton = document.querySelector<HTMLButtonElement>('[data-copy-config]');
 const copyPromptButton = document.querySelector<HTMLButtonElement>('[data-copy-prompt]');
 const toggleThemeButton = document.querySelector<HTMLButtonElement>('[data-toggle-theme]');
-const toggleKeyButton = document.querySelector<HTMLButtonElement>('[data-toggle-key]');
 const runFullCheckButton = document.querySelector<HTMLButtonElement>('[data-run-full-check]');
 const consoleToggleButton = document.querySelector<HTMLButtonElement>('[data-console-toggle]');
 const bottomConsoleEl = document.querySelector<HTMLElement>('[data-bottom-console]');
@@ -71,15 +66,9 @@ const serviceSummaryEl = document.querySelector<HTMLElement>('[data-service-summ
 const serviceStatusEl = document.querySelector<HTMLElement>('[data-service-status]');
 const serviceOutputEl = document.querySelector<HTMLElement>('[data-service-output]');
 const serviceButtons = document.querySelectorAll<HTMLButtonElement>('[data-service-action]');
-const configFileEl = document.querySelector<HTMLElement>('[data-config-file]');
-const configJsonEl = document.querySelector<HTMLElement>('[data-config-json]');
-const configStatusEl = document.querySelector<HTMLElement>('[data-config-status]');
-const keyPreviewEl = document.querySelector<HTMLElement>('[data-key-preview]');
 const promptEl = document.querySelector<HTMLElement>('[data-start-prompt]');
 const projectListEl = document.querySelector<HTMLElement>('[data-projects]');
 const modesEl = document.querySelector<HTMLElement>('[data-modes]');
-const diagnosticsEl = document.querySelector<HTMLElement>('[data-diagnostics]');
-const diffEl = document.querySelector<HTMLElement>('[data-mcp-diff]');
 const windowTitlebarEl = document.querySelector<HTMLElement>('[data-window-titlebar]');
 
 let accessState: DesktopAccessState | null = null;
@@ -152,12 +141,6 @@ downloadConfigButton?.addEventListener('click', () => {
   void saveCurrentConfigPackage();
 });
 
-copyConfigButton?.addEventListener('click', () => {
-  void copyText(currentPackage?.configJson ?? '')
-    .then(() => writeLog('Файл настройки MCP скопирован'))
-    .catch(error => writeLog(errorMessage(error)));
-});
-
 copyPromptButton?.addEventListener('click', () => {
   void copyText(currentPackage?.prompt ?? '')
     .then(() => writeLog('Стартовый prompt скопирован'))
@@ -167,10 +150,6 @@ copyPromptButton?.addEventListener('click', () => {
 toggleThemeButton?.addEventListener('click', () => {
   const theme = uiState.theme === 'light' ? 'dark' : 'light';
   void saveUiState({ ...uiState, theme }).then(() => renderUiState());
-});
-
-toggleKeyButton?.addEventListener('click', () => {
-  void saveUiState({ ...uiState, keyVisible: !uiState.keyVisible }).then(() => renderCurrentPackage());
 });
 
 consoleToggleButton?.addEventListener('click', () => {
@@ -199,15 +178,6 @@ checklistEl?.addEventListener('click', event => {
   const button = target.closest<HTMLButtonElement>('[data-check-action]');
   if (!button) return;
   void handleCheckAction(button.dataset.checkAction).catch(error => writeLog(errorMessage(error)));
-});
-
-diagnosticsEl?.addEventListener('click', event => {
-  const target = event.target;
-  if (!(target instanceof Element)) return;
-  const button = target.closest<HTMLButtonElement>('[data-nav-section]');
-  const activeSection = sectionFrom(button?.dataset.navSection);
-  if (!activeSection) return;
-  void goToSection(activeSection);
 });
 
 serviceButtons.forEach(button => {
@@ -240,7 +210,7 @@ async function handleCheckAction(value: string | undefined): Promise<void> {
     case 'verify':
       writeLog('Проверяем MCP-сервер, ключ доступа и watcher...');
       await refresh();
-      writeLog('Проверка завершена. Результат обновлён в чеклисте и диагностике.');
+      writeLog('Проверка завершена. Результат обновлён в обзорном чеклисте.');
       return;
     case 'open_logs':
       await saveUiState({ ...uiState, consoleOpen: true });
@@ -313,11 +283,10 @@ async function refresh(): Promise<void> {
   currentProjects = await safeProjects();
   renderProjectSelect(currentProjects, projectSelect, currentProjectId());
   hydrateProjectForm(projectForm, selectedProject(), accessState.config);
-  const [check, pack, modes, diff] = await Promise.all([
+  const [check, pack, modes] = await Promise.all([
     safeFullCheck(),
     safeConfigPackage(),
     safeModes(),
-    safeDiff(),
   ]);
   currentPackage = pack;
   renderOverall(check, overallStatusEl);
@@ -326,8 +295,6 @@ async function refresh(): Promise<void> {
   renderCurrentPackage();
   renderProjects(currentProjects, projectListEl);
   renderModes(modes, modesEl);
-  renderDiagnostics(check.diagnostics, diagnosticsEl);
-  renderDiff(diff, diffEl);
 }
 
 async function safeAccessStatus(): Promise<DesktopAccessState> {
@@ -382,14 +349,6 @@ async function safeModes() {
   }
 }
 
-async function safeDiff(): Promise<McpDiffPreview> {
-  try {
-    return await window.watcherDesktop.mcp.previewDiff('generic');
-  } catch (error) {
-    return { client: 'generic', configPath: 'недоступно', backupRequired: true, changes: [errorMessage(error)] };
-  }
-}
-
 async function saveUiState(next: DesktopUiState): Promise<void> {
   uiState = await window.watcherDesktop.ui.saveState(next);
 }
@@ -409,11 +368,10 @@ function renderUiState(): void {
 function renderCurrentPackage(): void {
   renderConfigPackage(
     currentPackage,
-    { configFileEl, configJsonEl, configStatusEl, keyPreviewEl, promptEl },
+    { configFileEl: null, configJsonEl: null, configStatusEl: null, keyPreviewEl: null, promptEl },
     uiState.keyVisible,
     accessState?.serverVerified === true,
   );
-  setText(toggleKeyButton, uiState.keyVisible ? 'Скрыть' : 'Показать');
 }
 
 function currentProjectId(): string {
@@ -457,7 +415,7 @@ function fallbackCheck(message: string): DesktopConnectionCheck {
     message: 'Проверка подключения не завершена',
     projectId: null,
     checkedAt: new Date().toISOString(),
-    nodes: [{ id: 'runtime', label: 'Проверка подключения', status: 'error', detail: message, action: 'open_logs', actionLabel: 'Показать диагностику' }],
+    nodes: [{ id: 'runtime', label: 'Проверка подключения', status: 'error', detail: message, action: 'open_logs', actionLabel: 'Показать логи' }],
     service: fallbackStatus(message),
     diagnostics,
   };

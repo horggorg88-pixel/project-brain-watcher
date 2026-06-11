@@ -33,18 +33,15 @@ test('opens the real desktop control panel and proves the dry service rail', asy
     await expect(page.locator('[data-profile-card]')).toContainText('Пульт готов');
     await expect(page.getByRole('heading', { name: 'Проверка контура' })).toBeVisible();
     await expect(page.locator('[data-overall-status]')).not.toHaveText('Проверяем...');
-
-    await page.getByRole('button', { name: 'Конфиг' }).click();
-    await expect(page.locator('[data-section="mcp"]')).toBeVisible();
-    await expect(page.locator('[data-config-json]')).toContainText('project-brain');
-    await expect(page.locator('[data-config-json]')).toContainText(`Bearer ${fakeBearer}`);
-    await page.locator('[data-copy-config]').click();
-    await expect(page.locator('[data-service-output]')).toContainText('Файл настройки MCP скопирован');
-    expect(await readClipboard(app)).toContain(`Bearer ${fakeBearer}`);
+    await expect(page.getByRole('button', { name: 'Конфиг' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Диагностика' })).toHaveCount(0);
+    await expect(page.locator('[data-nav-section="settings"]')).toHaveCount(0);
+    await expect(page.locator('[data-section="mcp"]')).toHaveCount(0);
+    await expect(page.locator('[data-section="diagnostics"]')).toHaveCount(0);
+    await expect(page.locator('[data-section="settings"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Скачать файл настройки' })).toBeVisible();
 
     await page.locator('[data-project-select]').selectOption('client-project');
-    await expect(page.locator('[data-config-json]')).toContainText('client-project');
-    await expect(page.locator('[data-start-prompt]')).toContainText('brain_status(project_id="client-project"');
     await page.getByRole('button', { name: 'Обзор' }).click();
     const watcherInstallAction = page.locator('[data-node="watcher"] [data-check-action="install_service"]');
     await expect(watcherInstallAction).toBeVisible();
@@ -63,6 +60,15 @@ test('opens the real desktop control panel and proves the dry service rail', asy
     await page.locator('[data-copy-prompt]').click();
     await expect(page.locator('[data-service-output]')).toContainText('Стартовый prompt скопирован');
     expect(await readClipboard(app)).toContain('brain_status(project_id="client-project"');
+
+    await page.getByRole('button', { name: 'Режимы' }).click();
+    await expect(page.locator('[data-section="modes"]')).toBeVisible();
+    await expect(page.locator('[data-modes]')).toContainText('Основные MCP-режимы');
+    await expect(page.locator('[data-modes]')).toContainText('Операторские режимы');
+    await expect(page.locator('[data-modes]')).toContainText('Runtime, Policy, Gates');
+    await expect(page.locator('[data-modes]')).toContainText('Когда применять');
+    await expect(page.locator('[data-modes]')).toContainText('Wave не стартует без runtime_session_id и policy_context_pack.');
+    await page.screenshot({ path: testInfo.outputPath('desktop-modes-page.png'), fullPage: true });
 
     await page.getByRole('button', { name: 'Watcher' }).click();
     await expect(page.locator('[data-section="watcher"]')).toBeVisible();

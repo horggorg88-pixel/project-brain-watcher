@@ -853,8 +853,26 @@ describe('watcher desktop core', () => {
 
     const modes = listDesktopModeSummaries(paths);
 
-    expect(modes.map(mode => mode.id)).toEqual(['brain', 'wave', 'idol', 'swarm', 'watcher']);
+    expect(modes.map(mode => mode.id)).toEqual([
+      'brain',
+      'wave',
+      'idol',
+      'swarm',
+      'watcher',
+      'consultation',
+      'active',
+      'fix-loop',
+      'deep-analysis',
+      'review',
+      'council',
+      'audit',
+      'refactor',
+      'runtime-policy-gates',
+      'todoist-sync',
+    ]);
     expect(modes.find(mode => mode.id === 'idol')?.rails.length).toBeGreaterThan(0);
+    expect(modes.find(mode => mode.id === 'wave')?.description).toContain('три волны');
+    expect(modes.find(mode => mode.id === 'runtime-policy-gates')?.useCases).toContain('Wave не стартует без runtime_session_id и policy_context_pack.');
   });
 
   it('opens a local desktop session only after valid credentials and config discovery', async () => {

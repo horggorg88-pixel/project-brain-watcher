@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { DesktopSection, DesktopTheme, DesktopUiState } from './contracts.js';
 import type { DesktopCorePaths } from './desktop-profile-store.js';
 
-const SECTIONS: readonly DesktopSection[] = ['start', 'mcp', 'prompt', 'watcher', 'projects', 'modes', 'diagnostics', 'settings'];
+const SECTIONS: readonly DesktopSection[] = ['start', 'prompt', 'watcher', 'projects', 'modes'];
 const THEMES: readonly DesktopTheme[] = ['light', 'dark'];
 
 export function defaultDesktopUiState(): DesktopUiState {

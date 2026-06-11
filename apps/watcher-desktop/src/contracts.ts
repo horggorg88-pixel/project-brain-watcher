@@ -4,7 +4,7 @@ export type WatcherPolicyDecision = 'allow' | 'prompt' | 'deny';
 export type WatcherPolicyRisk = 'low' | 'medium' | 'high';
 export type McpConfigSource = 'codex' | 'claude' | 'cursor' | 'generic' | 'none';
 export type DesktopTheme = 'light' | 'dark';
-export type DesktopSection = 'start' | 'mcp' | 'prompt' | 'watcher' | 'projects' | 'modes' | 'diagnostics' | 'settings';
+export type DesktopSection = 'start' | 'prompt' | 'watcher' | 'projects' | 'modes';
 export type DesktopOverallStatus = 'ready' | 'action_required' | 'error';
 export type DesktopCheckStatus = 'active' | 'inactive' | 'waiting' | 'error';
 export type DesktopCheckAction =
@@ -201,8 +201,12 @@ export interface DesktopModeSummary {
   readonly id: string;
   readonly title: string;
   readonly technicalName: string;
+  readonly group: string;
   readonly status: DesktopModeStatus;
   readonly summary: string;
+  readonly description: string;
+  readonly whenToUse: string;
+  readonly useCases: readonly string[];
   readonly primaryAction: string;
   readonly rails: readonly DesktopModeRailStage[];
 }

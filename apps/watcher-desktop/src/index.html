@@ -45,13 +45,10 @@
           <button type="button" data-nav-section="start">Обзор</button>
           <button type="button" data-nav-section="watcher">Watcher</button>
           <p>Контур MCP</p>
-          <button type="button" data-nav-section="mcp">Конфиг</button>
           <button type="button" data-nav-section="prompt">Промт</button>
           <button type="button" data-nav-section="modes">Режимы</button>
           <p>Проект</p>
           <button type="button" data-nav-section="projects">Проекты</button>
-          <button type="button" data-nav-section="diagnostics">Диагностика</button>
-          <button type="button" data-nav-section="settings">Настройки</button>
         </nav>
 
         <section class="account-card" data-profile-card hidden></section>
@@ -79,34 +76,6 @@
             <button type="button" data-run-full-check>Проверить подключение</button>
           </div>
           <div class="checklist" data-checklist></div>
-        </section>
-
-        <section class="content-section" data-section="mcp" hidden>
-          <div class="section-head">
-            <div>
-              <p class="eyebrow">конфиг и ключ</p>
-              <h2>MCP-пакет</h2>
-            </div>
-            <button type="button" data-copy-config>Копировать файл настройки</button>
-          </div>
-          <div class="split-grid">
-            <section class="panel">
-              <div class="panel-head">
-                <h3>Барьер-ключ</h3>
-                <button type="button" class="ghost" data-toggle-key>Показать</button>
-              </div>
-              <p class="secret-line" data-key-preview>Ключ загружается...</p>
-              <p class="hint">i<span>Ключ не хранится в интерфейсе постоянно. Он читается из локального secret-файла watcher.</span></p>
-            </section>
-            <section class="panel">
-              <div class="panel-head">
-                <h3>Файл</h3>
-                <span data-config-file>mcp-config.json</span>
-              </div>
-              <p data-config-status>Загрузка конфига...</p>
-            </section>
-          </div>
-          <pre class="code-block" data-config-json>Загрузка...</pre>
         </section>
 
         <section class="content-section" data-section="prompt" hidden>
@@ -165,31 +134,9 @@
               <h2>Рельсы готовности</h2>
             </div>
           </div>
-          <div class="mode-grid" data-modes>Загрузка...</div>
+          <div class="mode-stack" data-modes>Загрузка...</div>
         </section>
 
-        <section class="content-section" data-section="diagnostics" hidden>
-          <div class="section-head">
-            <div>
-              <p class="eyebrow">диагностика</p>
-              <h2>Проблема и действие</h2>
-            </div>
-          </div>
-          <div class="diagnostic-list" data-diagnostics>Загрузка...</div>
-        </section>
-
-        <section class="content-section" data-section="settings" hidden>
-          <div class="section-head">
-            <div>
-              <p class="eyebrow">расширенное</p>
-              <h2>Настройки</h2>
-            </div>
-          </div>
-          <details class="danger-zone">
-            <summary>Расширенные технические данные</summary>
-            <pre class="code-block" data-mcp-diff>Загрузка...</pre>
-          </details>
-        </section>
       </section>
 
       <section class="bottom-console" data-bottom-console>

@@ -4,9 +4,17 @@
   }
 
   .sidebar {
+    grid-column: 1;
+    grid-row: auto;
     min-height: auto;
     border-right: 0;
     border-bottom: 1px solid var(--line);
+  }
+
+  .workspace,
+  .bottom-console {
+    grid-column: 1;
+    grid-row: auto;
   }
 
   .sidebar-nav {
@@ -32,7 +40,5 @@
     display: grid;
   }
 
-  .bottom-console {
-    left: 14px;
-  }
+  .bottom-console { margin: 0 14px 14px; }
 }
