@@ -867,12 +867,12 @@ describe('watcher desktop core', () => {
       'council',
       'audit',
       'refactor',
-      'runtime-policy-gates',
       'todoist-sync',
     ]);
     expect(modes.find(mode => mode.id === 'idol')?.rails.length).toBeGreaterThan(0);
     expect(modes.find(mode => mode.id === 'wave')?.description).toContain('три волны');
-    expect(modes.find(mode => mode.id === 'runtime-policy-gates')?.useCases).toContain('Wave не стартует без runtime_session_id и policy_context_pack.');
+    expect(modes.find(mode => mode.id === 'runtime-policy-gates')).toBeUndefined();
+    expect(modes.find(mode => mode.id === 'todoist-sync')?.group).toBe('Интеграции');
   });
 
   it('opens a local desktop session only after valid credentials and config discovery', async () => {
@@ -1306,6 +1306,27 @@ describe('watcher desktop core', () => {
     expect(result.executed).toBe(false);
     expect(result.policy.decision).toBe('deny');
     expect(result.output).toContain('Сервер MCP не подтвердил доступ');
+  });
+
+  it('checks release availability without requiring a project bearer or mutating the service', async () => {
+    const paths = tempPaths();
+    const requests: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      requests.push(String(input));
+      return new Response(JSON.stringify({
+        tag_name: 'v9.9.9',
+        html_url: 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/tag/v9.9.9',
+      }), { status: 200 });
+    }));
+
+    const result = await runServiceAction(paths, { action: 'check_update', projectId: 'missing-project', confirmed: false });
+
+    expect(result.executed).toBe(false);
+    expect(result.policy.decision).toBe('allow');
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain('Новая версия доступна для скачивания.');
+    expect(result.output).toContain('Release: https://github.com/horggorg88-pixel/project-brain-watcher/releases/tag/v9.9.9');
+    expect(requests[0]).toContain('/releases/latest');
   });
 });
 

@@ -118,6 +118,7 @@ describe('watcher desktop contract', () => {
     expect(html).toContain('data-checklist');
     expect(html).toContain('data-download-config');
     expect(html).toContain('data-start-prompt');
+    expect(html).toContain('data-service-action="check_update"');
     expect(html).toContain('data-service-action="update"');
     expect(html).toContain('data-bottom-console');
     expect(html).toContain('data-modes');

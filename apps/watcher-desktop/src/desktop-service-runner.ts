@@ -33,6 +33,7 @@ export async function runServiceAction(
     discoverMcpConfig(paths),
   );
   if (request.action === 'health') return healthResult(paths, request.projectId);
+  if (request.action === 'check_update') return checkUpdateResult(paths, request.projectId);
   const token = profile ? readDesktopServiceToken(profile) : null;
   const status = readServiceStatus(paths, request.projectId);
   if (request.action === 'start' && status.running) {
@@ -152,6 +153,40 @@ async function updateVersionReport(): Promise<string> {
       `Watcher: ${watcherPackageVersion(WATCHER_PACKAGE)}`,
       'Принудительное обновление продолжается.',
     ].join('\n');
+  }
+}
+
+async function checkUpdateResult(paths: DesktopCorePaths, projectId: string): Promise<WatcherServiceActionResult> {
+  const status = readServiceStatus(paths, projectId);
+  try {
+    const check = await fetchReleaseVersionCheck(readLocalDesktopVersion(), watcherPackageVersion(WATCHER_PACKAGE));
+    const hasUpdate = check.desktop.outdated || check.watcher.outdated;
+    return {
+      executed: false,
+      policy: {
+        decision: 'allow',
+        risk: 'low',
+        reasons: [hasUpdate ? 'Новая версия доступна' : 'Новая версия не найдена'],
+      },
+      status,
+      exitCode: 0,
+      output: [
+        hasUpdate ? 'Новая версия доступна для скачивания.' : 'Новая версия не найдена. Пульт и watcher актуальны.',
+        formatReleaseVersionCheck(check),
+      ].join('\n\n'),
+    };
+  } catch (error) {
+    return {
+      executed: false,
+      policy: { decision: 'allow', risk: 'medium', reasons: ['Проверка версии не завершена'] },
+      status,
+      exitCode: 1,
+      output: [
+        `Проверка обновлений не завершена: ${errorMessage(error)}`,
+        `Пульт: ${safeLocalDesktopVersion()}`,
+        `Watcher: ${watcherPackageVersion(WATCHER_PACKAGE)}`,
+      ].join('\n'),
+    };
   }
 }
 
@@ -298,7 +333,7 @@ function defaultNpxExecutable(): string {
 }
 
 function actionLabel(action: WatcherServiceActionRequest['action']): string {
-  const labels = { health: 'Проверить', install: 'Установить службу', start: 'Запустить', stop: 'Остановить', restart: 'Перезапустить', update: 'Обновить пульт и watcher' };
+  const labels = { health: 'Проверить', install: 'Установить службу', start: 'Запустить', stop: 'Остановить', restart: 'Перезапустить', check_update: 'Проверить обновления', update: 'Обновить пульт и watcher' };
   return labels[action];
 }
 

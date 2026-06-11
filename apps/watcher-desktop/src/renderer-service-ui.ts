@@ -23,7 +23,7 @@ export interface ServiceActionConfirmationRequest {
 }
 
 export function isServiceAction(value: string | undefined): value is WatcherServiceAction {
-  return value === 'health' || value === 'install' || value === 'start' || value === 'stop' || value === 'restart' || value === 'update';
+  return value === 'health' || value === 'install' || value === 'start' || value === 'stop' || value === 'restart' || value === 'check_update' || value === 'update';
 }
 
 export function setServiceBusy(buttons: NodeListOf<HTMLButtonElement>, busy: boolean): void {
@@ -63,7 +63,7 @@ export function resolveServiceActionConfirmation(
 }
 
 export function actionLabel(action: WatcherServiceAction): string {
-  const labels = { health: 'Проверить подключение', install: 'Установить службу', start: 'Запустить watcher', stop: 'Остановить watcher', restart: 'Перезапустить watcher', update: 'Обновить пульт и watcher' };
+  const labels = { health: 'Проверить подключение', install: 'Установить службу', start: 'Запустить watcher', stop: 'Остановить watcher', restart: 'Перезапустить watcher', check_update: 'Проверить обновления', update: 'Обновить пульт и watcher' };
   return labels[action];
 }
 
@@ -79,6 +79,7 @@ function confirmationLabel(action: WatcherServiceAction): string {
     start: 'Подтвердить запуск',
     stop: 'Подтвердить остановку',
     restart: 'Подтвердить перезапуск',
+    check_update: 'Проверить обновления',
     update: 'Подтвердить обновление',
   };
   return labels[action];

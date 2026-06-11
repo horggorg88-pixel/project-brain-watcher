@@ -75,6 +75,22 @@ describe('watcher desktop service UI confirmation', () => {
     expect(decision.message).toBeNull();
   });
 
+  it('allows release update checks without a confirmation rail', () => {
+    const pending: PendingServiceActionConfirmation = { action: 'restart', projectId: 'demo', expiresAt: 20_000 };
+
+    const decision = resolveServiceActionConfirmation({
+      action: 'check_update',
+      confirmAction: false,
+      nowMs: 12_000,
+      pending,
+      projectId: 'demo',
+    });
+
+    expect(decision.confirmed).toBe(true);
+    expect(decision.pending).toBeNull();
+    expect(decision.message).toBeNull();
+  });
+
   it('requires a same-action second click for every mutating service action', () => {
     const actions = ['install', 'start', 'stop', 'restart', 'update'] as const;
 

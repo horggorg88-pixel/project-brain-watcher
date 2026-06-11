@@ -65,13 +65,14 @@ test('opens the real desktop control panel and proves the dry service rail', asy
     await expect(page.locator('[data-section="modes"]')).toBeVisible();
     await expect(page.locator('[data-modes]')).toContainText('Основные MCP-режимы');
     await expect(page.locator('[data-modes]')).toContainText('Операторские режимы');
-    await expect(page.locator('[data-modes]')).toContainText('Runtime, Policy, Gates');
     await expect(page.locator('[data-modes]')).toContainText('Когда применять');
-    await expect(page.locator('[data-modes]')).toContainText('Wave не стартует без runtime_session_id и policy_context_pack.');
+    await expect(page.locator('[data-modes]')).not.toContainText('Слои управления');
+    await expect(page.locator('[data-modes]')).not.toContainText('Runtime, Policy, Gates');
     await page.screenshot({ path: testInfo.outputPath('desktop-modes-page.png'), fullPage: true });
 
     await page.getByRole('button', { name: 'Watcher' }).click();
     await expect(page.locator('[data-section="watcher"]')).toBeVisible();
+    await expect(page.locator('[data-service-action="check_update"]')).toBeVisible();
     await page.locator('[data-service-action="health"]').click();
     await expect(page.locator('[data-service-output]')).toContainText('Проверка не пройдена');
     for (const action of ['install', 'start', 'restart', 'stop'] as const) {

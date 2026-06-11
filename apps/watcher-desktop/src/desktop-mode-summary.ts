@@ -129,12 +129,6 @@ function rails(id: string, state: ModeRuntimeState): readonly DesktopModeRailSta
         rail('dry-run', 'Dry run', true, 'План до правки'),
         rail('rollback', 'Rollback', true, 'Откат при compile fail'),
       ];
-    case 'runtime-policy-gates':
-      return [
-        rail('runtime', 'Runtime', state.runtimeReady, state.runtimeReady ? 'Сессия готова' : 'Нужен runtime_start'),
-        rail('policy', 'Policy', state.diagnosticsAllowed, 'Контракт режима'),
-        rail('gates', 'Gates', state.runtimeReady, 'Проход этапов'),
-      ];
     case 'todoist-sync':
       return [
         rail('brain', 'Brain first', state.runtimeReady, 'Сначала remember'),

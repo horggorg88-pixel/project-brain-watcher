@@ -184,7 +184,7 @@ serviceButtons.forEach(button => {
   button.addEventListener('click', () => {
     const action = button.dataset.serviceAction;
     if (!isServiceAction(action)) return;
-    void runServiceActionFromUi(action, action !== 'health');
+    void runServiceActionFromUi(action, action !== 'health' && action !== 'check_update');
   });
 });
 
