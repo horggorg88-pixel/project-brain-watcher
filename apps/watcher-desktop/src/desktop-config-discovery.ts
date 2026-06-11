@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse as parseToml } from 'smol-toml';
 import type { McpConfigDiscovery, McpConfigSource } from './contracts.js';
+import { discoverDesktopAccessHandoff } from './desktop-access-handoff.js';
 import { normalizeMcpServerUrl } from './desktop-mcp-endpoint.js';
 import { readProfiles, type DesktopCorePaths } from './desktop-profile-store.js';
 
@@ -12,10 +13,11 @@ const CURSOR_CONFIG = join('AppData', 'Roaming', 'Cursor', 'User', 'mcp.json');
 export function discoverMcpConfig(paths: DesktopCorePaths): McpConfigDiscovery {
   const candidates = [
     readSavedProfileConfig(paths),
+    discoverDesktopAccessHandoff(paths),
     readCodexConfig(join(paths.homePath, CODEX_CONFIG)),
     readJsonConfig('claude', join(paths.homePath, CLAUDE_CONFIG)),
     readJsonConfig('cursor', join(paths.homePath, CURSOR_CONFIG)),
-  ];
+  ].filter((candidate): candidate is McpConfigDiscovery => candidate !== null);
   return candidates.find(candidate => candidate.found) ?? missingConfig(paths);
 }
 

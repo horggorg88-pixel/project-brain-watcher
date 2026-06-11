@@ -29,10 +29,15 @@ export function readDesktopServiceSecret(profile: SavedProjectProfile): string |
 }
 
 export function readDesktopServiceToken(profile: SavedProjectProfile): string | null {
+  const secret = readDesktopServiceSecret(profile);
+  if (isConcreteBearerToken(secret)) return secret.trim();
+  return readDesktopEnvServiceToken(profile);
+}
+
+export function readDesktopEnvServiceToken(profile: SavedProjectProfile): string | null {
   const envToken = process.env[profile.tokenEnv];
   if (isConcreteBearerToken(envToken)) return envToken.trim();
-  const secret = readDesktopServiceSecret(profile);
-  return isConcreteBearerToken(secret) ? secret.trim() : null;
+  return null;
 }
 
 export function syncDesktopServiceSecretFromEnv(profile: SavedProjectProfile): DesktopServiceSecretState | null {

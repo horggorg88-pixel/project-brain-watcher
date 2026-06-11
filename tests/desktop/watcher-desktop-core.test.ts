@@ -289,6 +289,8 @@ describe('watcher desktop core', () => {
 
     const result = importProjectConfig(paths, source);
 
+    expect(result.profile).not.toBeNull();
+    if (!result.profile) throw new Error('project profile missing');
     expect(result.profile.id).toBe('mcp-monorepo');
     expect(result.profile.serverUrl).toBe('http://149.33.14.250');
     expect(result.tokenDetected).toBe(true);
@@ -321,9 +323,58 @@ describe('watcher desktop core', () => {
 
     const result = importProjectConfig(paths, source);
 
+    expect(result.profile).not.toBeNull();
+    if (!result.profile) throw new Error('project profile missing');
     expect(result.tokenDetected).toBe(false);
     expect(result.secretStaged).toBe(false);
     expect(readDesktopServiceSecret(result.profile)).toBeNull();
+  });
+
+  it('imports a personal access config and applies its bearer after a project folder is saved', () => {
+    const paths = tempPaths();
+    const source = join(paths.homePath, 'mcp-access-config.json');
+    const root = join(paths.homePath, 'Project Alpha');
+    mkdirSync(paths.homePath, { recursive: true });
+    mkdirSync(root, { recursive: true });
+    writeFileSync(source, JSON.stringify({
+      schema_version: 1,
+      kind: 'project-brain-access',
+      server_url: 'http://149.33.14.250',
+      token_env: 'MCP_BEARER_TOKEN',
+      mcpServers: {
+        'project-brain': {
+          type: 'http',
+          url: 'http://149.33.14.250/mcp',
+          headers: { Authorization: `Bearer ${VALID_TEST_BEARER}` },
+        },
+      },
+    }), 'utf-8');
+
+    const imported = importProjectConfig(paths, source);
+    const discovery = discoverMcpConfig(paths);
+    const saved = saveProfile(paths, {
+      id: 'project-alpha',
+      name: 'Project Alpha',
+      root,
+      indexId: 'idx-project-alpha',
+      serverUrl: '',
+      tokenEnv: '',
+    });
+    const pack = buildDesktopConfigPackage(paths, 'project-alpha');
+
+    expect(imported.profile).toBeNull();
+    expect(imported.accessConfigImported).toBe(true);
+    expect(imported.tokenDetected).toBe(true);
+    expect(imported.secretStaged).toBe(false);
+    expect(discovery.found).toBe(true);
+    expect(discovery.serverUrl).toBe('http://149.33.14.250');
+    expect(discovery.projectId).toBeNull();
+    expect(readDesktopServiceSecret(saved)).toBe(VALID_TEST_BEARER);
+    expect(saved.serverUrl).toBe('http://149.33.14.250');
+    expect(saved.tokenEnv).toBe('MCP_BEARER_TOKEN');
+    expect(pack.tokenAvailable).toBe(true);
+    expect(pack.configJson).toContain(`Bearer ${VALID_TEST_BEARER}`);
+    expect(pack.configJson).toContain('"url": "http://149.33.14.250/mcp/p/project-alpha"');
   });
 
   it('persists desktop UI state for section, theme and console preferences', () => {
@@ -537,7 +588,7 @@ describe('watcher desktop core', () => {
     expect(state.status).toBe('local_ready');
   });
 
-  it('prefers a valid environment bearer over a stale local service secret during login verification', async () => {
+  it('falls back to a valid environment bearer when the local service secret fails verification', async () => {
     const paths = tempPaths();
     const codexDir = join(paths.homePath, '.codex');
     const root = join(paths.homePath, 'Desktop', 'MCP');
@@ -563,7 +614,8 @@ describe('watcher desktop core', () => {
     const state = await loginAccess(paths, { email: 'client@example.com', password: 'password123' });
 
     expect(readDesktopServiceSecret(profile)).toBe(VALID_ENV_BEARER);
-    expect(authorizations[0]).toBe(`Bearer ${VALID_ENV_BEARER}`);
+    expect(authorizations[0]).toBe(`Bearer ${STALE_LOCAL_BEARER}`);
+    expect(authorizations[1]).toBe(`Bearer ${VALID_ENV_BEARER}`);
     expect(state.serverVerified).toBe(true);
     expect(state.status).toBe('local_ready');
   });
@@ -751,7 +803,7 @@ describe('watcher desktop core', () => {
     expect(pack.configJson).not.toContain(PLACEHOLDER_BEARER);
   });
 
-  it('builds the downloadable config package from env bearer when the local service secret is stale', () => {
+  it('builds the downloadable config package from the local project secret even when an env bearer exists', () => {
     const paths = tempPaths();
     const codexDir = join(paths.homePath, '.codex');
     const root = join(paths.homePath, 'Desktop', 'MCP');
@@ -770,9 +822,9 @@ describe('watcher desktop core', () => {
     const pack = buildDesktopConfigPackage(paths, 'mcp-monorepo');
 
     expect(pack.tokenAvailable).toBe(true);
-    expect(pack.tokenValue).toBe(VALID_ENV_BEARER);
-    expect(pack.configJson).toContain(`Bearer ${VALID_ENV_BEARER}`);
-    expect(pack.configJson).not.toContain(STALE_LOCAL_BEARER);
+    expect(pack.tokenValue).toBe(STALE_LOCAL_BEARER);
+    expect(pack.configJson).toContain(`Bearer ${STALE_LOCAL_BEARER}`);
+    expect(pack.configJson).not.toContain(VALID_ENV_BEARER);
   });
 
   it('keeps the desktop session bearer_unverified after config import until the server verifies access', async () => {
@@ -876,6 +928,8 @@ describe('watcher desktop core', () => {
     }), 'utf-8');
     mkdirSync(join(paths.homePath, 'repo'), { recursive: true });
     const imported = importProjectConfig(paths, source);
+    expect(imported.profile).not.toBeNull();
+    if (!imported.profile) throw new Error('project profile missing');
     vi.stubGlobal('fetch', vi.fn(async () => new Response('denied', { status: 401 })));
 
     const result = await runServiceAction(paths, { action: 'start', projectId: imported.profile.id, confirmed: true });

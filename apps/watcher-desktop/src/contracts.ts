@@ -58,11 +58,12 @@ export interface SavedProjectProfile extends ProjectDraft {
 }
 
 export interface ProjectImportResult {
-  readonly profile: SavedProjectProfile;
+  readonly profile: SavedProjectProfile | null;
   readonly sourcePath: string;
   readonly warnings: readonly string[];
   readonly tokenDetected: boolean;
   readonly secretStaged: boolean;
+  readonly accessConfigImported: boolean;
 }
 
 export interface McpDiffPreview {

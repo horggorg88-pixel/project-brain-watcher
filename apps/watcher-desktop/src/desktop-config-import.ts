@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import type { ProjectDraft, ProjectImportResult } from './contracts.js';
+import { saveDesktopAccessHandoff } from './desktop-access-handoff.js';
 import { normalizeMcpServerUrl } from './desktop-mcp-endpoint.js';
 import { saveProfile, type DesktopCorePaths } from './desktop-profile-store.js';
 import { isConcreteBearerToken, stageDesktopServiceSecret } from './desktop-service-secret.js';
 
 interface HandoffFile {
+  readonly kind?: unknown;
   readonly project_id?: unknown;
   readonly local_path?: unknown;
   readonly endpoint?: unknown;
@@ -16,9 +18,27 @@ interface HandoffFile {
 
 export function importProjectConfig(paths: DesktopCorePaths, sourcePath: string): ProjectImportResult {
   const parsed = parseHandoffFile(JSON.parse(readFileSync(sourcePath, 'utf-8')));
+  const bearerToken = readBearerToken(parsed);
+  if (isAccessConfig(parsed)) {
+    const serverUrl = readAccessServerUrl(parsed);
+    if (!serverUrl) throw new Error('Личный access-config должен содержать server_url или mcpServers.project-brain.url.');
+    if (!bearerToken) throw new Error('Личный access-config должен содержать реальный Bearer-токен.');
+    saveDesktopAccessHandoff(paths, {
+      serverUrl,
+      tokenEnv: readString(parsed.token_env) ?? 'MCP_BEARER_TOKEN',
+      token: bearerToken,
+    });
+    return {
+      profile: null,
+      sourcePath,
+      warnings: ['Личный access-config импортирован. Теперь выберите папку проекта, чтобы пульт создал проектный MCP-конфиг.'],
+      tokenDetected: true,
+      secretStaged: false,
+      accessConfigImported: true,
+    };
+  }
   const project = toProjectDraft(parsed);
   const profile = saveProfile(paths, project);
-  const bearerToken = readBearerToken(parsed);
   const secretStaged = bearerToken ? stageDesktopServiceSecret(profile, bearerToken).configured : false;
   return {
     profile,
@@ -26,7 +46,13 @@ export function importProjectConfig(paths: DesktopCorePaths, sourcePath: string)
     warnings: importWarnings(parsed, secretStaged),
     tokenDetected: bearerToken !== null,
     secretStaged,
+    accessConfigImported: false,
   };
+}
+
+function isAccessConfig(file: HandoffFile): boolean {
+  const kind = readString(file.kind);
+  return kind === 'project-brain-access' || (!readString(file.project_id) && !readString(file.local_path) && readBearerToken(file) !== null);
 }
 
 function toProjectDraft(file: HandoffFile): ProjectDraft {
@@ -69,6 +95,13 @@ function readServerUrl(value: unknown): string | null {
   const server = value['project-brain'];
   if (!isRecord(server)) return null;
   return readString(server.url);
+}
+
+function readAccessServerUrl(file: HandoffFile): string | null {
+  const explicit = readString(file.server_url);
+  if (explicit) return explicit;
+  const serverUrl = readServerUrl(file.mcpServers);
+  return endpointToServer(serverUrl, null);
 }
 
 function readBearerToken(file: HandoffFile): string | null {

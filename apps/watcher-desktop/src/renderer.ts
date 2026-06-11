@@ -284,7 +284,11 @@ async function importConfigFromDialog(): Promise<void> {
     writeLog('Импорт файла настройки MCP отменён');
     return;
   }
-  await saveUiState({ ...uiState, lastProjectId: result.profile.id, activeSection: 'start' });
+  await saveUiState({
+    ...uiState,
+    lastProjectId: result.profile?.id ?? uiState.lastProjectId,
+    activeSection: result.profile ? 'start' : 'projects',
+  });
   writeLog(importResultLog(result));
   await refresh();
 }
@@ -490,6 +494,7 @@ function serviceActionLog(result: WatcherServiceActionResult): string {
 
 function importResultLog(result: ProjectImportResult): string {
   const warnings = result.warnings.length ? `\n${result.warnings.join('\n')}` : '';
+  if (!result.profile) return `Личный access-config импортирован${warnings}`;
   return `Файл настройки MCP импортирован: ${result.profile.name}${warnings}`;
 }
 

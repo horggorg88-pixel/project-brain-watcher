@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { McpConfigDiscovery, ProjectDraft, SavedProjectProfile } from './contracts.js';
+import { readDesktopAccessHandoff, stageDesktopAccessHandoffForProfile } from './desktop-access-handoff.js';
 import { stageProjectBrainFiles } from './desktop-brain-bootstrap.js';
 import { normalizeMcpServerUrl } from './desktop-mcp-endpoint.js';
 
@@ -21,12 +22,20 @@ export function readProfiles(paths: DesktopCorePaths): readonly SavedProjectProf
 }
 
 export function saveProfile(paths: DesktopCorePaths, project: ProjectDraft): SavedProjectProfile {
-  const normalized = normalizeProject(project);
+  const handoff = readDesktopAccessHandoff(paths);
+  const serverUrl = project.serverUrl.trim() || handoff?.serverUrl || '';
+  const tokenEnv = project.tokenEnv.trim() || handoff?.tokenEnv || 'MCP_BEARER_TOKEN';
+  const normalized = normalizeProject({
+    ...project,
+    serverUrl,
+    tokenEnv,
+  });
   const profiles = readProfiles(paths).filter(item => item.id !== normalized.id);
   const saved = { ...normalized, createdAt: new Date().toISOString() };
   mkdirSync(paths.userDataPath, { recursive: true });
   writeFileSync(profilesPath(paths), JSON.stringify([...profiles, saved], null, 2), 'utf-8');
   stageProjectBrainFiles(saved);
+  stageDesktopAccessHandoffForProfile(paths, saved);
   return saved;
 }
 

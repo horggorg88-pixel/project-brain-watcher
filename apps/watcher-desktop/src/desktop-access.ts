@@ -9,10 +9,10 @@ import type { DesktopCorePaths } from './desktop-profile-store.js';
 import { applyMcpConfigToProfile, defaultProfile, readProfiles } from './desktop-profile-store.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
 import {
+  readDesktopEnvServiceToken,
   readDesktopServiceSecretState,
   readDesktopServiceToken,
   stageDesktopServiceSecret,
-  syncDesktopServiceSecretFromEnv,
 } from './desktop-service-secret.js';
 import { verifyProjectServerAccess } from './desktop-server-access.js';
 import { clearDesktopAccessSession, readDesktopAccessSession, saveDesktopAccessSession } from './desktop-access-session.js';
@@ -60,11 +60,22 @@ export async function loginAccess(paths: DesktopCorePaths, request: AccessLoginR
   const enteredBarrierKey = barrierTokenFromLogin(password);
   if (profile && enteredBarrierKey) secretState = stageDesktopServiceSecret(profile, enteredBarrierKey);
   const token = profile ? enteredBarrierKey ?? readDesktopServiceToken(profile) : null;
-  const serverAccess = config.found && token !== null && profile
+  let verifiedToken = token;
+  let serverAccess = config.found && token !== null && profile
     ? await verifyProjectServerAccess(profile, token)
     : { verified: false, message: '' };
-  if (profile && serverAccess.verified && !enteredBarrierKey) {
-    secretState = syncDesktopServiceSecretFromEnv(profile) ?? secretState;
+  if (profile && !serverAccess.verified && !enteredBarrierKey) {
+    const envToken = readDesktopEnvServiceToken(profile);
+    if (envToken && envToken !== token) {
+      const envAccess = await verifyProjectServerAccess(profile, envToken);
+      if (envAccess.verified) {
+        serverAccess = envAccess;
+        verifiedToken = envToken;
+      }
+    }
+  }
+  if (profile && serverAccess.verified && verifiedToken && !enteredBarrierKey) {
+    secretState = stageDesktopServiceSecret(profile, verifiedToken);
   }
   const serviceSecretReady = secretState.configured && secretState.acl.restricted;
   const serverVerified = serverAccess.verified;
