@@ -20,7 +20,7 @@ import {
 import { verifyProjectServerAccess } from './desktop-server-access.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.19';
+const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.20';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 
@@ -65,12 +65,13 @@ export async function runServiceAction(
     ? { [profile.tokenEnv]: token }
     : {});
   const finalStatus = await waitForServiceActionStatus(paths, request.action, profile.id);
+  const settlement = summarizeServiceActionSettlement(request.action, result.exitCode, result.output, finalStatus);
   return {
     executed: true,
     policy,
     status: finalStatus,
-    exitCode: result.exitCode,
-    output: result.output,
+    exitCode: settlement.exitCode,
+    output: settlement.output,
   };
 }
 
@@ -92,6 +93,33 @@ export function isServiceActionSettled(
   return true;
 }
 
+export function summarizeServiceActionSettlement(
+  action: WatcherServiceActionRequest['action'],
+  commandExitCode: number,
+  commandOutput: string,
+  status: WatcherServiceStatus,
+): { readonly exitCode: number; readonly output: string } {
+  const settlementError = serviceSettlementError(action, status);
+  if (!settlementError) return { exitCode: commandExitCode, output: commandOutput };
+  return {
+    exitCode: commandExitCode === 0 ? 1 : commandExitCode,
+    output: [commandOutput.trim(), settlementError].filter(Boolean).join('\n'),
+  };
+}
+
+function serviceSettlementError(
+  action: WatcherServiceActionRequest['action'],
+  status: WatcherServiceStatus,
+): string | null {
+  if ((action === 'start' || action === 'restart') && (!status.running || status.health !== 'healthy')) {
+    return `Watcher не перешёл в healthy: ${status.lastError ?? status.health}`;
+  }
+  if (action === 'stop' && status.running) {
+    return `Watcher не остановился: ${status.lastError ?? 'служба всё ещё RUNNING'}`;
+  }
+  return null;
+}
+
 async function runUpdateAction(
   paths: DesktopCorePaths,
   profile: SavedProjectProfile,
@@ -107,19 +135,20 @@ async function runUpdateAction(
   if (install.exitCode !== 0) return updateResult(paths, profile.id, policy, install.exitCode, versionReport, ['Пульт обновлён', install.output]);
   const restart = await spawnWatcher(command, buildServiceRestartArgs(profile), profile.root, env);
   const status = await waitForServiceActionStatus(paths, 'restart', profile.id);
+  const restartSettlement = summarizeServiceActionSettlement('restart', restart.exitCode, restart.output, status);
   return {
     executed: true,
     policy,
     status,
-    exitCode: restart.exitCode,
+    exitCode: restartSettlement.exitCode,
     output: [
       versionReport,
       'Пульт: команда обновления выполнена.',
       compactOutput(desktop.output),
       'Watcher: служба переустановлена через текущий release.',
       compactOutput(install.output),
-      'Watcher: служба перезапущена.',
-      compactOutput(restart.output),
+      'Watcher: команда перезапуска выполнена.',
+      compactOutput(restartSettlement.output),
     ].filter(Boolean).join('\n\n'),
   };
 }

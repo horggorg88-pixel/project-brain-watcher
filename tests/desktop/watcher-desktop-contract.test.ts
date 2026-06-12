@@ -218,6 +218,15 @@ describe('watcher desktop contract', () => {
     expect(watcherBundle).toContain('"--watch","--replace"');
   });
 
+  it('keeps service npx cache under the project service directory', () => {
+    const watcherBundle = readFileSync(join(process.cwd(), 'bin', 'watcher.js'), 'utf-8');
+
+    expect(watcherBundle).toContain('NPM_CONFIG_CACHE');
+    expect(watcherBundle).toContain('npm_config_cache');
+    expect(watcherBundle).toContain('NO_UPDATE_NOTIFIER');
+    expect(watcherBundle).toContain('npm-cache');
+  });
+
   it('recovers a watcher lease owner mismatch before stopping the service process', () => {
     const watcherBundle = readFileSync(join(process.cwd(), 'bin', 'watcher.js'), 'utf-8');
 

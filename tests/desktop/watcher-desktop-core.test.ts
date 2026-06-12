@@ -20,7 +20,7 @@ import {
 } from '../../apps/watcher-desktop/src/desktop-core.js';
 import { readDesktopServiceSecret, readDesktopServiceSecretState } from '../../apps/watcher-desktop/src/desktop-service-secret.js';
 import { stageDesktopServiceSecret } from '../../apps/watcher-desktop/src/desktop-service-secret.js';
-import { isServiceActionSettled, prepareServiceSecretForLaunch } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
+import { isServiceActionSettled, prepareServiceSecretForLaunch, summarizeServiceActionSettlement } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
 import { parseWindowsServiceOutput } from '../../apps/watcher-desktop/src/desktop-service-status.js';
 import { readDesktopUiState, saveDesktopUiState } from '../../apps/watcher-desktop/src/desktop-ui-state.js';
 import { defaultProfile, serviceName } from '../../apps/watcher-desktop/src/desktop-profile-store.js';
@@ -436,6 +436,24 @@ describe('watcher desktop core', () => {
     expect(isServiceActionSettled('restart', statusFixture({ running: false, lastError: 'Windows Service STOP_PENDING' }))).toBe(false);
     expect(isServiceActionSettled('stop', statusFixture({ running: false, lastError: 'Windows Service STOPPED' }))).toBe(true);
     expect(isServiceActionSettled('start', statusFixture({ running: true, health: 'healthy', lastError: null }))).toBe(true);
+  });
+
+  it('reports failed service settlement when WinSW start exits before watcher becomes healthy', () => {
+    const result = summarizeServiceActionSettlement(
+      'start',
+      0,
+      'Service started successfully.',
+      statusFixture({
+        running: false,
+        health: 'stopped',
+        lastError: 'Windows Service STOPPED, WIN32_EXIT_CODE=1067',
+      }),
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain('Service started successfully.');
+    expect(result.output).toContain('Watcher не перешёл в healthy');
+    expect(result.output).toContain('WIN32_EXIT_CODE=1067');
   });
 
   it('stages the verified bearer into the service secret before launching the installed service', () => {
