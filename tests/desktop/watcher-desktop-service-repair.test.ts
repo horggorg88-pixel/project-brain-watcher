@@ -10,6 +10,7 @@ import {
   serviceInstallAlreadyExists,
   shouldRepairServiceLauncherBeforeAction,
 } from '../../apps/watcher-desktop/src/desktop-service-repair.js';
+import { spawnWatcher } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
 
 const tempDirs: string[] = [];
 
@@ -68,6 +69,19 @@ describe('watcher desktop service repair', () => {
     expect(shouldRepairServiceLauncherBeforeAction('stop', statusFixture({ installed: true }), stale)).toBe(false);
     expect(shouldRepairServiceLauncherBeforeAction('start', statusFixture({ installed: false }), stale)).toBe(false);
     expect(shouldRepairServiceLauncherBeforeAction('start', statusFixture({ installed: true }), current)).toBe(false);
+  });
+
+  it('reports command timeouts with a diagnostic message instead of a silent exit code', async () => {
+    const result = await spawnWatcher(
+      process.execPath,
+      ['-e', 'setTimeout(() => {}, 250)'],
+      process.cwd(),
+      {},
+      { timeoutMs: 25, timeoutLabel: 'desktop update' },
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain('Команда прервана по таймауту: desktop update');
   });
 });
 

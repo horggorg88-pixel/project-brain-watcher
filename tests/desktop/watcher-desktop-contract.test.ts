@@ -217,6 +217,15 @@ describe('watcher desktop contract', () => {
     expect(serviceRunnerSource).toContain('service repair: install already exists');
   });
 
+  it('gives desktop self-update enough time and launches the downloaded installer', () => {
+    const serviceRunnerSource = readFileSync(join(appRoot, 'src', 'desktop-service-runner.ts'), 'utf-8');
+
+    expect(serviceRunnerSource).toContain('DESKTOP_UPDATE_TIMEOUT_MS');
+    expect(serviceRunnerSource).toContain('timeoutLabel: \'desktop update\'');
+    expect(serviceRunnerSource).toContain("'desktop', 'update', '--open'");
+    expect(serviceRunnerSource).toContain('Команда прервана по таймауту');
+  });
+
   it('keeps generated service launches on the current watcher release with explicit takeover', () => {
     const watcherBundle = readFileSync(join(process.cwd(), 'bin', 'watcher.js'), 'utf-8');
     const watcherPackage = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8')) as {

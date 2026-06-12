@@ -25,9 +25,17 @@ import {
 } from './desktop-service-repair.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.21';
+const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.22';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
+const WATCHER_COMMAND_TIMEOUT_MS = 60_000;
+const SERVICE_INSTALL_TIMEOUT_MS = 180_000;
+const DESKTOP_UPDATE_TIMEOUT_MS = 10 * 60_000;
+
+export interface SpawnWatcherOptions {
+  readonly timeoutMs?: number;
+  readonly timeoutLabel?: string;
+}
 
 export async function runServiceAction(
   paths: DesktopCorePaths,
@@ -87,7 +95,7 @@ export async function runServiceAction(
       output: repair.output,
     };
   }
-  const rawResult = await spawnWatcher(command, buildServiceArgs(request.action, profile), profile.root, env);
+  const rawResult = await spawnWatcher(command, buildServiceArgs(request.action, profile), profile.root, env, serviceSpawnOptions(request.action));
   const result = request.action === 'install'
     ? normalizeServiceInstallResult(rawResult.exitCode, rawResult.output)
     : rawResult;
@@ -112,7 +120,7 @@ async function repairServiceLauncherIfNeeded(
 ): Promise<{ readonly exitCode: number; readonly output: string } | null> {
   const repairState = readServiceLauncherRepairState(profile);
   if (!shouldRepairServiceLauncherBeforeAction(action, status, repairState)) return null;
-  const install = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env);
+  const install = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env, serviceSpawnOptions('install'));
   const normalized = normalizeServiceInstallResult(install.exitCode, install.output);
   return {
     exitCode: normalized.exitCode,
@@ -178,9 +186,12 @@ async function runUpdateAction(
   const versionReport = await updateVersionReport();
   const env = token ? { [profile.tokenEnv]: token } : {};
   const command = defaultNpxExecutable();
-  const desktop = await spawnWatcher(command, buildDesktopUpdateArgs(), profile.root, env);
+  const desktop = await spawnWatcher(command, buildDesktopUpdateArgs(), profile.root, env, {
+    timeoutMs: DESKTOP_UPDATE_TIMEOUT_MS,
+    timeoutLabel: 'desktop update',
+  });
   if (desktop.exitCode !== 0) return updateResult(paths, profile.id, policy, desktop.exitCode, versionReport, ['Пульт не обновлён', desktop.output]);
-  const installRaw = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env);
+  const installRaw = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env, serviceSpawnOptions('install'));
   const install = normalizeServiceInstallResult(installRaw.exitCode, installRaw.output);
   if (install.exitCode !== 0) return updateResult(paths, profile.id, policy, install.exitCode, versionReport, ['Пульт обновлён', install.output]);
   const restart = await spawnWatcher(command, buildServiceRestartArgs(profile), profile.root, env);
@@ -196,7 +207,7 @@ async function runUpdateAction(
     exitCode: restartSettlement.exitCode,
     output: [
       versionReport,
-      'Пульт: команда обновления выполнена.',
+      'Пульт: новая версия скачана, установщик запущен.',
       compactOutput(desktop.output),
       installSummary,
       compactOutput(install.output),
@@ -327,7 +338,7 @@ function buildServiceArgs(action: WatcherServiceActionRequest['action'], profile
 }
 
 function buildDesktopUpdateArgs(): string[] {
-  return ['--yes', WATCHER_PACKAGE, 'desktop', 'update'];
+  return ['--yes', WATCHER_PACKAGE, 'desktop', 'update', '--open'];
 }
 
 function buildServiceInstallArgs(profile: SavedProjectProfile): string[] {
@@ -351,15 +362,18 @@ function serviceArgs(profile: SavedProjectProfile): string[] {
   ];
 }
 
-function spawnWatcher(
+export function spawnWatcher(
   command: string,
   args: readonly string[],
   cwd: string,
   env: Readonly<Record<string, string>>,
+  options: SpawnWatcherOptions = {},
 ): Promise<{ readonly exitCode: number; readonly output: string }> {
   return new Promise(resolve => {
     const chunks: string[] = [];
     const invocation = spawnInvocation(command, args);
+    const timeoutMs = options.timeoutMs ?? WATCHER_COMMAND_TIMEOUT_MS;
+    let timedOut = false;
     let child: ReturnType<typeof spawn>;
     try {
       child = spawn(invocation.command, invocation.args, { cwd, env: { ...process.env, ...env }, windowsHide: true });
@@ -367,18 +381,38 @@ function spawnWatcher(
       resolve({ exitCode: 1, output: error instanceof Error ? error.message : String(error) });
       return;
     }
-    const timer = setTimeout(() => child.kill(), 60_000);
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, timeoutMs);
     child.stdout?.on('data', chunk => chunks.push(String(chunk)));
     child.stderr?.on('data', chunk => chunks.push(String(chunk)));
     child.on('close', code => {
       clearTimeout(timer);
-      resolve({ exitCode: code ?? 1, output: chunks.join('').trim() });
+      const output = chunks.join('').trim();
+      if (timedOut) {
+        resolve({
+          exitCode: 1,
+          output: [
+            output,
+            `Команда прервана по таймауту: ${options.timeoutLabel ?? command} (${timeoutMs} мс)`,
+          ].filter(Boolean).join('\n'),
+        });
+        return;
+      }
+      resolve({ exitCode: code ?? 1, output });
     });
     child.on('error', error => {
       clearTimeout(timer);
       resolve({ exitCode: 1, output: error.message });
     });
   });
+}
+
+function serviceSpawnOptions(action: WatcherServiceActionRequest['action']): SpawnWatcherOptions {
+  return action === 'install'
+    ? { timeoutMs: SERVICE_INSTALL_TIMEOUT_MS, timeoutLabel: 'service install' }
+    : { timeoutLabel: `service ${action}` };
 }
 
 async function waitForServiceActionStatus(
