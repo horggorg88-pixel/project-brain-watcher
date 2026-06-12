@@ -26,7 +26,7 @@ import {
 } from './desktop-service-repair.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.24';
+const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.25';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 const WATCHER_COMMAND_TIMEOUT_MS = 60_000;
@@ -395,6 +395,10 @@ function buildServiceRestartArgs(profile: SavedProjectProfile): string[] {
 
 function serviceArgs(profile: SavedProjectProfile): string[] {
   return [
+    '--service-runner',
+    'node',
+    '--watcher-entry',
+    serviceWatcherEntry(profile),
     '--path',
     profile.root,
     '--server',
@@ -404,6 +408,10 @@ function serviceArgs(profile: SavedProjectProfile): string[] {
     '--project',
     profile.id,
   ];
+}
+
+function serviceWatcherEntry(profile: SavedProjectProfile): string {
+  return join(profile.root, '.brain', 'service', 'runtime', 'node_modules', 'project-brain-watcher', 'bin', 'watcher.js');
 }
 
 export function spawnWatcher(

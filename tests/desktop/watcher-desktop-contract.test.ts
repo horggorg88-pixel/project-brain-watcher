@@ -207,6 +207,27 @@ describe('watcher desktop contract', () => {
     expect(serviceRunnerSource).toContain("'/d', '/s', '/c'");
   });
 
+  it('installs service runtime through a local node package instead of npx runtime installs', () => {
+    const serviceRunnerSource = readFileSync(join(appRoot, 'src', 'desktop-service-runner.ts'), 'utf-8');
+
+    expect(serviceRunnerSource).toContain("'--service-runner'");
+    expect(serviceRunnerSource).toContain("'node'");
+    expect(serviceRunnerSource).toContain("'--watcher-entry'");
+    expect(serviceRunnerSource).toContain('serviceWatcherEntry(profile)');
+    expect(serviceRunnerSource).toContain("'runtime', 'node_modules', 'project-brain-watcher', 'bin', 'watcher.js'");
+    expect(serviceRunnerSource).not.toContain("return ['--path',");
+  });
+
+  it('materializes the node service runtime during service install', () => {
+    const watcherBundle = readFileSync(join(process.cwd(), 'bin', 'watcher.js'), 'utf-8');
+
+    expect(watcherBundle).toContain('Service node runtime установлен');
+    expect(watcherBundle).toContain('npm.cmd');
+    expect(watcherBundle).toContain('npm install');
+    expect(watcherBundle).toContain('npxPackage');
+    expect(watcherBundle).toContain('watcherEntry');
+  });
+
   it('repairs existing service metadata before start and update flows', () => {
     const serviceRunnerSource = readFileSync(join(appRoot, 'src', 'desktop-service-runner.ts'), 'utf-8');
 

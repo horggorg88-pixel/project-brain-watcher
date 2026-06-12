@@ -30,6 +30,10 @@ function verifyWatcherTarball() {
     const watcherBin = join(tempRoot, 'node_modules', '.bin', process.platform === 'win32' ? 'project-brain-watcher.cmd' : 'project-brain-watcher');
     run(watcherBin, ['--help']);
     run(watcherBin, ['desktop', 'status', '--desktop-dir', join(tempRoot, 'desktop')]);
+    const serviceRuntime = join(tempRoot, '.brain', 'service', 'runtime');
+    run('npm', ['install', '--prefix', serviceRuntime, tarball, '--no-audit', '--no-fund']);
+    const serviceWatcherEntry = join(serviceRuntime, 'node_modules', 'project-brain-watcher', 'bin', 'watcher.js');
+    run(process.execPath, [serviceWatcherEntry, '--help']);
     run(watcherBin, [
       'service',
       'plan',
@@ -49,8 +53,9 @@ function verifyWatcherTarball() {
 
 function run(command, args) {
   const executable = process.platform === 'win32' && command === 'npm' ? 'npm.cmd' : command;
+  const useShell = process.platform === 'win32' && /\.(cmd|bat)$/i.test(executable);
   const result = spawnSync(executable, args, {
-    shell: process.platform === 'win32',
+    shell: useShell,
     stdio: 'inherit',
     windowsHide: true,
   });
