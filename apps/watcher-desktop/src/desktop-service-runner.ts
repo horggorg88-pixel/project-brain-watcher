@@ -18,9 +18,14 @@ import {
   watcherPackageVersion,
 } from './desktop-release-update.js';
 import { verifyProjectServerAccess } from './desktop-server-access.js';
+import {
+  normalizeServiceInstallResult,
+  readServiceLauncherRepairState,
+  shouldRepairServiceLauncherBeforeAction,
+} from './desktop-service-repair.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.20';
+const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.21';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 
@@ -60,18 +65,62 @@ export async function runServiceAction(
     }
     prepareServiceSecretForLaunch(profile, token);
   }
+  const env = token ? { [profile.tokenEnv]: token } : {};
+  const command = defaultNpxExecutable();
   if (request.action === 'update') return runUpdateAction(paths, profile, token, policy);
-  const result = await spawnWatcher(defaultNpxExecutable(), buildServiceArgs(request.action, profile), profile.root, token
-    ? { [profile.tokenEnv]: token }
-    : {});
+  const repair = await repairServiceLauncherIfNeeded(profile, status, request.action, command, env);
+  if (repair && repair.exitCode !== 0) {
+    return {
+      executed: true,
+      policy,
+      status: readServiceStatus(paths, profile.id),
+      exitCode: repair.exitCode,
+      output: repair.output,
+    };
+  }
+  if (request.action === 'install' && repair) {
+    return {
+      executed: true,
+      policy,
+      status: readServiceStatus(paths, profile.id),
+      exitCode: repair.exitCode,
+      output: repair.output,
+    };
+  }
+  const rawResult = await spawnWatcher(command, buildServiceArgs(request.action, profile), profile.root, env);
+  const result = request.action === 'install'
+    ? normalizeServiceInstallResult(rawResult.exitCode, rawResult.output)
+    : rawResult;
   const finalStatus = await waitForServiceActionStatus(paths, request.action, profile.id);
-  const settlement = summarizeServiceActionSettlement(request.action, result.exitCode, result.output, finalStatus);
+  const commandOutput = [repair?.output, result.output].filter(Boolean).join('\n\n');
+  const settlement = summarizeServiceActionSettlement(request.action, result.exitCode, commandOutput, finalStatus);
   return {
     executed: true,
     policy,
     status: finalStatus,
     exitCode: settlement.exitCode,
     output: settlement.output,
+  };
+}
+
+async function repairServiceLauncherIfNeeded(
+  profile: SavedProjectProfile,
+  status: WatcherServiceStatus,
+  action: WatcherServiceActionRequest['action'],
+  command: string,
+  env: Readonly<Record<string, string>>,
+): Promise<{ readonly exitCode: number; readonly output: string } | null> {
+  const repairState = readServiceLauncherRepairState(profile);
+  if (!shouldRepairServiceLauncherBeforeAction(action, status, repairState)) return null;
+  const install = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env);
+  const normalized = normalizeServiceInstallResult(install.exitCode, install.output);
+  return {
+    exitCode: normalized.exitCode,
+    output: [
+      `service repair: launcher устарел (${repairState.reasons.join(', ')})`,
+      install.exitCode === 0 ? null : 'service repair: install already exists',
+      normalized.output,
+    ].filter(Boolean).join('\n'),
   };
 }
 
@@ -131,11 +180,15 @@ async function runUpdateAction(
   const command = defaultNpxExecutable();
   const desktop = await spawnWatcher(command, buildDesktopUpdateArgs(), profile.root, env);
   if (desktop.exitCode !== 0) return updateResult(paths, profile.id, policy, desktop.exitCode, versionReport, ['Пульт не обновлён', desktop.output]);
-  const install = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env);
+  const installRaw = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env);
+  const install = normalizeServiceInstallResult(installRaw.exitCode, installRaw.output);
   if (install.exitCode !== 0) return updateResult(paths, profile.id, policy, install.exitCode, versionReport, ['Пульт обновлён', install.output]);
   const restart = await spawnWatcher(command, buildServiceRestartArgs(profile), profile.root, env);
   const status = await waitForServiceActionStatus(paths, 'restart', profile.id);
   const restartSettlement = summarizeServiceActionSettlement('restart', restart.exitCode, restart.output, status);
+  const installSummary = installRaw.exitCode === 0
+    ? 'Watcher: служба установлена через текущий release.'
+    : 'Watcher: service repair: install already exists, launcher/XML обновлены.';
   return {
     executed: true,
     policy,
@@ -145,7 +198,7 @@ async function runUpdateAction(
       versionReport,
       'Пульт: команда обновления выполнена.',
       compactOutput(desktop.output),
-      'Watcher: служба переустановлена через текущий release.',
+      installSummary,
       compactOutput(install.output),
       'Watcher: команда перезапуска выполнена.',
       compactOutput(restartSettlement.output),

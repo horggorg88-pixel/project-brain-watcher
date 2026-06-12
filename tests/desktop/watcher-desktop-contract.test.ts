@@ -207,6 +207,16 @@ describe('watcher desktop contract', () => {
     expect(serviceRunnerSource).toContain("'/d', '/s', '/c'");
   });
 
+  it('repairs existing service metadata before start and update flows', () => {
+    const serviceRunnerSource = readFileSync(join(appRoot, 'src', 'desktop-service-runner.ts'), 'utf-8');
+
+    expect(serviceRunnerSource).toContain('readServiceLauncherRepairState');
+    expect(serviceRunnerSource).toContain('shouldRepairServiceLauncherBeforeAction');
+    expect(serviceRunnerSource).toContain('normalizeServiceInstallResult');
+    expect(serviceRunnerSource).toContain('service repair: launcher устарел');
+    expect(serviceRunnerSource).toContain('service repair: install already exists');
+  });
+
   it('keeps generated service launches on the current watcher release with explicit takeover', () => {
     const watcherBundle = readFileSync(join(process.cwd(), 'bin', 'watcher.js'), 'utf-8');
     const watcherPackage = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8')) as {
