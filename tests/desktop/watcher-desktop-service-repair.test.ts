@@ -6,8 +6,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { SavedProjectProfile, WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
 import {
   normalizeServiceInstallResult,
+  normalizeServiceRefreshResult,
   readServiceLauncherRepairState,
   serviceInstallAlreadyExists,
+  serviceRefreshUnsupported,
   shouldRepairServiceLauncherBeforeAction,
 } from '../../apps/watcher-desktop/src/desktop-service-repair.js';
 import { spawnWatcher } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
@@ -34,6 +36,21 @@ describe('watcher desktop service repair', () => {
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain('служба уже установлена');
     expect(result.output).toContain('launcher/XML обновлены');
+  });
+
+  it('treats unsupported WinSW refresh as a legacy wrapper compatibility fallback', () => {
+    const output = [
+      'FATAL - Unhandled exception',
+      'System.Exception: Unknown command: refresh',
+      '   at WinSW.Program.Run(String[] argsArray, IServiceConfig config)',
+    ].join('\n');
+    const result = normalizeServiceRefreshResult(1, output);
+
+    expect(serviceRefreshUnsupported(output)).toBe(true);
+    expect(serviceRefreshUnsupported('WinSW refresh failed with exit code 1')).toBe(false);
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain('WinSW refresh недоступен');
+    expect(result.output).toContain('старый WinSW');
   });
 
   it('detects missing and legacy service launchers that still use the LocalSystem npm cache', () => {

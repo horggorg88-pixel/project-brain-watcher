@@ -37,6 +37,10 @@ export function serviceInstallAlreadyExists(output: string): boolean {
   return /already exists|служба уже существует/i.test(output);
 }
 
+export function serviceRefreshUnsupported(output: string): boolean {
+  return /unknown command:\s*refresh/i.test(output);
+}
+
 export function normalizeServiceInstallResult(exitCode: number, output: string): ServiceCommandResult {
   if (exitCode === 0 || !serviceInstallAlreadyExists(output)) return { exitCode, output };
   return {
@@ -44,6 +48,17 @@ export function normalizeServiceInstallResult(exitCode: number, output: string):
     output: [
       output.trim(),
       'service repair: служба уже установлена, launcher/XML обновлены, можно продолжать запуск или перезапуск.',
+    ].filter(Boolean).join('\n'),
+  };
+}
+
+export function normalizeServiceRefreshResult(exitCode: number, output: string): ServiceCommandResult {
+  if (exitCode === 0 || !serviceRefreshUnsupported(output)) return { exitCode, output };
+  return {
+    exitCode: 0,
+    output: [
+      output.trim(),
+      'service repair: WinSW refresh недоступен в старый WinSW, launcher/XML обновлены, продолжаю запуск через start/restart.',
     ].filter(Boolean).join('\n'),
   };
 }

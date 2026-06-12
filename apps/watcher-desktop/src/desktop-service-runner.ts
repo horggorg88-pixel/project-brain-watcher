@@ -20,12 +20,13 @@ import {
 import { verifyProjectServerAccess } from './desktop-server-access.js';
 import {
   normalizeServiceInstallResult,
+  normalizeServiceRefreshResult,
   readServiceLauncherRepairState,
   shouldRepairServiceLauncherBeforeAction,
 } from './desktop-service-repair.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.23';
+const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.24';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 const WATCHER_COMMAND_TIMEOUT_MS = 60_000;
@@ -131,8 +132,13 @@ async function repairServiceLauncherIfNeeded(
     return { exitCode: normalized.exitCode, output: output.filter(Boolean).join('\n') };
   }
   if (install.exitCode !== 0) {
-    const refresh = await refreshServiceMetadata(profile, command, env);
-    output.push(refresh.exitCode === 0 ? 'service repair: refresh выполнен' : 'service repair: refresh не выполнен');
+    const refreshRaw = await refreshServiceMetadata(profile, command, env);
+    const refresh = normalizeServiceRefreshResult(refreshRaw.exitCode, refreshRaw.output);
+    output.push(refreshRaw.exitCode === 0
+      ? 'service repair: refresh выполнен'
+      : refresh.exitCode === 0
+        ? 'service repair: refresh недоступен, продолжаю через start/restart'
+        : 'service repair: refresh не выполнен');
     output.push(refresh.output);
     return { exitCode: refresh.exitCode, output: output.filter(Boolean).join('\n') };
   }
@@ -215,7 +221,8 @@ async function runUpdateAction(
   const installRaw = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env, serviceSpawnOptions('install'));
   const install = normalizeServiceInstallResult(installRaw.exitCode, installRaw.output);
   if (install.exitCode !== 0) return updateResult(paths, profile.id, policy, install.exitCode, versionReport, ['Пульт обновлён', install.output]);
-  const refresh = installRaw.exitCode === 0 ? null : await refreshServiceMetadata(profile, command, env);
+  const refreshRaw = installRaw.exitCode === 0 ? null : await refreshServiceMetadata(profile, command, env);
+  const refresh = refreshRaw ? normalizeServiceRefreshResult(refreshRaw.exitCode, refreshRaw.output) : null;
   if (refresh && refresh.exitCode !== 0) {
     return updateResult(paths, profile.id, policy, refresh.exitCode, versionReport, [
       'Пульт обновлён',
@@ -229,7 +236,9 @@ async function runUpdateAction(
   const restartSettlement = summarizeServiceActionSettlement('restart', restart.exitCode, restart.output, status);
   const installSummary = installRaw.exitCode === 0
     ? 'Watcher: служба установлена через текущий release.'
-    : 'Watcher: service repair: install already exists, launcher/XML обновлены, refresh выполнен.';
+    : refreshRaw?.exitCode === 0
+      ? 'Watcher: service repair: install already exists, launcher/XML обновлены, refresh выполнен.'
+      : 'Watcher: service repair: install already exists, launcher/XML обновлены, refresh недоступен, выполнен restart.';
   return {
     executed: true,
     policy,
