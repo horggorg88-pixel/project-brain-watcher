@@ -213,8 +213,10 @@ describe('watcher desktop contract', () => {
     expect(serviceRunnerSource).toContain('readServiceLauncherRepairState');
     expect(serviceRunnerSource).toContain('shouldRepairServiceLauncherBeforeAction');
     expect(serviceRunnerSource).toContain('normalizeServiceInstallResult');
+    expect(serviceRunnerSource).toContain('buildServiceRefreshArgs');
     expect(serviceRunnerSource).toContain('service repair: launcher устарел');
     expect(serviceRunnerSource).toContain('service repair: install already exists');
+    expect(serviceRunnerSource).toContain('service repair: refresh');
   });
 
   it('gives desktop self-update enough time and launches the downloaded installer', () => {
@@ -235,6 +237,7 @@ describe('watcher desktop contract', () => {
     expect(watcherBundle).toContain(`"v${watcherPackage.version}"`);
     expect(watcherBundle).not.toContain('"v1.4.4"');
     expect(watcherBundle).toContain('"--watch","--replace"');
+    expect(watcherBundle).toContain('"refresh"');
   });
 
   it('keeps service npx cache under the project service directory', () => {

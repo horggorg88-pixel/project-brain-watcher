@@ -25,7 +25,7 @@ import {
 } from './desktop-service-repair.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.22';
+const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.23';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 const WATCHER_COMMAND_TIMEOUT_MS = 60_000;
@@ -122,14 +122,35 @@ async function repairServiceLauncherIfNeeded(
   if (!shouldRepairServiceLauncherBeforeAction(action, status, repairState)) return null;
   const install = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env, serviceSpawnOptions('install'));
   const normalized = normalizeServiceInstallResult(install.exitCode, install.output);
+  const output = [
+    `service repair: launcher устарел (${repairState.reasons.join(', ')})`,
+    install.exitCode === 0 ? null : 'service repair: install already exists',
+    normalized.output,
+  ];
+  if (normalized.exitCode !== 0) {
+    return { exitCode: normalized.exitCode, output: output.filter(Boolean).join('\n') };
+  }
+  if (install.exitCode !== 0) {
+    const refresh = await refreshServiceMetadata(profile, command, env);
+    output.push(refresh.exitCode === 0 ? 'service repair: refresh выполнен' : 'service repair: refresh не выполнен');
+    output.push(refresh.output);
+    return { exitCode: refresh.exitCode, output: output.filter(Boolean).join('\n') };
+  }
   return {
-    exitCode: normalized.exitCode,
-    output: [
-      `service repair: launcher устарел (${repairState.reasons.join(', ')})`,
-      install.exitCode === 0 ? null : 'service repair: install already exists',
-      normalized.output,
-    ].filter(Boolean).join('\n'),
+    exitCode: 0,
+    output: output.filter(Boolean).join('\n'),
   };
+}
+
+async function refreshServiceMetadata(
+  profile: SavedProjectProfile,
+  command: string,
+  env: Readonly<Record<string, string>>,
+): Promise<{ readonly exitCode: number; readonly output: string }> {
+  return spawnWatcher(command, buildServiceRefreshArgs(profile), profile.root, env, {
+    timeoutMs: SERVICE_INSTALL_TIMEOUT_MS,
+    timeoutLabel: 'service refresh',
+  });
 }
 
 export function prepareServiceSecretForLaunch(
@@ -194,12 +215,21 @@ async function runUpdateAction(
   const installRaw = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env, serviceSpawnOptions('install'));
   const install = normalizeServiceInstallResult(installRaw.exitCode, installRaw.output);
   if (install.exitCode !== 0) return updateResult(paths, profile.id, policy, install.exitCode, versionReport, ['Пульт обновлён', install.output]);
+  const refresh = installRaw.exitCode === 0 ? null : await refreshServiceMetadata(profile, command, env);
+  if (refresh && refresh.exitCode !== 0) {
+    return updateResult(paths, profile.id, policy, refresh.exitCode, versionReport, [
+      'Пульт обновлён',
+      install.output,
+      'Watcher: service repair: refresh не выполнен.',
+      refresh.output,
+    ]);
+  }
   const restart = await spawnWatcher(command, buildServiceRestartArgs(profile), profile.root, env);
   const status = await waitForServiceActionStatus(paths, 'restart', profile.id);
   const restartSettlement = summarizeServiceActionSettlement('restart', restart.exitCode, restart.output, status);
   const installSummary = installRaw.exitCode === 0
     ? 'Watcher: служба установлена через текущий release.'
-    : 'Watcher: service repair: install already exists, launcher/XML обновлены.';
+    : 'Watcher: service repair: install already exists, launcher/XML обновлены, refresh выполнен.';
   return {
     executed: true,
     policy,
@@ -211,6 +241,7 @@ async function runUpdateAction(
       compactOutput(desktop.output),
       installSummary,
       compactOutput(install.output),
+      refresh ? compactOutput(refresh.output) : null,
       'Watcher: команда перезапуска выполнена.',
       compactOutput(restartSettlement.output),
     ].filter(Boolean).join('\n\n'),
@@ -343,6 +374,10 @@ function buildDesktopUpdateArgs(): string[] {
 
 function buildServiceInstallArgs(profile: SavedProjectProfile): string[] {
   return ['--yes', WATCHER_PACKAGE, 'service', 'install', ...serviceArgs(profile)];
+}
+
+function buildServiceRefreshArgs(profile: SavedProjectProfile): string[] {
+  return ['--yes', WATCHER_PACKAGE, 'service', 'refresh', ...serviceArgs(profile)];
 }
 
 function buildServiceRestartArgs(profile: SavedProjectProfile): string[] {
