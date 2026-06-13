@@ -185,15 +185,20 @@ describe('watcher desktop contract', () => {
     expect(packageJson.devDependencies?.electron).toBeDefined();
   });
 
-  it('keeps watcher native sqlite dependency outside the ESM bundle', () => {
+  it('keeps the service watcher package free of native sqlite install dependencies', () => {
     const watcherPackage = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8')) as {
       files?: readonly string[];
       dependencies?: Record<string, string>;
     };
+    const watcherBundle = readFileSync(join(process.cwd(), 'bin', 'watcher.js'), 'utf-8');
 
     expect(watcherPackage.files).toContain('bin/watcher.js');
     expect(watcherPackage.files).toContain('bin/run-watcher.js');
-    expect(watcherPackage.dependencies?.['better-sqlite3']).toBeDefined();
+    expect(watcherPackage.dependencies?.['better-sqlite3']).toBeUndefined();
+    expect(watcherBundle).not.toContain('better-sqlite3');
+    expect(watcherBundle).toContain('watcher-events.json');
+    expect(watcherBundle).not.toContain('watcher-events.sqlite');
+    expect(watcherBundle).not.toContain('durable SQLite');
   });
 
   it('starts service actions through the current watcher release', () => {
