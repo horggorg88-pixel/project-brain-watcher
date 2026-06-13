@@ -96,9 +96,12 @@ export function readLocalDesktopVersion(): string {
 }
 
 export function watcherPackageVersion(packageSpec: string): string {
-  const match = /#v?([^#\s]+)$/.exec(packageSpec.trim());
-  if (!match) throw new Error(`Версия watcher не найдена в package spec: ${packageSpec}`);
-  return normalizeReleaseVersion(match[1] ?? '');
+  const normalizedSpec = packageSpec.trim();
+  const hashMatch = /#v?([^#\s]+)$/.exec(normalizedSpec);
+  if (hashMatch) return normalizeReleaseVersion(hashMatch[1] ?? '');
+  const tarballMatch = /project-brain-watcher-v?([^/\s]+)\.tgz(?:[?#].*)?$/i.exec(normalizedSpec);
+  if (tarballMatch) return normalizeReleaseVersion(tarballMatch[1] ?? '');
+  throw new Error(`Версия watcher не найдена в package spec: ${packageSpec}`);
 }
 
 function lane(currentVersion: string, latestVersion: string): ReleaseLaneVersion {

@@ -202,11 +202,13 @@ describe('watcher desktop contract', () => {
       version?: string;
     };
 
-    expect(serviceRunnerSource).toContain(`project-brain-watcher#v${watcherPackage.version}`);
+    expect(serviceRunnerSource).toContain(`/releases/download/v${watcherPackage.version}/`);
+    expect(serviceRunnerSource).toContain(`project-brain-watcher-${watcherPackage.version}.tgz`);
     expect(serviceRunnerSource).toContain("'desktop', 'update'");
     expect(serviceRunnerSource).toContain("'service', 'install'");
     expect(serviceRunnerSource).toContain("'service', 'restart'");
     expect(serviceRunnerSource).not.toContain('project-brain-watcher#v1.4.4');
+    expect(serviceRunnerSource).not.toContain(`project-brain-watcher#v${watcherPackage.version}`);
     expect(serviceRunnerSource).toContain("'cmd.exe'");
     expect(serviceRunnerSource).toContain("'/d', '/s', '/c'");
   });
@@ -235,13 +237,16 @@ describe('watcher desktop contract', () => {
 
     expect(watcherBundle).toContain('Service node runtime установлен');
     expect(watcherBundle).toContain('npm.cmd');
-    expect(watcherBundle).toContain('npm install');
+    expect(watcherBundle).toContain('"install","--prefix"');
     expect(watcherBundle).toContain('npxPackage');
     expect(watcherBundle).toContain('watcherEntry');
     expect(watcherBundle).toContain('runtime-install.log');
     expect(watcherBundle).toContain('exit_code');
     expect(watcherBundle).toContain('--- stdout ---');
     expect(watcherBundle).toContain('--- stderr ---');
+    expect(watcherBundle).toContain('github:horggorg88-pixel\\/project-brain-watcher#v');
+    expect(watcherBundle).toContain('releases/download/v');
+    expect(watcherBundle).toContain('project-brain-watcher-');
   });
 
   it('repairs existing service metadata before start and update flows', () => {
@@ -285,7 +290,9 @@ describe('watcher desktop contract', () => {
       version?: string;
     };
 
-    expect(watcherBundle).toContain(`"v${watcherPackage.version}"`);
+    expect(watcherBundle).toContain(String(watcherPackage.version));
+    expect(watcherBundle).toContain('project-brain-watcher-');
+    expect(watcherBundle).toContain(`/releases/download/v`);
     expect(watcherBundle).not.toContain('"v1.4.4"');
     expect(watcherBundle).toContain('"--watch","--replace"');
     expect(watcherBundle).toContain('"refresh"');

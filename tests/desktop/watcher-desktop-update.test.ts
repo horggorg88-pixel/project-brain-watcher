@@ -3,6 +3,7 @@ import {
   buildReleaseVersionCheck,
   formatReleaseVersionCheck,
   normalizeReleaseVersion,
+  watcherPackageVersion,
 } from '../../apps/watcher-desktop/src/desktop-release-update.js';
 
 describe('watcher desktop release update checks', () => {
@@ -38,5 +39,12 @@ describe('watcher desktop release update checks', () => {
     expect(check.watcher.outdated).toBe(false);
     expect(formatReleaseVersionCheck(check)).toContain('Пульт: 1.4.15 актуален');
     expect(formatReleaseVersionCheck(check)).toContain('Watcher: 1.4.15 актуален');
+  });
+
+  it('extracts watcher version from GitHub shorthand and release tarball specs', () => {
+    expect(watcherPackageVersion('github:horggorg88-pixel/project-brain-watcher#v1.4.29')).toBe('1.4.29');
+    expect(watcherPackageVersion(
+      'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.29/project-brain-watcher-1.4.29.tgz',
+    )).toBe('1.4.29');
   });
 });
