@@ -237,6 +237,7 @@ describe('watcher desktop contract', () => {
 
     expect(watcherBundle).toContain('Service node runtime установлен');
     expect(watcherBundle).toContain('Service node runtime entry создан');
+    expect(watcherBundle).toContain('cmd.exe');
     expect(watcherBundle).toContain('npm.cmd');
     expect(watcherBundle).toContain('"install","--prefix"');
     expect(watcherBundle).toContain('npxPackage');
