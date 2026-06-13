@@ -238,6 +238,10 @@ describe('watcher desktop contract', () => {
     expect(watcherBundle).toContain('npm install');
     expect(watcherBundle).toContain('npxPackage');
     expect(watcherBundle).toContain('watcherEntry');
+    expect(watcherBundle).toContain('runtime-install.log');
+    expect(watcherBundle).toContain('exit_code');
+    expect(watcherBundle).toContain('--- stdout ---');
+    expect(watcherBundle).toContain('--- stderr ---');
   });
 
   it('repairs existing service metadata before start and update flows', () => {
