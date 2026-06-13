@@ -39,6 +39,8 @@ export function readServiceLauncherRepairState(profile: SavedProjectProfile): Se
     reasons.push('launcher_missing_node_runtime_entry');
   } else if (!existsSync(watcherEntry)) {
     reasons.push('service_runtime_missing');
+  } else if (!existsSync(serviceRuntimeManifestPath(profile))) {
+    reasons.push('service_runtime_manifest_missing');
   }
   const xmlPath = serviceXmlPath(profile);
   if (existsSync(xmlPath) && usesNpxRunner(readFileSync(xmlPath, 'utf-8'))) {
@@ -87,7 +89,11 @@ export function shouldRepairServiceLauncherBeforeAction(
 }
 
 function serviceRuntimeWatcherEntry(profile: SavedProjectProfile): string {
-  return join(profile.root, '.brain', 'service', 'runtime', 'node_modules', 'project-brain-watcher', 'bin', 'watcher.js');
+  return join(profile.root, '.brain', 'service', 'runtime-entry.js');
+}
+
+function serviceRuntimeManifestPath(profile: SavedProjectProfile): string {
+  return join(profile.root, '.brain', 'service', 'active-runtime.json');
 }
 
 function serviceXmlPath(profile: SavedProjectProfile): string {

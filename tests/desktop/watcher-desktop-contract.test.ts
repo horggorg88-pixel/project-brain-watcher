@@ -220,7 +220,7 @@ describe('watcher desktop contract', () => {
     expect(serviceRunnerSource).toContain("'node'");
     expect(serviceRunnerSource).toContain("'--watcher-entry'");
     expect(serviceRunnerSource).toContain('serviceWatcherEntry(profile)');
-    expect(serviceRunnerSource).toContain("'runtime', 'node_modules', 'project-brain-watcher', 'bin', 'watcher.js'");
+    expect(serviceRunnerSource).toContain("'runtime-entry.js'");
     expect(serviceRunnerSource).not.toContain("return ['--path',");
   });
 
@@ -236,11 +236,18 @@ describe('watcher desktop contract', () => {
     const watcherBundle = readFileSync(join(process.cwd(), 'bin', 'watcher.js'), 'utf-8');
 
     expect(watcherBundle).toContain('Service node runtime установлен');
+    expect(watcherBundle).toContain('Service node runtime entry создан');
     expect(watcherBundle).toContain('npm.cmd');
     expect(watcherBundle).toContain('"install","--prefix"');
     expect(watcherBundle).toContain('npxPackage');
     expect(watcherBundle).toContain('watcherEntry');
     expect(watcherBundle).toContain('runtime-install.log');
+    expect(watcherBundle).toContain('runtime-staging');
+    expect(watcherBundle).toContain('runtime-entry.js');
+    expect(watcherBundle).toContain('active-runtime.json');
+    expect(watcherBundle).toContain('active_entry');
+    expect(watcherBundle).toContain('attempt_runtime_dir');
+    expect(watcherBundle).toContain('attempt_npm_cache');
     expect(watcherBundle).toContain('exit_code');
     expect(watcherBundle).toContain('--- stdout ---');
     expect(watcherBundle).toContain('--- stderr ---');
