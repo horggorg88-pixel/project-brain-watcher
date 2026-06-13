@@ -67,6 +67,8 @@ describe('watcher desktop contract', () => {
     expect(contractsSource).toContain('readonly group: string');
     expect(contractsSource).toContain('readonly description: string');
     expect(contractsSource).toContain('readonly whenToUse: string');
+    expect(contractsSource).toContain('readonly aliases?: readonly string[]');
+    expect(contractsSource).toContain('readonly confusionGuard?: string');
     expect(contractsSource).toContain('readonly useCases: readonly string[]');
     expect(preloadSource).toContain("ipcRenderer.invoke('window:minimize'");
     expect(preloadSource).toContain("ipcRenderer.invoke('window:toggle-maximize'");
@@ -90,6 +92,8 @@ describe('watcher desktop contract', () => {
     expect(rendererViewSource).toContain('data-access-logout');
     expect(rendererViewSource).toContain('mode-group');
     expect(rendererViewSource).toContain('mode-description');
+    expect(rendererViewSource).toContain('Триггеры');
+    expect(rendererViewSource).toContain('Не путать');
     expect(rendererViewSource).toContain('Когда применять');
     expect(rendererViewSource).toContain('Кейсы');
     expect(rendererViewSource).not.toContain('disabled>Выход</button>');
@@ -246,6 +250,20 @@ describe('watcher desktop contract', () => {
     expect(serviceRunnerSource).toContain('service repair: launcher устарел');
     expect(serviceRunnerSource).toContain('service repair: install already exists');
     expect(serviceRunnerSource).toContain('service repair: refresh');
+  });
+
+  it('keeps the mode legend explicit about wavy aliases and Idol as an MCP mode', () => {
+    const modeCatalogSource = readFileSync(join(appRoot, 'src', 'desktop-mode-catalog.ts'), 'utf-8');
+    const configPackageSource = readFileSync(join(appRoot, 'src', 'desktop-config-package.ts'), 'utf-8');
+
+    expect(modeCatalogSource).toContain('wavy');
+    expect(modeCatalogSource).toContain('вейви');
+    expect(modeCatalogSource).toContain('IDOL не внешняя шкала');
+    expect(modeCatalogSource).toContain('operator_workflow:idol');
+    expect(configPackageSource).toContain('Лёгкая легенда MCP-режимов');
+    expect(configPackageSource).toContain('wave / wavy / вейви');
+    expect(configPackageSource).toContain('idol / идол');
+    expect(configPackageSource).toContain('IDOL не внешняя шкала');
   });
 
   it('gives desktop self-update enough time and launches the downloaded installer', () => {

@@ -6,7 +6,14 @@ export interface DesktopModeCatalogEntry {
   readonly summary: string;
   readonly description: string;
   readonly whenToUse: string;
+  readonly aliases?: readonly string[];
+  readonly confusionGuard?: string;
   readonly useCases: readonly string[];
+}
+
+interface DesktopModeCatalogEntryOptions {
+  readonly aliases?: readonly string[];
+  readonly confusionGuard?: string;
 }
 
 export const desktopModeCatalog: readonly DesktopModeCatalogEntry[] = [
@@ -17,7 +24,8 @@ export const desktopModeCatalog: readonly DesktopModeCatalogEntry[] = [
       'ИИ получает актуальную карту проекта перед правками.',
       'После выбора нового проекта route фиксируется на правильном local_path.',
       'Пульт показывает, найден ли MCP-конфиг и активен ли watcher.',
-    ]),
+    ],
+    { aliases: ['BRAIN ON', 'brain_status'], confusionGuard: 'Brain выбирает проект и контекст; он не заменяет operator workflow.' }),
   entry('wave', 'Wave', 'operator_workflow:wave', 'Основные MCP-режимы', 'Три волны и пять агентов через operator rails',
     'Режим зрелой проверки идеи или реализации: три волны, пять агентов, обязательные стадии plan, validate, start и фиксация результата. Нужен, чтобы ИИ не завершал анализ раньше времени.',
     'Используется для UX-ревью, архитектурной зрелости, покрытия сценариев и перед крупными изменениями.',
@@ -25,7 +33,8 @@ export const desktopModeCatalog: readonly DesktopModeCatalogEntry[] = [
       'Пять агентов смотрят на один и тот же контур с разных сторон.',
       'Каждая волна должна оставить evidence, иначе workflow не считается завершённым.',
       'После фикса можно повторить wave и сравнить зрелость до/после.',
-    ]),
+    ],
+    { aliases: ['wave', 'waves', 'wavy', 'вейви', 'волны'], confusionGuard: 'Wave проверяет один проход волнами; Idol запускает повторяемые циклы со scorecard.' }),
   entry('idol', 'Idol', 'operator_workflow:idol', 'Основные MCP-режимы', 'Циклы idol с wave-внутренностями и evidence gates',
     'Надстройка над wave: режим идёт циклами, внутри каждого цикла есть wave-проработка, агентские receipts, scorecard и порог зрелости. Это режим доведения концепции до заданного уровня, а не разовая проверка.',
     'Используется, когда нужно поднять зрелость режима, UX или архитектуры до целевого процента.',
@@ -33,7 +42,8 @@ export const desktopModeCatalog: readonly DesktopModeCatalogEntry[] = [
       'Цикл не закрывается без трёх wave-волн и отчётов агентов.',
       'Scorecard показывает, где зрелость просела: рельсы, gates, UX или интеграции.',
       'Если цель 95%, Idol повторяет проходы до закрытия дыр.',
-    ]),
+    ],
+    { aliases: ['idol', 'идол', 'IDOL', 'maturity', 'зрелость'], confusionGuard: 'IDOL не внешняя шкала; это MCP operator_workflow:idol со scorecard, NG+ gates и receipts.' }),
   entry('swarm', 'Swarm', 'swarm_start', 'Основные MCP-режимы', 'Параллельные агенты через watcher applier',
     'Режим параллельной реализации: задачи режутся на независимые файлы или блоки, агенты работают изолированно, watcher принимает результат и применяет через отдельную ветку.',
     'Используется, когда есть много независимых задач и нужен контролируемый параллелизм.',
@@ -41,7 +51,8 @@ export const desktopModeCatalog: readonly DesktopModeCatalogEntry[] = [
       'Один агент пишет один файл или один независимый блок.',
       'Watcher принимает изменения через applier, а не через ручную кашу правок.',
       'Ревью diff остаётся обязательным перед merge.',
-    ]),
+    ],
+    { aliases: ['swarm', 'рой', 'parallel agents'], confusionGuard: 'Swarm исполняет независимые задачи; Wave/Idol оценивают зрелость и gates.' }),
   entry('watcher', 'Watcher', 'project-brain-watcher', 'Основные MCP-режимы', 'Локальная служба индексации и доставки изменений',
     'Локальная служба, которая держит индекс проекта свежим, доиндексирует изменения, отдаёт состояние в MCP и служит транспортом для desktop/swarm/applier сценариев.',
     'Используется постоянно: после установки, при смене проекта, перед проверками и во время работы агентов.',
@@ -49,7 +60,8 @@ export const desktopModeCatalog: readonly DesktopModeCatalogEntry[] = [
       'После первого полного индекса watcher дальше должен доиндексировать изменения.',
       'Пульт может запустить, перезапустить, остановить и обновить службу.',
       'Логи показывают, жив ли watcher и что он реально делает.',
-    ]),
+    ],
+    { aliases: ['watcher', 'service', 'служба'], confusionGuard: 'Watcher должен запускаться из папки выбранного проекта; watcher MCP-монорепо не заменяет watcher клиентского узла.' }),
   entry('consultation', 'Консультация', 'mode:consultation', 'Операторские режимы', 'Только объяснение и анализ без изменений',
     'Безопасный режим разговора: ИИ может читать контекст, объяснять, сравнивать, разбирать кейсы, но не должен менять проект, запускать мутации или пушить.',
     'Используется, когда нужно понять последствия, риски или концепцию до реализации.',
@@ -133,6 +145,7 @@ function entry(
   description: string,
   whenToUse: string,
   useCases: readonly string[],
+  options: DesktopModeCatalogEntryOptions = {},
 ): DesktopModeCatalogEntry {
-  return { id, title, technicalName, group, summary, description, whenToUse, useCases };
+  return { id, title, technicalName, group, summary, description, whenToUse, useCases, ...options };
 }

@@ -485,6 +485,52 @@ describe('watcher desktop core', () => {
     expect(result.output).toContain('.brain/service/runtime');
   });
 
+  it('diagnoses the lbsclipnote field node service loop from Dmitry logs', () => {
+    const result = summarizeServiceActionSettlement(
+      'start',
+      0,
+      [
+        'service repair: launcher устарел (launcher_missing_service_npm_cache, launcher_missing_update_notifier_guard)',
+        'service repair: install already exists',
+        'service repair: WinSW refresh недоступен в старый WinSW, launcher/XML обновлены, продолжаю запуск через start/restart.',
+        'Service started successfully.',
+      ].join('\n'),
+      statusFixture({
+        projectId: 'lbsclipnote',
+        root: 'C:\\Jobka\\projects\\LBSCLIPNOTE_WORK\\LBSClipNote',
+        running: false,
+        health: 'stopped',
+        lastError: 'Windows Service STOPPED, WIN32_EXIT_CODE=1067',
+        logs: {
+          errPath: 'C:\\Jobka\\projects\\LBSCLIPNOTE_WORK\\LBSClipNote\\.brain\\service\\ProjectBrainWatcher-lbsclipnote.err.log',
+          outPath: 'C:\\Jobka\\projects\\LBSCLIPNOTE_WORK\\LBSClipNote\\.brain\\service\\ProjectBrainWatcher-lbsclipnote.out.log',
+          wrapperPath: 'C:\\Jobka\\projects\\LBSCLIPNOTE_WORK\\LBSClipNote\\.brain\\service\\ProjectBrainWatcher-lbsclipnote.wrapper.log',
+          err: [
+            'npm warn deprecated prebuild-install@7.1.3',
+            'npm warn cleanup Failed to remove some directories',
+            'C:\\Jobka\\projects\\LBSCLIPNOTE_WORK\\LBSClipNote\\.brain\\service\\npm-cache\\_npx\\59ff3b72c3b79437\\node_modules',
+            'Error: EPERM: operation not permitted, rmdir',
+          ].join('\n'),
+          out: '',
+          wrapper: [
+            'FATAL - Unhandled exception',
+            'System.Exception: Unknown command: refresh',
+            'A service with ID ProjectBrainWatcher-lbsclipnote already exists.',
+          ].join('\n'),
+        },
+      }),
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain('field-node lbsclipnote');
+    expect(result.output).toContain('C:\\Jobka\\projects\\LBSCLIPNOTE_WORK\\LBSClipNote');
+    expect(result.output).toContain('install already exists не является причиной падения watcher');
+    expect(result.output).toContain('refresh не поддерживается текущим WinSW');
+    expect(result.output).toContain('EPERM cleanup в npm-cache');
+    expect(result.output).toContain('.brain/service/runtime');
+    expect(result.output).toContain('WIN32_EXIT_CODE=1067');
+  });
+
   it('stages the verified bearer into the service secret before launching the installed service', () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'repo');
@@ -694,6 +740,10 @@ describe('watcher desktop core', () => {
     expect(pack.prompt).toContain('brain_status(project_id="mcp-monorepo"');
     expect(pack.prompt).toContain('reinitialize_project_route');
     expect(pack.prompt).toContain('policy_context_pack');
+    expect(pack.prompt).toContain('Лёгкая легенда MCP-режимов');
+    expect(pack.prompt).toContain('wave / wavy / вейви');
+    expect(pack.prompt).toContain('idol / идол');
+    expect(pack.prompt).toContain('IDOL не внешняя шкала');
     expect(pack.prompt).not.toContain(VALID_TEST_BEARER);
   });
 
@@ -918,6 +968,9 @@ describe('watcher desktop core', () => {
     ]);
     expect(modes.find(mode => mode.id === 'idol')?.rails.length).toBeGreaterThan(0);
     expect(modes.find(mode => mode.id === 'wave')?.description).toContain('три волны');
+    expect(modes.find(mode => mode.id === 'wave')?.aliases).toEqual(expect.arrayContaining(['wavy', 'вейви']));
+    expect(modes.find(mode => mode.id === 'idol')?.aliases).toEqual(expect.arrayContaining(['idol', 'идол']));
+    expect(modes.find(mode => mode.id === 'idol')?.confusionGuard).toContain('не внешняя шкала');
     expect(modes.find(mode => mode.id === 'runtime-policy-gates')).toBeUndefined();
     expect(modes.find(mode => mode.id === 'todoist-sync')?.group).toBe('Интеграции');
   });

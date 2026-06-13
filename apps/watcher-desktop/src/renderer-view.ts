@@ -136,7 +136,9 @@ function renderModeCard(mode: DesktopModeSummary): string {
     <p class="mode-summary">${escapeHtml(mode.summary)}</p>
     <p class="mode-description">${escapeHtml(mode.description)}</p>
     <dl class="mode-facts">
+      ${mode.aliases?.length ? `<div><dt>Триггеры</dt><dd>${escapeHtml(mode.aliases.join(', '))}</dd></div>` : ''}
       <div><dt>Когда применять</dt><dd>${escapeHtml(mode.whenToUse)}</dd></div>
+      ${mode.confusionGuard ? `<div><dt>Не путать</dt><dd>${escapeHtml(mode.confusionGuard)}</dd></div>` : ''}
       <div><dt>Кейсы</dt><dd><ul>${mode.useCases.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></dd></div>
     </dl>
     <div class="rail-line">${mode.rails.map(stage => `<span class="${stage.active ? 'active' : ''}" title="${escapeHtml(stage.detail)}">${escapeHtml(stage.label)}</span>`).join('')}</div>

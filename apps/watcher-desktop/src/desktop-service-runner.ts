@@ -26,7 +26,7 @@ import {
 } from './desktop-service-repair.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.26';
+const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.27';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 const WATCHER_COMMAND_TIMEOUT_MS = 60_000;
@@ -210,11 +210,23 @@ function serviceSettlementError(
 function serviceFailureDiagnostics(status: WatcherServiceStatus): string | null {
   const reasons: string[] = [];
   const logText = [status.logs?.err, status.logs?.out, status.logs?.wrapper].filter(Boolean).join('\n');
+  if (status.projectId || status.root) {
+    reasons.push(`field-node ${status.projectId || 'unknown'}: ${status.root || 'root не определён'}. Проверяй именно этот профиль и его Windows service metadata.`);
+  }
   if (/\b_npx\b|npm-cache|npm warn cleanup/i.test(logText)) {
     reasons.push('launcher всё ещё запускает npx/npm; служба должна идти через локальный .brain/service/runtime node package.');
   }
+  if (/EPERM/i.test(logText) && /(?:npm-cache|_npx)/i.test(logText)) {
+    reasons.push('EPERM cleanup в npm-cache указывает на npx/npm runtime footprint; проверь launch-watcher.ps1 и .brain/service/runtime перед повторным start.');
+  }
   if (/cannot find module|module_not_found/i.test(logText) && /runtime|watcher\.js/i.test(logText)) {
     reasons.push('локальный service runtime отсутствует или повреждён; нужен repair/install для .brain/service/runtime.');
+  }
+  if (/already exists|служба уже существует/i.test(logText)) {
+    reasons.push('install already exists не является причиной падения watcher; это repair-фолбэк после обновления launcher/XML, дальше решает health после start/restart.');
+  }
+  if (/unknown command:\s*refresh/i.test(logText)) {
+    reasons.push('refresh не поддерживается текущим WinSW; это compatibility fallback, после него нужен обычный start/restart и проверка healthy.');
   }
   if (/WIN32_EXIT_CODE=1067/i.test(status.lastError ?? '')) {
     reasons.push('1067 означает, что Windows Service-процесс завершился после старта; первичная ошибка находится выше в watcher/npm логах.');

@@ -206,6 +206,8 @@ export interface DesktopModeSummary {
   readonly summary: string;
   readonly description: string;
   readonly whenToUse: string;
+  readonly aliases?: readonly string[];
+  readonly confusionGuard?: string;
   readonly useCases: readonly string[];
   readonly primaryAction: string;
   readonly rails: readonly DesktopModeRailStage[];
