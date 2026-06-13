@@ -456,6 +456,35 @@ describe('watcher desktop core', () => {
     expect(result.output).toContain('WIN32_EXIT_CODE=1067');
   });
 
+  it('adds npx runtime diagnostics when a stopped service log shows npm cache cleanup warnings', () => {
+    const result = summarizeServiceActionSettlement(
+      'start',
+      0,
+      'Service started successfully.',
+      statusFixture({
+        running: false,
+        health: 'stopped',
+        lastError: 'Windows Service STOPPED, WIN32_EXIT_CODE=1067',
+        logs: {
+          errPath: 'C:\\repo\\.brain\\service\\ProjectBrainWatcher-demo.err.log',
+          outPath: 'C:\\repo\\.brain\\service\\ProjectBrainWatcher-demo.out.log',
+          wrapperPath: 'C:\\repo\\.brain\\service\\ProjectBrainWatcher-demo.wrapper.log',
+          err: [
+            'npm warn cleanup Failed to remove some directories',
+            'C:\\repo\\.brain\\service\\npm-cache\\_npx\\59ff3b72c3b79437\\node_modules',
+          ].join('\n'),
+          out: '',
+          wrapper: 'Service started successfully.',
+        },
+      }),
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain('Диагностика службы');
+    expect(result.output).toContain('launcher всё ещё запускает npx/npm');
+    expect(result.output).toContain('.brain/service/runtime');
+  });
+
   it('stages the verified bearer into the service secret before launching the installed service', () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'repo');

@@ -26,7 +26,7 @@ import {
 } from './desktop-service-repair.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.25';
+const WATCHER_PACKAGE = 'github:horggorg88-pixel/project-brain-watcher#v1.4.26';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 const WATCHER_COMMAND_TIMEOUT_MS = 60_000;
@@ -96,7 +96,7 @@ export async function runServiceAction(
       output: repair.output,
     };
   }
-  const rawResult = await spawnWatcher(command, buildServiceArgs(request.action, profile), profile.root, env, serviceSpawnOptions(request.action));
+  const rawResult = await spawnWatcher(command, buildServiceActionArgs(request.action, profile), profile.root, env, serviceSpawnOptions(request.action));
   const result = request.action === 'install'
     ? normalizeServiceInstallResult(rawResult.exitCode, rawResult.output)
     : rawResult;
@@ -196,12 +196,30 @@ function serviceSettlementError(
   status: WatcherServiceStatus,
 ): string | null {
   if ((action === 'start' || action === 'restart') && (!status.running || status.health !== 'healthy')) {
-    return `Watcher не перешёл в healthy: ${status.lastError ?? status.health}`;
+    return [
+      `Watcher не перешёл в healthy: ${status.lastError ?? status.health}`,
+      serviceFailureDiagnostics(status),
+    ].filter(Boolean).join('\n');
   }
   if (action === 'stop' && status.running) {
     return `Watcher не остановился: ${status.lastError ?? 'служба всё ещё RUNNING'}`;
   }
   return null;
+}
+
+function serviceFailureDiagnostics(status: WatcherServiceStatus): string | null {
+  const reasons: string[] = [];
+  const logText = [status.logs?.err, status.logs?.out, status.logs?.wrapper].filter(Boolean).join('\n');
+  if (/\b_npx\b|npm-cache|npm warn cleanup/i.test(logText)) {
+    reasons.push('launcher всё ещё запускает npx/npm; служба должна идти через локальный .brain/service/runtime node package.');
+  }
+  if (/cannot find module|module_not_found/i.test(logText) && /runtime|watcher\.js/i.test(logText)) {
+    reasons.push('локальный service runtime отсутствует или повреждён; нужен repair/install для .brain/service/runtime.');
+  }
+  if (/WIN32_EXIT_CODE=1067/i.test(status.lastError ?? '')) {
+    reasons.push('1067 означает, что Windows Service-процесс завершился после старта; первичная ошибка находится выше в watcher/npm логах.');
+  }
+  return reasons.length > 0 ? ['Диагностика службы:', ...reasons.map(reason => `- ${reason}`)].join('\n') : null;
 }
 
 async function runUpdateAction(
@@ -360,21 +378,8 @@ function servicePolicy(
   return { decision: 'allow', risk: request.action === 'install' || request.action === 'update' ? 'high' : 'medium', reasons: ['Действие подтверждено пользователем'] };
 }
 
-function buildServiceArgs(action: WatcherServiceActionRequest['action'], profile: SavedProjectProfile): string[] {
-  return [
-    '--yes',
-    WATCHER_PACKAGE,
-    'service',
-    action,
-    '--path',
-    profile.root,
-    '--server',
-    profile.serverUrl,
-    '--token-env',
-    profile.tokenEnv,
-    '--project',
-    profile.id,
-  ];
+function buildServiceActionArgs(action: WatcherServiceActionRequest['action'], profile: SavedProjectProfile): string[] {
+  return ['--yes', WATCHER_PACKAGE, 'service', action, ...serviceArgs(profile)];
 }
 
 function buildDesktopUpdateArgs(): string[] {

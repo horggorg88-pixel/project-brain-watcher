@@ -218,6 +218,14 @@ describe('watcher desktop contract', () => {
     expect(serviceRunnerSource).not.toContain("return ['--path',");
   });
 
+  it('routes normal service mutations through the local node runtime arguments', () => {
+    const serviceRunnerSource = readFileSync(join(appRoot, 'src', 'desktop-service-runner.ts'), 'utf-8');
+
+    expect(serviceRunnerSource).toContain('buildServiceActionArgs(request.action, profile)');
+    expect(serviceRunnerSource).toContain("return ['--yes', WATCHER_PACKAGE, 'service', action, ...serviceArgs(profile)]");
+    expect(serviceRunnerSource).not.toContain("'service',\n    action,\n    '--path'");
+  });
+
   it('materializes the node service runtime during service install', () => {
     const watcherBundle = readFileSync(join(process.cwd(), 'bin', 'watcher.js'), 'utf-8');
 

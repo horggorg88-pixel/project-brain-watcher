@@ -61,11 +61,17 @@ describe('watcher desktop service repair', () => {
     const missing = readServiceLauncherRepairState(profile);
     writeFileSync(join(serviceDir, 'launch-watcher.ps1'), '$ErrorActionPreference = "Stop"\n& npx @args\n', 'utf-8');
     const legacy = readServiceLauncherRepairState(profile);
+    const runtimeBin = join(serviceDir, 'runtime', 'node_modules', 'project-brain-watcher', 'bin');
+    const watcherEntry = join(runtimeBin, 'watcher.js');
+    mkdirSync(runtimeBin, { recursive: true });
+    writeFileSync(watcherEntry, '#!/usr/bin/env node\n', 'utf-8');
     writeFileSync(join(serviceDir, 'launch-watcher.ps1'), [
       '$ErrorActionPreference = "Stop"',
       '$npmCache = Join-Path $PSScriptRoot "npm-cache"',
       '[Environment]::SetEnvironmentVariable("NPM_CONFIG_CACHE", $npmCache, "Process")',
       '[Environment]::SetEnvironmentVariable("NO_UPDATE_NOTIFIER", "1", "Process")',
+      '$exe = "node.exe"',
+      `$argsList = @("${watcherEntry}", "start")`,
     ].join('\n'), 'utf-8');
     const current = readServiceLauncherRepairState(profile);
 
@@ -74,6 +80,73 @@ describe('watcher desktop service repair', () => {
     expect(legacy.requiresRepair).toBe(true);
     expect(legacy.reasons).toContain('launcher_missing_service_npm_cache');
     expect(current.requiresRepair).toBe(false);
+  });
+
+  it('detects npx launchers even when npm cache guards are already present', () => {
+    const profile = profileFixture();
+    const serviceDir = join(profile.root, '.brain', 'service');
+    mkdirSync(serviceDir, { recursive: true });
+    writeFileSync(join(serviceDir, 'launch-watcher.ps1'), [
+      '$ErrorActionPreference = "Stop"',
+      '$npmCache = Join-Path $PSScriptRoot "npm-cache"',
+      '[Environment]::SetEnvironmentVariable("NPM_CONFIG_CACHE", $npmCache, "Process")',
+      '[Environment]::SetEnvironmentVariable("NO_UPDATE_NOTIFIER", "1", "Process")',
+      '$exe = "npx.cmd"',
+      '$argsList = @("--yes", "github:horggorg88-pixel/project-brain-watcher#v1.4.25", "start")',
+    ].join('\n'), 'utf-8');
+
+    const state = readServiceLauncherRepairState(profile);
+
+    expect(state.requiresRepair).toBe(true);
+    expect(state.reasons).toContain('launcher_uses_npx_runner');
+  });
+
+  it('requires repair when a node launcher points at a missing local service runtime', () => {
+    const profile = profileFixture();
+    const serviceDir = join(profile.root, '.brain', 'service');
+    const watcherEntry = join(serviceDir, 'runtime', 'node_modules', 'project-brain-watcher', 'bin', 'watcher.js');
+    mkdirSync(serviceDir, { recursive: true });
+    writeFileSync(join(serviceDir, 'launch-watcher.ps1'), [
+      '$ErrorActionPreference = "Stop"',
+      '$npmCache = Join-Path $PSScriptRoot "npm-cache"',
+      '[Environment]::SetEnvironmentVariable("NPM_CONFIG_CACHE", $npmCache, "Process")',
+      '[Environment]::SetEnvironmentVariable("NO_UPDATE_NOTIFIER", "1", "Process")',
+      '$exe = "node.exe"',
+      `$argsList = @("${watcherEntry}", "start")`,
+    ].join('\n'), 'utf-8');
+
+    const state = readServiceLauncherRepairState(profile);
+
+    expect(state.requiresRepair).toBe(true);
+    expect(state.reasons).toContain('service_runtime_missing');
+  });
+
+  it('requires repair when service XML still launches npx metadata', () => {
+    const profile = profileFixture();
+    const serviceDir = join(profile.root, '.brain', 'service');
+    const runtimeBin = join(serviceDir, 'runtime', 'node_modules', 'project-brain-watcher', 'bin');
+    const watcherEntry = join(runtimeBin, 'watcher.js');
+    mkdirSync(runtimeBin, { recursive: true });
+    writeFileSync(watcherEntry, '#!/usr/bin/env node\n', 'utf-8');
+    writeFileSync(join(serviceDir, 'launch-watcher.ps1'), [
+      '$ErrorActionPreference = "Stop"',
+      '$npmCache = Join-Path $PSScriptRoot "npm-cache"',
+      '[Environment]::SetEnvironmentVariable("NPM_CONFIG_CACHE", $npmCache, "Process")',
+      '[Environment]::SetEnvironmentVariable("NO_UPDATE_NOTIFIER", "1", "Process")',
+      '$exe = "node.exe"',
+      `$argsList = @("${watcherEntry}", "start")`,
+    ].join('\n'), 'utf-8');
+    writeFileSync(join(serviceDir, 'ProjectBrainWatcher-demo.xml'), [
+      '<service>',
+      '  <executable>npx.cmd</executable>',
+      '  <arguments>--yes github:horggorg88-pixel/project-brain-watcher#v1.4.4 service start</arguments>',
+      '</service>',
+    ].join('\n'), 'utf-8');
+
+    const state = readServiceLauncherRepairState(profile);
+
+    expect(state.requiresRepair).toBe(true);
+    expect(state.reasons).toContain('service_xml_uses_npx_runner');
   });
 
   it('requests launcher repair before starting an installed service with stale metadata', () => {
