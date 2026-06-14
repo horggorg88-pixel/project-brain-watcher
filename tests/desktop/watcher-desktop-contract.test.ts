@@ -143,15 +143,20 @@ describe('watcher desktop contract', () => {
   });
 
   it('keeps project block buttons aligned without text wrapping', () => {
+    const html = readFileSync(join(appRoot, 'src', 'index.html'), 'utf-8');
     const baseCss = readFileSync(join(appRoot, 'src', 'styles', 'base.css'), 'utf-8');
     const layoutCss = readFileSync(join(appRoot, 'src', 'styles', 'layout.css'), 'utf-8');
     const componentsCss = readFileSync(join(appRoot, 'src', 'styles', 'components.css'), 'utf-8');
+    const topbarHtml = html.match(/<header class="topbar">[\s\S]*?<\/header>/)?.[0] ?? '';
 
+    expect(topbarHtml).not.toContain('data-open-service-logs');
     expect(baseCss).toContain('display: inline-flex;');
     expect(baseCss).toContain('white-space: nowrap;');
     expect(baseCss).toMatch(/body\s*\{[\s\S]*color:\s*var\(--ink\)/);
     expect(layoutCss).toContain('.project-picker > button');
     expect(layoutCss).toContain('.project-picker label');
+    expect(layoutCss).toContain('.project-picker label::after');
+    expect(layoutCss).toContain('appearance: none;');
     expect(layoutCss).toContain('margin-bottom: 0;');
     expect(layoutCss).toContain('.topbar-actions > button');
     expect(layoutCss).toContain('.topbar-actions .overall-badge');
