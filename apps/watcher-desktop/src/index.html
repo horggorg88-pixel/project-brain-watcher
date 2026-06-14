@@ -62,6 +62,7 @@
           </div>
           <div class="topbar-actions">
             <span class="overall-badge" data-overall-status>Проверяем...</span>
+            <button type="button" class="ghost" data-open-service-logs>Показать логи</button>
             <button type="button" data-download-config>Скачать файл настройки</button>
             <button type="button" class="ghost" data-toggle-theme>Тема</button>
           </div>
@@ -75,6 +76,7 @@
             </div>
             <button type="button" data-run-full-check>Проверить подключение</button>
           </div>
+          <div class="connection-cause" data-connection-cause>Проверяем причину...</div>
           <div class="checklist" data-checklist></div>
         </section>
 
@@ -97,6 +99,7 @@
             </div>
             <div class="section-actions">
               <span class="overall-badge" data-service-summary>Проверяем...</span>
+              <button type="button" class="ghost" data-open-service-logs>Показать логи</button>
               <button type="button" class="ghost" data-copy-service-logs>Копировать логи</button>
             </div>
           </div>
@@ -146,7 +149,7 @@
       <section class="bottom-console" data-bottom-console>
         <div>
           <strong>Логи</strong>
-          <button type="button" class="ghost" data-console-toggle>Скрыть</button>
+          <button type="button" class="ghost" data-console-toggle>Скрыть логи</button>
         </div>
         <pre data-service-output>Команды службы ещё не запускались</pre>
       </section>

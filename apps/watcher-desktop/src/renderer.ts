@@ -22,6 +22,7 @@ import {
   hydrateProjectForm,
   renderConfigPackage,
   renderConnectionCheck,
+  renderConnectionCause,
   renderModes,
   renderOverall,
   renderProjectSelect,
@@ -57,11 +58,13 @@ const selectRootButton = document.querySelector<HTMLButtonElement>('[data-select
 const downloadConfigButton = document.querySelector<HTMLButtonElement>('[data-download-config]');
 const copyPromptButton = document.querySelector<HTMLButtonElement>('[data-copy-prompt]');
 const copyServiceLogsButton = document.querySelector<HTMLButtonElement>('[data-copy-service-logs]');
+const openServiceLogsButtons = document.querySelectorAll<HTMLButtonElement>('[data-open-service-logs]');
 const toggleThemeButton = document.querySelector<HTMLButtonElement>('[data-toggle-theme]');
 const runFullCheckButton = document.querySelector<HTMLButtonElement>('[data-run-full-check]');
 const consoleToggleButton = document.querySelector<HTMLButtonElement>('[data-console-toggle]');
 const bottomConsoleEl = document.querySelector<HTMLElement>('[data-bottom-console]');
 const checklistEl = document.querySelector<HTMLElement>('[data-checklist]');
+const connectionCauseEl = document.querySelector<HTMLElement>('[data-connection-cause]');
 const overallStatusEl = document.querySelector<HTMLElement>('[data-overall-status]');
 const serviceSummaryEl = document.querySelector<HTMLElement>('[data-service-summary]');
 const serviceStatusEl = document.querySelector<HTMLElement>('[data-service-status]');
@@ -154,6 +157,12 @@ copyServiceLogsButton?.addEventListener('click', () => {
     .catch(error => writeLog(errorMessage(error)));
 });
 
+openServiceLogsButtons.forEach(button => {
+  button.addEventListener('click', () => {
+    void openServiceLogs();
+  });
+});
+
 toggleThemeButton?.addEventListener('click', () => {
   const theme = uiState.theme === 'light' ? 'dark' : 'light';
   void saveUiState({ ...uiState, theme }).then(() => renderUiState());
@@ -220,8 +229,7 @@ async function handleCheckAction(value: string | undefined): Promise<void> {
       writeLog('Проверка завершена. Результат обновлён в обзорном чеклисте.');
       return;
     case 'open_logs':
-      await saveUiState({ ...uiState, consoleOpen: true });
-      renderUiState();
+      await openServiceLogs();
       return;
   }
 }
@@ -297,6 +305,7 @@ async function refresh(): Promise<void> {
   ]);
   currentPackage = pack;
   renderOverall(check, overallStatusEl);
+  renderConnectionCause(check, connectionCauseEl);
   renderConnectionCheck(check, checklistEl);
   renderService(check.service, serviceStatusEl, serviceSummaryEl);
   renderCurrentPackage();
@@ -368,8 +377,13 @@ async function saveRootProfile(root: string): Promise<void> {
 
 function renderUiState(): void {
   applyUiState(uiState, sections, navButtons);
-  bottomConsoleEl?.toggleAttribute('hidden', !uiState.consoleOpen);
-  setText(consoleToggleButton, uiState.consoleOpen ? 'Скрыть' : 'Показать');
+  bottomConsoleEl?.toggleAttribute('data-collapsed', !uiState.consoleOpen);
+  setText(consoleToggleButton, uiState.consoleOpen ? 'Скрыть логи' : 'Показать логи');
+}
+
+async function openServiceLogs(): Promise<void> {
+  await saveUiState({ ...uiState, consoleOpen: true });
+  renderUiState();
 }
 
 function renderCurrentPackage(): void {

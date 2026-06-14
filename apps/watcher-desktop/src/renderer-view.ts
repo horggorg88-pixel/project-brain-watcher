@@ -56,6 +56,13 @@ export function renderConnectionCheck(check: DesktopConnectionCheck, element: HT
   )).join('');
 }
 
+export function renderConnectionCause(check: DesktopConnectionCheck, element: HTMLElement | null): void {
+  if (!element) return;
+  const blocker = check.nodes.find(node => node.status !== 'active');
+  element.dataset.status = check.overall;
+  setText(element, blocker ? `Причина: ${blocker.label}: ${blocker.detail}` : 'Причина: контур MCP готов');
+}
+
 export function renderOverall(check: DesktopConnectionCheck, element: HTMLElement | null): void {
   if (!element) return;
   element.dataset.status = check.overall;

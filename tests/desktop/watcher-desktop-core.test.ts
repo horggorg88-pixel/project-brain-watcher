@@ -993,6 +993,34 @@ describe('watcher desktop core', () => {
     expect(check.overall).toBe('action_required');
   });
 
+  it('surfaces the exact MCP server access failure as the primary connection reason', async () => {
+    const paths = tempPaths();
+    const source = join(paths.homePath, 'denied-project-mcp-config.json');
+    mkdirSync(paths.homePath, { recursive: true });
+    writeFileSync(source, JSON.stringify({
+      project_id: 'denied-project',
+      endpoint: 'http://149.33.14.250/mcp/p/denied-project',
+      local_path: join(paths.homePath, 'repo'),
+      token_env: 'MCP_BEARER_TOKEN',
+      mcpServers: {
+        'project-brain': {
+          url: 'http://149.33.14.250/mcp/p/denied-project',
+          headers: { Authorization: `Bearer ${VALID_TEST_BEARER}` },
+        },
+      },
+    }), 'utf-8');
+    mkdirSync(join(paths.homePath, 'repo'), { recursive: true });
+    importProjectConfig(paths, source);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('denied', { status: 401 })));
+
+    const check = await buildDesktopConnectionCheck(paths, 'denied-project');
+    const serverNode = check.nodes.find(node => node.id === 'server');
+
+    expect(check.message).toContain('Сервер MCP не подтвердил доступ: HTTP 401');
+    expect(serverNode?.detail).toContain('Сервер MCP не подтвердил доступ: HTTP 401');
+    expect(serverNode?.actionLabel).toBe('Показать причину');
+  });
+
   it('offers service installation for a selected project that has config but no watcher service', async () => {
     const paths = tempPaths();
     const monorepoRoot = join(paths.homePath, 'MCP');

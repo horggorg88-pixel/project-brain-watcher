@@ -29,11 +29,18 @@ export async function buildDesktopConnectionCheck(
   const service = readServiceStatus(paths, scopedProjectId);
   const diagnostics = previewDiagnostics(paths, scopedProjectId);
   const server = profile ? await verifyProjectServerAccess(profile, token) : null;
-  const nodes = buildNodes({ profile, configFound: config.found, secretConfigured: secret.configured, serverVerified: server?.verified ?? false, service });
+  const nodes = buildNodes({
+    profile,
+    configFound: config.found,
+    secretConfigured: secret.configured,
+    serverMessage: server?.message ?? null,
+    serverVerified: server?.verified ?? false,
+    service,
+  });
   const overall = resolveOverall(nodes);
   return {
     overall,
-    message: statusMessage(overall),
+    message: statusMessage(overall, nodes),
     projectId: profile?.id ?? null,
     checkedAt: new Date().toISOString(),
     nodes,
@@ -46,14 +53,18 @@ function buildNodes(input: {
   readonly profile: SavedProjectProfile | null;
   readonly configFound: boolean;
   readonly secretConfigured: boolean;
+  readonly serverMessage: string | null;
   readonly serverVerified: boolean;
   readonly service: WatcherServiceStatus;
 }): readonly DesktopCheckNode[] {
+  const serverDetail = input.serverVerified
+    ? 'Сервер подтвердил доступ'
+    : input.serverMessage ?? 'Пульт не может подтвердить доступ к MCP-серверу';
   return [
     node('project', 'Проект', Boolean(input.profile), input.profile?.root ?? 'Выберите папку проекта', 'select_project', 'Выбрать папку'),
     node('config', 'Файл настройки', input.configFound, input.configFound ? 'Файл настройки принят' : 'Импортируйте файл из личного кабинета', 'import_config', 'Импортировать файл'),
     node('key', 'Ключ доступа', input.secretConfigured, input.secretConfigured ? 'Ключ сохранён локально' : 'Пульт не нашёл локальный ключ', 'download_config', 'Скачать пакет'),
-    node('server', 'MCP-сервер', input.serverVerified, input.serverVerified ? 'Сервер подтвердил доступ' : 'Пульт не может подтвердить доступ к MCP-серверу', 'verify', 'Проверить MCP'),
+    node('server', 'MCP-сервер', input.serverVerified, serverDetail, 'open_logs', input.serverVerified ? 'Проверить MCP' : 'Показать причину'),
     node('watcher', 'Watcher', input.service.running && input.service.health === 'healthy', serviceDetail(input.service), serviceAction(input.service), serviceActionLabel(input.service)),
   ];
 }
@@ -75,10 +86,12 @@ function resolveOverall(nodes: readonly DesktopCheckNode[]): DesktopConnectionCh
   return inactive.length ? 'action_required' : 'ready';
 }
 
-function statusMessage(overall: DesktopConnectionCheck['overall']): string {
+function statusMessage(overall: DesktopConnectionCheck['overall'], nodes: readonly DesktopCheckNode[]): string {
   if (overall === 'ready') return 'Подключение готово';
-  if (overall === 'error') return 'Нужно выбрать проект или импортировать настройку';
-  return 'Остался шаг подключения';
+  const blocker = nodes.find(item => item.status !== 'active');
+  const reason = blocker ? `${blocker.label}: ${blocker.detail}` : 'причина не определена';
+  if (overall === 'error') return `Проверка остановлена. Причина: ${reason}`;
+  return `Остался шаг подключения. Причина: ${reason}`;
 }
 
 function serviceDetail(service: WatcherServiceStatus): string {

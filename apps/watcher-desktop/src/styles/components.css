@@ -148,6 +148,22 @@ h3 {
   margin-top: 14px;
 }
 
+.connection-cause {
+  margin-top: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--soft);
+  padding: 10px 12px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.connection-cause[data-status="error"],
+.connection-cause[data-status="action_required"] {
+  border-width: 2px;
+}
+
 .check-row,
 .diagnostic-row,
 .project-row,

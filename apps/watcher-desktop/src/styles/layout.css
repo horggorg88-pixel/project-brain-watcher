@@ -98,8 +98,9 @@
 
 .topbar {
   display: flex;
-  align-items: end;
+  align-items: start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   border: 1px solid var(--line);
   background: var(--panel);
@@ -107,9 +108,10 @@
 }
 
 .project-picker {
+  flex: 1 1 420px;
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(260px, 420px) auto;
+  grid-template-columns: minmax(220px, 1fr) auto;
   gap: 8px;
   align-items: end;
 }
@@ -119,9 +121,13 @@
 }
 
 .topbar-actions {
+  flex: 1 1 360px;
+  min-width: 0;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: end;
+  justify-content: end;
 }
 
 .section-actions {
@@ -139,7 +145,17 @@
   align-self: end;
 }
 
-.topbar-actions .overall-badge,
+.topbar-actions .overall-badge {
+  flex: 1 1 260px;
+  min-height: 34px;
+  justify-content: start;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  padding-bottom: 6px;
+  padding-top: 6px;
+  white-space: normal;
+}
+
 .section-actions .overall-badge {
   min-height: 34px;
   white-space: nowrap;
@@ -226,7 +242,24 @@
   padding: 8px 10px;
 }
 
+.bottom-console .ghost {
+  border-color: rgba(255, 255, 255, 0.42);
+  color: var(--inverse-ink);
+}
+
+.bottom-console .ghost:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
 .bottom-console pre {
   max-height: 122px;
   padding: 10px;
+}
+
+.bottom-console[data-collapsed] {
+  max-height: none;
+}
+
+.bottom-console[data-collapsed] pre {
+  display: none;
 }

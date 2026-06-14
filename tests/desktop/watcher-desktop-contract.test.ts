@@ -277,11 +277,19 @@ describe('watcher desktop contract', () => {
   it('exposes a copy button for service logs in the watcher panel', () => {
     const html = readFileSync(join(appRoot, 'src', 'index.html'), 'utf-8');
     const rendererSource = readFileSync(join(appRoot, 'src', 'renderer.ts'), 'utf-8');
+    const layoutCss = readFileSync(join(appRoot, 'src', 'styles', 'layout.css'), 'utf-8');
 
     expect(html).toContain('data-copy-service-logs');
+    expect(html).toContain('data-open-service-logs');
     expect(rendererSource).toContain('copyServiceLogsButton');
+    expect(rendererSource).toContain('openServiceLogsButtons');
     expect(rendererSource).toContain('serviceLogsText');
     expect(rendererSource).toContain('Логи службы скопированы');
+    expect(rendererSource).toContain("bottomConsoleEl?.toggleAttribute('data-collapsed'");
+    expect(rendererSource).not.toContain("bottomConsoleEl?.toggleAttribute('hidden'");
+    expect(layoutCss).toContain('.bottom-console[data-collapsed]');
+    expect(layoutCss).toContain('.bottom-console .ghost');
+    expect(layoutCss).toContain('color: var(--inverse-ink)');
   });
 
   it('keeps the mode legend explicit about wavy aliases and Idol as an MCP mode', () => {
