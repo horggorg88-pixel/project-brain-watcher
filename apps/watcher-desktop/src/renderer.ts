@@ -56,6 +56,7 @@ const projectSelect = document.querySelector<HTMLSelectElement>('[data-project-s
 const selectRootButton = document.querySelector<HTMLButtonElement>('[data-select-root]');
 const downloadConfigButton = document.querySelector<HTMLButtonElement>('[data-download-config]');
 const copyPromptButton = document.querySelector<HTMLButtonElement>('[data-copy-prompt]');
+const copyServiceLogsButton = document.querySelector<HTMLButtonElement>('[data-copy-service-logs]');
 const toggleThemeButton = document.querySelector<HTMLButtonElement>('[data-toggle-theme]');
 const runFullCheckButton = document.querySelector<HTMLButtonElement>('[data-run-full-check]');
 const consoleToggleButton = document.querySelector<HTMLButtonElement>('[data-console-toggle]');
@@ -144,6 +145,12 @@ downloadConfigButton?.addEventListener('click', () => {
 copyPromptButton?.addEventListener('click', () => {
   void copyText(currentPackage?.prompt ?? '')
     .then(() => writeLog('Стартовый prompt скопирован'))
+    .catch(error => writeLog(errorMessage(error)));
+});
+
+copyServiceLogsButton?.addEventListener('click', () => {
+  void copyText(serviceLogsText())
+    .then(() => writeLog('Логи службы скопированы'))
     .catch(error => writeLog(errorMessage(error)));
 });
 
@@ -445,6 +452,12 @@ async function copyText(value: string): Promise<void> {
 function writeLog(value: string): void {
   setText(serviceOutputEl, value);
   if (!uiState.consoleOpen) void saveUiState({ ...uiState, consoleOpen: true }).then(() => renderUiState());
+}
+
+function serviceLogsText(): string {
+  const statusText = serviceStatusEl?.textContent?.trim() ?? '';
+  const commandText = serviceOutputEl?.textContent?.trim() ?? '';
+  return [statusText, commandText].filter(Boolean).join('\n\n');
 }
 
 function serviceActionLog(result: WatcherServiceActionResult): string {

@@ -27,6 +27,12 @@ export interface WindowsServiceState {
   readonly installed: boolean;
   readonly running: boolean;
   readonly lastError: string | null;
+  readonly serviceBinaryPath: string | null;
+  readonly metadataError: string | null;
+}
+
+export interface WindowsServiceConfigState {
+  readonly binaryPath: string | null;
 }
 
 export function readServiceStatus(paths: DesktopCorePaths, projectId?: string): WatcherServiceStatus {
@@ -36,6 +42,9 @@ export function readServiceStatus(paths: DesktopCorePaths, projectId?: string): 
   const logs = readServiceLogTail(profile);
   const serviceState = readWindowsServiceState(profile);
   const installed = existsSync(serviceExePath(profile)) || serviceState.installed;
+  if (serviceState.installed && serviceState.metadataError) {
+    return stoppedStatus(true, joinStatusMessages(serviceState.lastError, serviceState.metadataError), profile, logs);
+  }
   if (serviceState.installed && !serviceState.running) {
     return stoppedStatus(true, serviceState.lastError ?? 'Служба Watcher остановлена', profile, logs);
   }
@@ -108,11 +117,17 @@ export function readServiceLogTail(profile: SavedProjectProfile): WatcherService
 }
 
 function readWindowsServiceState(profile: SavedProjectProfile): WindowsServiceState {
-  if (process.platform !== 'win32') return { installed: false, running: false, lastError: null };
+  if (process.platform !== 'win32') return emptyWindowsServiceState();
   const result = spawnSync('sc.exe', ['queryex', serviceName(profile.id)], { encoding: 'utf-8', windowsHide: true });
   const output = [result.stdout, result.stderr].filter(Boolean).join('\n');
-  if (result.status !== 0) return { installed: false, running: false, lastError: null };
-  return parseWindowsServiceOutput(output);
+  if (result.status !== 0) return emptyWindowsServiceState();
+  const state = parseWindowsServiceOutput(output);
+  const config = readWindowsServiceConfigState(profile);
+  return {
+    ...state,
+    serviceBinaryPath: config.binaryPath,
+    metadataError: windowsServiceMetadataError(profile, config),
+  };
 }
 
 export function parseWindowsServiceOutput(output: string): WindowsServiceState {
@@ -120,7 +135,14 @@ export function parseWindowsServiceOutput(output: string): WindowsServiceState {
     installed: true,
     running: parseWindowsServiceState(output)?.code === '4',
     lastError: parseWindowsServiceExit(output),
+    serviceBinaryPath: null,
+    metadataError: null,
   };
+}
+
+export function parseWindowsServiceConfigOutput(output: string): WindowsServiceConfigState {
+  const match = output.match(/BINARY_PATH_NAME\s*:\s*(.+)/i);
+  return { binaryPath: match ? extractExecutablePath(match[1]) : null };
 }
 
 function parseWindowsServiceExit(output: string): string | null {
@@ -136,6 +158,55 @@ function parseWindowsServiceExit(output: string): string | null {
 function parseWindowsServiceState(output: string): { readonly code: string; readonly name: string } | null {
   const match = output.match(/:\s*([1-7])\s+(STOPPED|START_PENDING|STOP_PENDING|RUNNING|CONTINUE_PENDING|PAUSE_PENDING|PAUSED)\b/i);
   return match ? { code: match[1], name: match[2].toUpperCase() } : null;
+}
+
+function readWindowsServiceConfigState(profile: SavedProjectProfile): WindowsServiceConfigState {
+  const result = spawnSync('sc.exe', ['qc', serviceName(profile.id)], { encoding: 'utf-8', windowsHide: true });
+  const output = [result.stdout, result.stderr].filter(Boolean).join('\n');
+  return result.status === 0 ? parseWindowsServiceConfigOutput(output) : { binaryPath: null };
+}
+
+function windowsServiceMetadataError(profile: SavedProjectProfile, config: WindowsServiceConfigState): string | null {
+  if (!config.binaryPath) return null;
+  const expectedExe = serviceExePath(profile);
+  if (normalizePath(config.binaryPath) === normalizePath(expectedExe)) return null;
+  const actualRoot = serviceRootFromBinaryPath(config.binaryPath) ?? config.binaryPath;
+  return `Windows Service metadata указывает на другой root: ${actualRoot}. Ожидался ${profile.root}.`;
+}
+
+function serviceRootFromBinaryPath(path: string): string | null {
+  const normalized = normalizePath(path);
+  const marker = '/.brain/service/';
+  const markerIndex = normalized.indexOf(marker);
+  return markerIndex === -1 ? null : path.slice(0, markerIndex);
+}
+
+function extractExecutablePath(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.startsWith('"')) {
+    const endQuote = trimmed.indexOf('"', 1);
+    if (endQuote > 0) return trimmed.slice(1, endQuote);
+  }
+  const executable = trimmed.match(/^[A-Za-z]:\\.*?\.exe\b/i)?.[0];
+  return executable ?? stripSurroundingQuotes(trimmed);
+}
+
+function stripSurroundingQuotes(value: string): string {
+  return value.startsWith('"') && value.endsWith('"') ? value.slice(1, -1) : value;
+}
+
+function emptyWindowsServiceState(): WindowsServiceState {
+  return {
+    installed: false,
+    running: false,
+    lastError: null,
+    serviceBinaryPath: null,
+    metadataError: null,
+  };
+}
+
+function joinStatusMessages(...messages: Array<string | null>): string {
+  return messages.filter((message): message is string => Boolean(message)).join('\n');
 }
 
 function parseRuntimeLock(value: unknown): RuntimeLockFile | null {
@@ -181,6 +252,10 @@ function stripAnsi(value: string): string {
 function lastLines(value: string, limit: number): string {
   const lines = value.split('\n').map(line => line.trimEnd()).filter(line => line.trim().length > 0);
   return lines.slice(-limit).join('\n');
+}
+
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, '/').replace(/\/+$/g, '').toLowerCase();
 }
 
 function errorMessage(error: unknown): string {

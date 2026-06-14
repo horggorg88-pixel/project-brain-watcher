@@ -228,10 +228,45 @@ function serviceFailureDiagnostics(status: WatcherServiceStatus): string | null 
   if (/unknown command:\s*refresh/i.test(logText)) {
     reasons.push('refresh не поддерживается текущим WinSW; это compatibility fallback, после него нужен обычный start/restart и проверка healthy.');
   }
+  if (/Watcher lease rejected:\s*Unauthorized/i.test(logText)) {
+    reasons.push('service secret не принят сервером: bearer службы устарел, не совпадает с рабочим MCP_BEARER_TOKEN или не имеет write-доступа к проекту.');
+  }
+  const staleRoot = findStaleServiceRoot(status.root, logText);
+  if (staleRoot) {
+    reasons.push(`Windows service metadata указывает на другой root: ${staleRoot}. Ожидался ${status.root}.`);
+  }
   if (/WIN32_EXIT_CODE=1067/i.test(status.lastError ?? '')) {
     reasons.push('1067 означает, что Windows Service-процесс завершился после старта; первичная ошибка находится выше в watcher/npm логах.');
   }
   return reasons.length > 0 ? ['Диагностика службы:', ...reasons.map(reason => `- ${reason}`)].join('\n') : null;
+}
+
+function findStaleServiceRoot(expectedRoot: string | null, logText: string): string | null {
+  if (!expectedRoot) return null;
+  const expected = normalizePath(expectedRoot);
+  const candidates = windowsPaths(logText)
+    .map(serviceRootCandidate)
+    .filter((candidate): candidate is string => candidate !== null);
+  return candidates.find(candidate => normalizePath(candidate) !== expected) ?? null;
+}
+
+function windowsPaths(value: string): readonly string[] {
+  return [...value.matchAll(/[A-Za-z]:\\[^\s"']+/g)].map(match => match[0]);
+}
+
+function serviceRootCandidate(path: string): string | null {
+  const normalized = normalizePath(path);
+  if (!normalized.includes('/desktop/') && !normalized.includes('/.brain/')) return null;
+  if (normalized.startsWith('c:/windows/') || normalized.includes('/program files/')) return null;
+  const brainIndex = normalized.indexOf('/.brain/');
+  if (brainIndex !== -1) return path.slice(0, brainIndex);
+  const binWatcherIndex = normalized.indexOf('/bin/watcher.js');
+  if (binWatcherIndex !== -1) return path.slice(0, binWatcherIndex);
+  return path;
+}
+
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, '/').replace(/\/+$/g, '').toLowerCase();
 }
 
 async function runUpdateAction(

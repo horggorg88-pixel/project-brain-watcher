@@ -124,14 +124,23 @@
   align-items: end;
 }
 
+.section-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: end;
+}
+
 .project-picker > button,
 .topbar-actions > button,
+.section-actions > button,
 .section-head > button {
   min-height: 34px;
   align-self: end;
 }
 
-.topbar-actions .overall-badge {
+.topbar-actions .overall-badge,
+.section-actions .overall-badge {
   min-height: 34px;
   white-space: nowrap;
 }

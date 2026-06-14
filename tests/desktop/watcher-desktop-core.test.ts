@@ -21,7 +21,7 @@ import {
 import { readDesktopServiceSecret, readDesktopServiceSecretState } from '../../apps/watcher-desktop/src/desktop-service-secret.js';
 import { stageDesktopServiceSecret } from '../../apps/watcher-desktop/src/desktop-service-secret.js';
 import { isServiceActionSettled, prepareServiceSecretForLaunch, summarizeServiceActionSettlement } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
-import { parseWindowsServiceOutput } from '../../apps/watcher-desktop/src/desktop-service-status.js';
+import { parseWindowsServiceConfigOutput, parseWindowsServiceOutput } from '../../apps/watcher-desktop/src/desktop-service-status.js';
 import { readDesktopUiState, saveDesktopUiState } from '../../apps/watcher-desktop/src/desktop-ui-state.js';
 import { defaultProfile, serviceName } from '../../apps/watcher-desktop/src/desktop-profile-store.js';
 import type { WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
@@ -284,6 +284,17 @@ describe('watcher desktop core', () => {
     expect(status.lastError).toBeNull();
   });
 
+  it('parses Windows service binary path from sc.exe qc output', () => {
+    const config = parseWindowsServiceConfigOutput([
+      '[SC] QueryServiceConfig SUCCESS',
+      'SERVICE_NAME: ProjectBrainWatcher-mcp-monorepo',
+      '        BINARY_PATH_NAME   : "C:\\Users\\New\\Desktop\\MCP\\.brain\\service\\ProjectBrainWatcher-mcp-monorepo.exe"',
+      '        SERVICE_START_NAME : LocalSystem',
+    ].join('\n'));
+
+    expect(config.binaryPath).toBe('C:\\Users\\New\\Desktop\\MCP\\.brain\\service\\ProjectBrainWatcher-mcp-monorepo.exe');
+  });
+
   it('blocks start actions when a profile has no MCP server', async () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'repo');
@@ -529,6 +540,39 @@ describe('watcher desktop core', () => {
     expect(result.output).toContain('EPERM cleanup в npm-cache');
     expect(result.output).toContain('.brain/service/runtime');
     expect(result.output).toContain('WIN32_EXIT_CODE=1067');
+  });
+
+  it('diagnoses stale Windows service metadata when wrapper logs point at another project root', () => {
+    const result = summarizeServiceActionSettlement(
+      'start',
+      0,
+      'Service started successfully.',
+      statusFixture({
+        projectId: 'mcp-monorepo',
+        root: 'C:\\Users\\New\\Desktop\\mcp-monorepo',
+        running: false,
+        health: 'stopped',
+        lastError: 'Windows Service STOPPED, WIN32_EXIT_CODE=1067',
+        logs: {
+          errPath: 'C:\\Users\\New\\Desktop\\mcp-monorepo\\.brain\\service\\ProjectBrainWatcher-mcp-monorepo.err.log',
+          outPath: 'C:\\Users\\New\\Desktop\\mcp-monorepo\\.brain\\service\\ProjectBrainWatcher-mcp-monorepo.out.log',
+          wrapperPath: 'C:\\Users\\New\\Desktop\\mcp-monorepo\\.brain\\service\\ProjectBrainWatcher-mcp-monorepo.wrapper.log',
+          err: '',
+          out: [
+            'Путь:  C:\\Users\\New\\Desktop\\MCP',
+            'Watcher lease rejected: Unauthorized',
+          ].join('\n'),
+          wrapper: [
+            'Starting C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe "-NoProfile" "-File" "C:\\Users\\New\\Desktop\\MCP\\.brain\\service\\launch-watcher.ps1" "start" "--path" "C:\\Users\\New\\Desktop\\MCP"',
+            'Started process 2456',
+          ].join('\n'),
+        },
+      }),
+    );
+
+    expect(result.output).toContain('Windows service metadata указывает на другой root');
+    expect(result.output).toContain('C:\\Users\\New\\Desktop\\MCP');
+    expect(result.output).toContain('service secret не принят сервером');
   });
 
   it('stages the verified bearer into the service secret before launching the installed service', () => {

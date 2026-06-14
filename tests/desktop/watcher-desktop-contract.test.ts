@@ -274,6 +274,16 @@ describe('watcher desktop contract', () => {
     expect(serviceRunnerSource).toContain('service repair: refresh');
   });
 
+  it('exposes a copy button for service logs in the watcher panel', () => {
+    const html = readFileSync(join(appRoot, 'src', 'index.html'), 'utf-8');
+    const rendererSource = readFileSync(join(appRoot, 'src', 'renderer.ts'), 'utf-8');
+
+    expect(html).toContain('data-copy-service-logs');
+    expect(rendererSource).toContain('copyServiceLogsButton');
+    expect(rendererSource).toContain('serviceLogsText');
+    expect(rendererSource).toContain('Логи службы скопированы');
+  });
+
   it('keeps the mode legend explicit about wavy aliases and Idol as an MCP mode', () => {
     const modeCatalogSource = readFileSync(join(appRoot, 'src', 'desktop-mode-catalog.ts'), 'utf-8');
     const configPackageSource = readFileSync(join(appRoot, 'src', 'desktop-config-package.ts'), 'utf-8');
