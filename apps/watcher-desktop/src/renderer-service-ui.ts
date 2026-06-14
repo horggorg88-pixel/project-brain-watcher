@@ -48,6 +48,9 @@ export function setServiceActionState(buttons: NodeListOf<HTMLButtonElement>, st
     button.hidden = !presentation.visible;
     button.style.order = String(presentation.order);
     button.dataset.commandVariant = presentation.variant;
+    button.dataset.tooltip = serviceActionTooltip(action);
+    button.title = serviceActionTooltip(action);
+    button.classList.add('icon-button', 'service-icon-button');
     button.classList.toggle('ghost', presentation.variant !== 'primary');
   });
 }
@@ -59,9 +62,16 @@ export function setServiceConfirmationHint(
   Array.from(buttons).forEach(button => {
     const action = button.dataset.serviceAction;
     if (!isServiceAction(action)) return;
-    button.textContent = pending && pending.action === action
+    const label = pending && pending.action === action
       ? confirmationLabel(action)
       : actionLabel(action);
+    button.innerHTML = serviceActionIcon(action);
+    button.setAttribute('aria-label', label);
+    const tooltip = pending && pending.action === action
+      ? `Подтвердить действие: ${serviceActionTooltip(action)}`
+      : serviceActionTooltip(action);
+    button.dataset.tooltip = tooltip;
+    button.title = tooltip;
   });
 }
 
@@ -85,6 +95,32 @@ export function resolveServiceActionConfirmation(
 export function actionLabel(action: WatcherServiceAction): string {
   const labels = { health: 'Проверить подключение', install: 'Установить службу', start: 'Запустить watcher', stop: 'Остановить watcher', restart: 'Перезапустить watcher', check_update: 'Проверить обновления', update: 'Обновить пульт и watcher' };
   return labels[action];
+}
+
+function serviceActionTooltip(action: WatcherServiceAction): string {
+  const labels = {
+    health: 'Проверить MCP-доступ и состояние службы без изменений',
+    install: 'Установить Windows-службу watcher для выбранного проекта',
+    start: 'Запустить watcher и начать индексацию выбранного проекта',
+    stop: 'Остановить watcher для выбранного проекта',
+    restart: 'Перезапустить watcher с текущим профилем проекта',
+    check_update: 'Проверить доступность новой версии пульта и watcher',
+    update: 'Скачать и запустить обновление пульта и watcher',
+  };
+  return labels[action];
+}
+
+function serviceActionIcon(action: WatcherServiceAction): string {
+  const icons = {
+    health: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/><path d="m9 12 2 2 4-4"/></svg>',
+    install: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>',
+    start: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7Z"/></svg>',
+    stop: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h12v12H6Z"/></svg>',
+    restart: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>',
+    check_update: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/><path d="M11 8v6"/><path d="M8 11h6"/></svg>',
+    update: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 16v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3"/><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/></svg>',
+  };
+  return icons[action];
 }
 
 export function decisionLabel(decision: WatcherPolicyDecision): string {

@@ -4,6 +4,7 @@ import type {
   DesktopConfigPackage,
   DesktopConfigSaveResult,
   DesktopConnectionCheck,
+  DesktopModeSummary,
   DesktopSection,
   DesktopUiState,
   DiagnosticsPreview,
@@ -73,10 +74,13 @@ const promptEl = document.querySelector<HTMLElement>('[data-start-prompt]');
 const projectListEl = document.querySelector<HTMLElement>('[data-projects]');
 const modesEl = document.querySelector<HTMLElement>('[data-modes]');
 const windowTitlebarEl = document.querySelector<HTMLElement>('[data-window-titlebar]');
+const floatingTooltipEl = document.querySelector<HTMLElement>('[data-floating-tooltip]');
 
 let accessState: DesktopAccessState | null = null;
 let uiState: DesktopUiState = defaultUiState();
 let currentProjects: readonly SavedProjectProfile[] = [];
+let currentModes: readonly DesktopModeSummary[] = [];
+let activeModeId: string | null = null;
 let currentPackage: DesktopConfigPackage | null = null;
 let pendingServiceAction: PendingServiceActionConfirmation | null = null;
 
@@ -133,6 +137,63 @@ projectSelect?.addEventListener('change', () => {
   void saveUiState({ ...uiState, lastProjectId: projectSelect.value || null }).then(() => refresh());
 });
 
+document.addEventListener('click', event => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+
+  const toggle = target.closest<HTMLButtonElement>('[data-custom-select-toggle]');
+  if (toggle) {
+    event.preventDefault();
+    toggleCustomSelect(toggle);
+    return;
+  }
+
+  const projectOption = target.closest<HTMLButtonElement>('[data-project-option]');
+  if (projectOption) {
+    event.preventDefault();
+    selectProjectOption(projectOption);
+    return;
+  }
+
+  const modeOption = target.closest<HTMLButtonElement>('[data-mode-option]');
+  if (modeOption) {
+    event.preventDefault();
+    selectModeOption(modeOption);
+    return;
+  }
+
+  closeCustomSelects();
+});
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeCustomSelects();
+});
+
+document.addEventListener('pointerover', event => {
+  showTooltipFromTarget(event.target);
+});
+
+document.addEventListener('pointerout', event => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const anchor = target.closest<HTMLElement>('[data-tooltip]');
+  if (!anchor) return;
+  const related = event.relatedTarget;
+  if (related instanceof Element && anchor.contains(related)) return;
+  hideTooltip();
+});
+
+document.addEventListener('focusin', event => {
+  showTooltipFromTarget(event.target);
+});
+
+document.addEventListener('focusout', () => {
+  hideTooltip();
+});
+
+window.addEventListener('resize', hideTooltip);
+window.addEventListener('scroll', hideTooltip, true);
+
 selectRootButton?.addEventListener('click', () => {
   void window.watcherDesktop.projects.selectRoot()
     .then(path => path ? saveRootProfile(path) : null)
@@ -163,6 +224,23 @@ toggleThemeButton?.addEventListener('click', () => {
 
 consoleToggleButton?.addEventListener('click', () => {
   void saveUiState({ ...uiState, consoleOpen: !uiState.consoleOpen }).then(() => renderUiState());
+});
+
+modesEl?.addEventListener('change', event => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const select = target.closest<HTMLSelectElement>('[data-mode-select]');
+  if (!select) return;
+  setActiveMode(select.value);
+});
+
+modesEl?.addEventListener('click', event => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest<HTMLButtonElement>('[data-mode-step]');
+  if (!button) return;
+  const direction = button.dataset.modeStep;
+  if (direction === 'prev' || direction === 'next') stepActiveMode(direction);
 });
 
 windowTitlebarEl?.addEventListener('click', event => {
@@ -297,6 +375,8 @@ async function refresh(): Promise<void> {
     safeModes(),
   ]);
   currentPackage = pack;
+  currentModes = modes;
+  activeModeId = resolveActiveModeId(currentModes, activeModeId);
   renderOverall(check, overallStatusEl);
   renderConnectionCause(check, connectionCauseEl);
   renderConnectionCheck(check, checklistEl);
@@ -305,7 +385,7 @@ async function refresh(): Promise<void> {
   setServiceConfirmationHint(serviceButtons, pendingServiceAction);
   renderCurrentPackage();
   renderProjects(currentProjects, projectListEl);
-  renderModes(modes, modesEl);
+  renderModes(currentModes, modesEl, activeModeId);
 }
 
 async function safeAccessStatus(): Promise<DesktopAccessState> {
@@ -373,7 +453,142 @@ async function saveRootProfile(root: string): Promise<void> {
 function renderUiState(): void {
   applyUiState(uiState, sections, navButtons);
   bottomConsoleEl?.toggleAttribute('data-collapsed', !uiState.consoleOpen);
-  setText(consoleToggleButton, uiState.consoleOpen ? 'Скрыть логи' : 'Показать логи');
+  renderThemeToggle();
+  renderConsoleToggle();
+}
+
+function setActiveMode(modeId: string): void {
+  activeModeId = resolveActiveModeId(currentModes, modeId);
+  renderModes(currentModes, modesEl, activeModeId);
+}
+
+function toggleCustomSelect(toggle: HTMLButtonElement): void {
+  const root = toggle.closest<HTMLElement>('[data-custom-select]');
+  const menu = root?.querySelector<HTMLElement>('[data-custom-select-menu]');
+  if (!root || !menu) return;
+  const willOpen = menu.hidden;
+  closeCustomSelects(root);
+  menu.hidden = !willOpen;
+  toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  root.toggleAttribute('data-open', willOpen);
+}
+
+function closeCustomSelects(exceptRoot: HTMLElement | null = null): void {
+  document.querySelectorAll<HTMLElement>('[data-custom-select]').forEach(root => {
+    if (exceptRoot && root === exceptRoot) return;
+    root.removeAttribute('data-open');
+    root.querySelector<HTMLElement>('[data-custom-select-menu]')?.setAttribute('hidden', '');
+    root.querySelector<HTMLButtonElement>('[data-custom-select-toggle]')?.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function selectProjectOption(option: HTMLButtonElement): void {
+  const value = option.dataset.projectOption;
+  if (!value || !projectSelect) return;
+  projectSelect.value = value;
+  closeCustomSelects();
+  projectSelect.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function selectModeOption(option: HTMLButtonElement): void {
+  const value = option.dataset.modeOption;
+  const root = option.closest<HTMLElement>('[data-mode-picker]');
+  const select = root?.querySelector<HTMLSelectElement>('[data-mode-select]');
+  if (!value || !select) return;
+  select.value = value;
+  closeCustomSelects();
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function stepActiveMode(direction: 'prev' | 'next'): void {
+  if (currentModes.length === 0) return;
+  const currentId = resolveActiveModeId(currentModes, activeModeId);
+  const currentIndex = Math.max(0, currentModes.findIndex(mode => mode.id === currentId));
+  const offset = direction === 'next' ? 1 : -1;
+  const nextIndex = (currentIndex + offset + currentModes.length) % currentModes.length;
+  setActiveMode(currentModes[nextIndex]?.id ?? currentId);
+}
+
+function resolveActiveModeId(modes: readonly DesktopModeSummary[], modeId: string | null): string | null {
+  if (modes.length === 0) return null;
+  return modes.some(mode => mode.id === modeId) ? modeId : modes[0]?.id ?? null;
+}
+
+function renderThemeToggle(): void {
+  const darkTarget = uiState.theme === 'light';
+  const label = darkTarget ? 'Включить тёмную тему' : 'Включить светлую тему';
+  setIconButton(toggleThemeButton, darkTarget ? moonIcon() : sunIcon(), label);
+}
+
+function renderConsoleToggle(): void {
+  const label = uiState.consoleOpen ? 'Скрыть логи' : 'Показать логи';
+  setIconButton(consoleToggleButton, uiState.consoleOpen ? chevronDownIcon() : chevronUpIcon(), label);
+}
+
+function setIconButton(button: HTMLButtonElement | null, icon: string, label: string): void {
+  if (!button) return;
+  button.innerHTML = icon;
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  button.dataset.tooltip = label;
+}
+
+function showTooltipFromTarget(target: EventTarget | null): void {
+  if (!floatingTooltipEl || !(target instanceof Element)) return;
+  const anchor = target.closest<HTMLElement>('[data-tooltip]');
+  const text = anchor?.dataset.tooltip?.trim();
+  if (!anchor || !text || anchor.matches(':disabled')) {
+    hideTooltip();
+    return;
+  }
+  setText(floatingTooltipEl, text);
+  floatingTooltipEl.hidden = false;
+  floatingTooltipEl.dataset.visible = 'true';
+  positionTooltip(anchor, floatingTooltipEl);
+}
+
+function hideTooltip(): void {
+  if (!floatingTooltipEl) return;
+  floatingTooltipEl.removeAttribute('data-visible');
+  floatingTooltipEl.hidden = true;
+}
+
+function positionTooltip(anchor: HTMLElement, tooltip: HTMLElement): void {
+  tooltip.style.left = '0';
+  tooltip.style.top = '0';
+  const anchorRect = anchor.getBoundingClientRect();
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const margin = 8;
+  const left = clamp(
+    anchorRect.left + (anchorRect.width - tooltipRect.width) / 2,
+    margin,
+    window.innerWidth - tooltipRect.width - margin,
+  );
+  const top = anchorRect.top > tooltipRect.height + margin
+    ? anchorRect.top - tooltipRect.height - margin
+    : anchorRect.bottom + margin;
+  tooltip.style.left = `${Math.round(left)}px`;
+  tooltip.style.top = `${Math.round(Math.max(margin, top))}px`;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), Math.max(min, max));
+}
+
+function sunIcon(): string {
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M3 12h2M19 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/><circle cx="12" cy="12" r="4"/></svg>';
+}
+
+function moonIcon(): string {
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+}
+
+function chevronUpIcon(): string {
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>';
+}
+
+function chevronDownIcon(): string {
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
 }
 
 async function openServiceLogs(): Promise<void> {

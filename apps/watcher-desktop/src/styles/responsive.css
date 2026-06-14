@@ -63,26 +63,30 @@
   .topbar,
   .split-grid,
   .form-grid,
-  .mode-grid,
-  .service-head,
-  .service-status-actions {
+  .service-head {
     grid-template-columns: 1fr;
   }
 
-  .topbar-actions {
-    grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(150px, 1fr));
+  .service-toolbar {
+    justify-content: start;
+  }
+
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) repeat(3, 42px);
   }
 
   .topbar-actions .overall-badge {
-    grid-column: 1;
+    grid-column: 1 / -1;
     max-width: none;
   }
 
-  .project-picker label,
-  .project-picker > button,
-  .topbar-actions > * {
+  .project-select-field {
     grid-column: 1;
   }
+
+  .project-picker > .icon-button { grid-column: 2; }
+  .topbar-actions > [data-download-config] { grid-column: 3; }
+  .topbar-actions > [data-toggle-theme] { grid-column: 4; }
 
   .bottom-console { margin: 0 14px 14px; }
 }
@@ -96,23 +100,35 @@
     grid-column: 1;
   }
 
-  .project-picker,
-  .topbar-actions,
   .section-head,
   .section-actions,
-  .service-log-actions,
-  .service-command-grid {
+  .mode-browser-head {
     display: grid;
     grid-template-columns: 1fr;
   }
 
   .project-picker > button,
-  .topbar-actions > button,
-  .section-actions > button,
-  .section-head > button,
-  .service-log-actions > button,
-  .command-list button {
+  .section-actions > button:not(.icon-button),
+  .section-head > button:not(.icon-button),
+  .command-list button:not(.icon-button) {
     width: 100%;
+  }
+
+  .topbar-actions > .icon-button,
+  .project-picker > .icon-button,
+  .mode-browser-actions {
+    justify-self: start;
+  }
+
+  .topbar-actions > .icon-button,
+  .project-picker > .icon-button,
+  .section-head > .icon-button,
+  .service-toolbar > .icon-button {
+    width: 42px;
+  }
+
+  .mode-select-label {
+    max-width: none;
   }
 
   .account-card {

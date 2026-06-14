@@ -9,6 +9,7 @@
   --soft: #ededeb;
   --danger: #8f1d18;
   --danger-soft: rgba(143, 29, 24, 0.08);
+  --dropdown-panel: #fff;
   --inverse: #111;
   --inverse-ink: #fff;
   --mono: "Cascadia Mono", Consolas, monospace;
@@ -60,6 +61,23 @@ button {
 button:hover { background: #303030; }
 button:disabled { cursor: not-allowed; opacity: 0.5; }
 
+.icon-button {
+  width: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 0;
+}
+
+.icon-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
 button[data-command-variant="danger"] {
   border-color: var(--danger);
   background: transparent;
@@ -79,6 +97,30 @@ select {
   color: var(--ink);
   padding: 0 10px;
   outline: none;
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+select::-ms-expand {
+  display: none;
+}
+
+.native-select-fallback {
+  position: absolute;
+  width: 1px;
+  min-height: 1px;
+  margin: 0;
+  border: 0;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
 }
 
 input:focus,

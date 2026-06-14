@@ -3,12 +3,15 @@ body[data-theme="dark"] {
   --bg: #121212;
   --ink: #f4f4f0;
   --muted: #a6a6a0;
-  --line: rgba(244, 244, 240, 0.18);
-  --line-strong: rgba(244, 244, 240, 0.42);
-  --panel: rgba(27, 27, 25, 0.94);
+  --line: #393934;
+  --line-strong: #707067;
+  --panel: #1b1b19;
   --soft: #242421;
+  --dropdown-panel: #1b1b19;
   --inverse: #f4f4f0;
   --inverse-ink: #111;
+  background: var(--bg);
+  background-size: auto;
 }
 
 body[data-theme="dark"] button {
@@ -27,9 +30,39 @@ body[data-theme="dark"] .diagnostic-row,
 body[data-theme="dark"] .project-row,
 body[data-theme="dark"] .mode-card,
 body[data-theme="dark"] .panel,
+body[data-theme="dark"] .custom-select-menu,
+body[data-theme="dark"] .custom-select-trigger,
 body[data-theme="dark"] .sidebar,
+body[data-theme="dark"] .content-section,
 body[data-theme="dark"] .topbar {
   background: var(--panel);
+}
+
+body[data-theme="dark"] .custom-select-option {
+  background: var(--dropdown-panel);
+  color: var(--ink);
+}
+
+body[data-theme="dark"] .custom-select-trigger {
+  color: var(--ink);
+}
+
+body[data-theme="dark"] .custom-select-option:hover,
+body[data-theme="dark"] .custom-select-option:focus-visible {
+  background: var(--soft);
+  color: var(--ink);
+}
+
+body[data-theme="dark"] .custom-select-option[data-selected="true"] {
+  border-color: var(--line-strong);
+  background: var(--soft);
+  color: var(--ink);
+}
+
+body[data-theme="dark"] .custom-select-option[data-selected="true"]:hover,
+body[data-theme="dark"] .custom-select-option[data-selected="true"]:focus-visible {
+  background: var(--soft);
+  color: var(--ink);
 }
 
 body[data-theme="dark"] .bottom-console {
@@ -38,7 +71,7 @@ body[data-theme="dark"] .bottom-console {
 }
 
 body[data-theme="dark"] .window-titlebar {
-  background: rgba(18, 18, 18, 0.96);
+  background: var(--bg);
 }
 
 body[data-theme="dark"] .window-controls button {

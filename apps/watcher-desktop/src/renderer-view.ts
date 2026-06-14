@@ -49,6 +49,27 @@ export function renderProjectSelect(
     ? projects.map(project => `<option value="${escapeHtml(project.id)}">${escapeHtml(project.name)}</option>`).join('')
     : '<option value="">Проект не выбран</option>';
   select.value = current;
+  const root = select.closest<HTMLElement>('[data-project-picker]');
+  const trigger = root?.querySelector<HTMLButtonElement>('[data-project-select-button]');
+  const valueEl = root?.querySelector<HTMLElement>('[data-custom-select-value]');
+  const menu = root?.querySelector<HTMLElement>('[data-project-select-menu]');
+  const activeProject = projects.find(project => project.id === current);
+  setText(valueEl ?? null, activeProject?.name ?? 'Проект не выбран');
+  if (trigger) {
+    trigger.disabled = projects.length === 0;
+    trigger.dataset.value = current;
+  }
+  if (menu) {
+    menu.innerHTML = projects.length
+      ? projects.map(project => customSelectOption({
+        datasetName: 'data-project-option',
+        value: project.id,
+        label: project.name,
+        detail: project.root,
+        selected: project.id === current,
+      })).join('')
+      : '<span class="custom-select-empty">Проект не выбран</span>';
+  }
 }
 
 export function renderConnectionCheck(check: DesktopConnectionCheck, element: HTMLElement | null): void {
@@ -57,7 +78,7 @@ export function renderConnectionCheck(check: DesktopConnectionCheck, element: HT
     `<article class="check-row" data-node="${escapeHtml(node.id)}">
       <span class="toggle ${node.status === 'active' ? 'on' : 'off'}" aria-hidden="true"></span>
       <div><strong>${escapeHtml(node.label)}</strong><p>${escapeHtml(node.detail)}</p></div>
-      ${node.actionLabel ? `<button type="button" class="ghost" data-check-action="${node.action}">${escapeHtml(node.actionLabel)}</button>` : '<span class="check-ok">Активен</span>'}
+      ${node.actionLabel ? `<button type="button" class="ghost" data-check-action="${node.action}" title="${escapeHtml(checkActionTooltip(node.action))}" data-tooltip="${escapeHtml(checkActionTooltip(node.action))}">${escapeHtml(node.actionLabel)}</button>` : '<span class="check-ok">Активен</span>'}
     </article>`
   )).join('');
 }
@@ -122,20 +143,79 @@ export function renderProjects(projects: readonly SavedProjectProfile[], element
     : '<p class="empty-state">Выберите папку проекта, чтобы создать профиль.</p>';
 }
 
-export function renderModes(modes: readonly DesktopModeSummary[], element: HTMLElement | null): void {
+export function renderModes(modes: readonly DesktopModeSummary[], element: HTMLElement | null, activeModeId: string | null = null): void {
   if (!element) return;
-  const groups = [...new Set(modes.map(mode => mode.group))];
-  element.innerHTML = groups.map(group => (
-    `<section class="mode-group">
-      <div class="mode-group-head">
-        <h3>${escapeHtml(group)}</h3>
-        <span>${modes.filter(mode => mode.group === group).length} режимов</span>
+  if (modes.length === 0) {
+    element.innerHTML = '<p class="empty-state">Режимы пока не загружены.</p>';
+    return;
+  }
+  const activeMode = modes.find(mode => mode.id === activeModeId) ?? modes[0];
+  const activeIndex = Math.max(0, modes.findIndex(mode => mode.id === activeMode?.id));
+  if (!activeMode) return;
+  element.innerHTML = `<section class="mode-group mode-browser" data-mode-browser data-active-mode="${escapeHtml(activeMode.id)}">
+    <div class="mode-group-head mode-browser-head">
+      <div>
+        <h3>${escapeHtml(activeMode.group)}</h3>
+        <span>${modes.length} режимов · выбран ${activeIndex + 1} из ${modes.length}</span>
       </div>
-      <div class="mode-grid">
-        ${modes.filter(mode => mode.group === group).map(renderModeCard).join('')}
+      <div class="mode-browser-actions">
+        <button type="button" class="ghost icon-button" data-mode-step="prev" aria-label="Предыдущий режим" title="Предыдущий режим" data-tooltip="Предыдущий режим">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <button type="button" class="ghost icon-button" data-mode-step="next" aria-label="Следующий режим" title="Следующий режим" data-tooltip="Следующий режим">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
       </div>
-    </section>`
-  )).join('');
+    </div>
+    <div class="custom-select-field mode-select-label" data-mode-picker data-custom-select>
+      <span class="field-caption">Выбрать режим</span>
+      <select class="native-select-fallback" data-mode-select tabindex="-1" aria-hidden="true">
+        ${modes.map(mode => `<option value="${escapeHtml(mode.id)}" ${mode.id === activeMode.id ? 'selected' : ''}>${escapeHtml(mode.group)} / ${escapeHtml(mode.title)}</option>`).join('')}
+      </select>
+      <button type="button" class="custom-select-trigger" data-custom-select-toggle data-mode-select-button aria-haspopup="listbox" aria-expanded="false" title="Открыть список режимов" data-tooltip="Открыть список режимов">
+        <span data-custom-select-value>${escapeHtml(activeMode.group)} / ${escapeHtml(activeMode.title)}</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="custom-select-menu" data-custom-select-menu data-mode-select-menu role="listbox" hidden>
+        ${modes.map(mode => customSelectOption({
+          datasetName: 'data-mode-option',
+          value: mode.id,
+          label: `${mode.group} / ${mode.title}`,
+          detail: mode.summary,
+          selected: mode.id === activeMode.id,
+        })).join('')}
+      </div>
+    </div>
+    <div class="mode-carousel" data-mode-carousel>
+      ${renderModeCard(activeMode)}
+    </div>
+  </section>`;
+}
+
+function customSelectOption(option: {
+  readonly datasetName: string;
+  readonly detail: string;
+  readonly label: string;
+  readonly selected: boolean;
+  readonly value: string;
+}): string {
+  return `<button type="button" class="custom-select-option" ${option.datasetName}="${escapeHtml(option.value)}" role="option" aria-selected="${option.selected ? 'true' : 'false'}" ${option.selected ? 'data-selected="true"' : ''}>
+    <span>${escapeHtml(option.label)}</span>
+    <small>${escapeHtml(option.detail)}</small>
+  </button>`;
+}
+
+function checkActionTooltip(action: string): string {
+  const labels: Record<string, string> = {
+    download_config: 'Скачать файл настройки MCP для выбранного проекта',
+    import_config: 'Импортировать файл настройки MCP в пульт',
+    install_service: 'Установить Windows-службу watcher для проекта',
+    open_logs: 'Открыть нижнюю панель логов watcher',
+    select_project: 'Открыть профиль проекта и выбрать рабочую папку',
+    start_service: 'Запустить watcher для выбранного проекта',
+    verify: 'Повторить проверку MCP-сервера, ключа и watcher',
+  };
+  return labels[action] ?? 'Выполнить действие чеклиста';
 }
 
 function renderModeCard(mode: DesktopModeSummary): string {
