@@ -7,6 +7,7 @@ import { buildDesktopConfigPackage } from './desktop-config-package.js';
 import { buildDesktopConnectionCheck } from './desktop-connection-check.js';
 import { importProjectConfig } from './desktop-config-import.js';
 import { listDesktopModeSummaries } from './desktop-mode-summary.js';
+import { reportDesktopOnboardingProgress } from './desktop-onboarding-events.js';
 import { readDesktopUiState, saveDesktopUiState } from './desktop-ui-state.js';
 import { previewDiagnostics, previewMcpDiff, listDesktopProjectProfiles, readServiceStatus, runServiceAction, saveProfile, type DesktopCorePaths } from './desktop-core.js';
 
@@ -119,9 +120,12 @@ function registerIpcHandlers(): void {
   ipcMain.handle('service:run', (_event, request: WatcherServiceActionRequest) => (
     runServiceAction(corePaths(), request)
   ));
-  ipcMain.handle('service:full-check', (_event, projectId: string) => (
-    buildDesktopConnectionCheck(corePaths(), projectId)
-  ));
+  ipcMain.handle('service:full-check', async (_event, projectId: string) => {
+    const paths = corePaths();
+    const check = await buildDesktopConnectionCheck(paths, projectId);
+    void reportDesktopOnboardingProgress(paths, projectId, check);
+    return check;
+  });
   ipcMain.handle('projects:list', () => listDesktopProjectProfiles(corePaths()));
   ipcMain.handle('projects:save', (_event, project: ProjectDraft) => saveProfile(corePaths(), project));
   ipcMain.handle('projects:select-root', async () => {

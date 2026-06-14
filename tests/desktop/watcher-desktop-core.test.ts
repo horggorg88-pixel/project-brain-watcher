@@ -9,6 +9,7 @@ import { buildDesktopConnectionCheck } from '../../apps/watcher-desktop/src/desk
 import { importProjectConfig } from '../../apps/watcher-desktop/src/desktop-config-import.js';
 import { discoverMcpConfig } from '../../apps/watcher-desktop/src/desktop-config-discovery.js';
 import { listDesktopModeSummaries } from '../../apps/watcher-desktop/src/desktop-mode-summary.js';
+import { buildOnboardingEventReports, reportOnboardingEvents } from '../../apps/watcher-desktop/src/desktop-onboarding-events.js';
 import {
   readProfiles,
   readServiceStatus,
@@ -991,6 +992,82 @@ describe('watcher desktop core', () => {
     expect(check.nodes.find(node => node.id === 'server')?.status).toBe('active');
     expect(check.nodes.find(node => node.id === 'watcher')?.actionLabel).toBe('Установить службу');
     expect(check.overall).toBe('action_required');
+  });
+
+  it('builds onboarding events from completed desktop connection steps', () => {
+    const check = {
+      overall: 'ready',
+      message: 'Подключение готово',
+      projectId: 'client-project',
+      checkedAt: new Date().toISOString(),
+      nodes: [
+        { id: 'project', label: 'Проект', status: 'active', detail: 'repo', action: 'none', actionLabel: null },
+        { id: 'config', label: 'Файл настройки', status: 'active', detail: 'ready', action: 'none', actionLabel: null },
+        { id: 'key', label: 'Ключ доступа', status: 'active', detail: 'ready', action: 'none', actionLabel: null },
+        { id: 'server', label: 'MCP-сервер', status: 'active', detail: 'ready', action: 'none', actionLabel: null },
+        { id: 'watcher', label: 'Watcher', status: 'active', detail: 'ready', action: 'none', actionLabel: null },
+      ],
+      service: statusFixture({ projectId: 'client-project', running: true, health: 'healthy', readOnly: false }),
+      diagnostics: {
+        blocked: false,
+        requiresSecretConfirmation: false,
+        readiness: 'allow',
+        findings: [],
+        included: [],
+        secretWarnings: [],
+        checks: [],
+      },
+    } as const;
+
+    const events = buildOnboardingEventReports(check);
+
+    expect(events.map(event => event.eventType)).toEqual([
+      'desktop_opened',
+      'project_selected',
+      'config_ready',
+      'watcher_started',
+    ]);
+    expect(events.map(event => event.projectId)).toEqual([
+      'client-project',
+      'client-project',
+      'client-project',
+      'client-project',
+    ]);
+  });
+
+  it('posts onboarding events to the web server with the local bearer token', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'Client Project');
+    mkdirSync(root, { recursive: true });
+    const profile = saveProfile(paths, {
+      id: 'client-project',
+      name: 'Client Project',
+      root,
+      indexId: 'idx-client-project',
+      serverUrl: 'http://149.33.14.250/mcp/p/client-project',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const requests: Array<{ readonly url: string; readonly init: RequestInit | undefined }> = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({ url: String(input), init });
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    });
+
+    const result = await reportOnboardingEvents({
+      profile,
+      token: VALID_TEST_BEARER,
+      events: [{ eventType: 'watcher_started', source: 'watcher', projectId: 'client-project', payload: { health: 'healthy' } }],
+      fetcher,
+    });
+
+    const body = JSON.parse(String(requests[0]?.init?.body ?? '{}')) as Record<string, unknown>;
+    expect(result[0]?.sent).toBe(true);
+    expect(requests[0]?.url).toBe('http://149.33.14.250/api/onboarding/events');
+    expect(requests[0]?.init?.method).toBe('POST');
+    expect((requests[0]?.init?.headers as Record<string, string>).authorization).toBe(`Bearer ${VALID_TEST_BEARER}`);
+    expect(body.eventType).toBe('watcher_started');
+    expect(body.source).toBe('watcher');
+    expect(body.projectId).toBe('client-project');
   });
 
   it('surfaces the exact MCP server access failure as the primary connection reason', async () => {
