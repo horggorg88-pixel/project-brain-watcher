@@ -10,6 +10,7 @@ import {
   normalizeServiceRefreshResult,
   readServiceLauncherRepairState,
   serviceInstallAlreadyExists,
+  serviceImagePathRepairRequired,
   serviceRefreshUnsupported,
   shouldRepairServiceLauncherBeforeAction,
 } from '../../apps/watcher-desktop/src/desktop-service-repair.js';
@@ -63,6 +64,18 @@ describe('watcher desktop service repair', () => {
       'binPath=',
       `"${join(profile.root, '.brain', 'service', 'ProjectBrainWatcher-demo.exe')}"`,
     ]);
+  });
+
+  it('requires SCM binPath repair only when service metadata points at another root', () => {
+    expect(serviceImagePathRepairRequired(statusFixture({
+      lastError: [
+        'Windows Service STOPPED, WIN32_EXIT_CODE=1067',
+        'Windows Service metadata указывает на другой root: C:\\Users\\New\\Desktop\\MCP. Ожидался C:\\Users\\New\\Desktop\\mcp-monorepo.',
+      ].join('\n'),
+    }))).toBe(true);
+    expect(serviceImagePathRepairRequired(statusFixture({
+      lastError: 'Windows Service STOPPED, WIN32_EXIT_CODE=1067',
+    }))).toBe(false);
   });
 
   it('detects missing and legacy service launchers that still use the LocalSystem npm cache', () => {

@@ -24,11 +24,12 @@ import {
   normalizeServiceInstallResult,
   normalizeServiceRefreshResult,
   readServiceLauncherRepairState,
+  serviceImagePathRepairRequired,
   shouldRepairServiceLauncherBeforeAction,
 } from './desktop-service-repair.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.33/project-brain-watcher-1.4.33.tgz';
+const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.34/project-brain-watcher-1.4.34.tgz';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 const WATCHER_COMMAND_TIMEOUT_MS = 60_000;
@@ -146,7 +147,7 @@ async function repairServiceLauncherIfNeeded(
         : 'service repair: refresh не выполнен');
     output.push(refresh.output);
     if (refresh.exitCode !== 0) return { exitCode: refresh.exitCode, output: output.filter(Boolean).join('\n') };
-    if (refreshRaw.exitCode !== 0) {
+    if (refreshRaw.exitCode !== 0 && serviceImagePathRepairRequired(status)) {
       const imagePathRaw = await repairServiceImagePath(profile);
       const imagePath = normalizeServiceImagePathRepairResult(imagePathRaw.exitCode, imagePathRaw.output);
       output.push(imagePathRaw.exitCode === 0
@@ -154,6 +155,9 @@ async function repairServiceLauncherIfNeeded(
         : 'service repair: SCM binPath не обновлён');
       output.push(imagePath.output);
       return { exitCode: imagePath.exitCode, output: output.filter(Boolean).join('\n') };
+    }
+    if (refreshRaw.exitCode !== 0) {
+      output.push('service repair: SCM binPath уже указывает на текущий проект, admin repair не нужен');
     }
     return { exitCode: 0, output: output.filter(Boolean).join('\n') };
   }
@@ -339,8 +343,12 @@ async function runUpdateAction(
       refresh.output,
     ]);
   }
-  const imagePathRaw = refreshRaw && refreshRaw.exitCode !== 0 ? await repairServiceImagePath(profile) : null;
+  const statusAfterRefresh = refreshRaw && refreshRaw.exitCode !== 0 ? readServiceStatus(paths, profile.id) : null;
+  const imagePathRaw = statusAfterRefresh && serviceImagePathRepairRequired(statusAfterRefresh) ? await repairServiceImagePath(profile) : null;
   const imagePath = imagePathRaw ? normalizeServiceImagePathRepairResult(imagePathRaw.exitCode, imagePathRaw.output) : null;
+  const imagePathRepairSkipped = refreshRaw && refreshRaw.exitCode !== 0 && !imagePath
+    ? 'Watcher: service repair: SCM binPath уже указывает на текущий проект, admin repair не нужен.'
+    : null;
   if (imagePath && imagePath.exitCode !== 0) {
     return updateResult(paths, profile.id, policy, imagePath.exitCode, versionReport, [
       'Пульт обновлён',
@@ -357,7 +365,9 @@ async function runUpdateAction(
     ? 'Watcher: служба установлена через текущий release.'
     : refreshRaw?.exitCode === 0
       ? 'Watcher: service repair: install already exists, launcher/XML обновлены, refresh выполнен.'
-      : 'Watcher: service repair: install already exists, launcher/XML обновлены, SCM binPath обновлён, выполнен restart.';
+      : imagePath
+        ? 'Watcher: service repair: install already exists, launcher/XML обновлены, SCM binPath обновлён, выполнен restart.'
+        : 'Watcher: service repair: install already exists, launcher/XML обновлены, SCM binPath уже актуален, выполнен restart.';
   return {
     executed: true,
     policy,
@@ -370,6 +380,7 @@ async function runUpdateAction(
       installSummary,
       compactOutput(install.output),
       refresh ? compactOutput(refresh.output) : null,
+      imagePathRepairSkipped,
       imagePath ? compactOutput(imagePath.output) : null,
       'Watcher: команда перезапуска выполнена.',
       compactOutput(restartSettlement.output),

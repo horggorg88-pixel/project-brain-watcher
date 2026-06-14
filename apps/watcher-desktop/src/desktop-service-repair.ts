@@ -102,6 +102,10 @@ export function normalizeServiceImagePathRepairResult(exitCode: number, output: 
   };
 }
 
+export function serviceImagePathRepairRequired(status: WatcherServiceStatus): boolean {
+  return /Windows Service metadata указывает на другой root/i.test(status.lastError ?? '');
+}
+
 export function shouldRepairServiceLauncherBeforeAction(
   action: WatcherServiceAction,
   status: WatcherServiceStatus,
