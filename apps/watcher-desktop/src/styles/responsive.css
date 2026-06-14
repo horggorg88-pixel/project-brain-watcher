@@ -63,7 +63,9 @@
   .topbar,
   .split-grid,
   .form-grid,
-  .mode-grid {
+  .mode-grid,
+  .service-head,
+  .service-status-actions {
     grid-template-columns: 1fr;
   }
 
@@ -97,7 +99,9 @@
   .project-picker,
   .topbar-actions,
   .section-head,
-  .section-actions {
+  .section-actions,
+  .service-log-actions,
+  .service-command-grid {
     display: grid;
     grid-template-columns: 1fr;
   }
@@ -106,6 +110,7 @@
   .topbar-actions > button,
   .section-actions > button,
   .section-head > button,
+  .service-log-actions > button,
   .command-list button {
     width: 100%;
   }

@@ -357,6 +357,21 @@ h3 {
   display: none;
 }
 
+.service-command-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(188px, 1fr));
+  align-items: stretch;
+  gap: 8px;
+}
+
+.service-command-grid button {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding-inline: 10px;
+  text-align: center;
+}
+
 .rail-line {
   display: flex;
   flex-wrap: wrap;

@@ -285,9 +285,15 @@ describe('watcher desktop contract', () => {
     const html = readFileSync(join(appRoot, 'src', 'index.html'), 'utf-8');
     const rendererSource = readFileSync(join(appRoot, 'src', 'renderer.ts'), 'utf-8');
     const layoutCss = readFileSync(join(appRoot, 'src', 'styles', 'layout.css'), 'utf-8');
+    const componentsCss = readFileSync(join(appRoot, 'src', 'styles', 'components.css'), 'utf-8');
 
     expect(html).toContain('data-copy-service-logs');
     expect(html).toContain('data-open-service-logs');
+    expect(html).toContain('class="section-head service-head"');
+    expect(html).toContain('class="section-actions service-status-actions"');
+    expect(html).toContain('class="service-log-actions"');
+    expect(html).toContain('class="command-list service-command-grid"');
+    expect(html).toContain('class="code-block service-status-output"');
     expect(rendererSource).toContain('copyServiceLogsButton');
     expect(rendererSource).toContain('openServiceLogsButtons');
     expect(rendererSource).toContain('serviceLogsText');
@@ -297,6 +303,11 @@ describe('watcher desktop contract', () => {
     expect(layoutCss).toContain('.bottom-console[data-collapsed]');
     expect(layoutCss).toContain('.bottom-console .ghost');
     expect(layoutCss).toContain('color: var(--inverse-ink)');
+    expect(layoutCss).toContain('.service-status-actions');
+    expect(layoutCss).toContain('.service-log-actions');
+    expect(layoutCss).toContain('.service-status-output');
+    expect(componentsCss).toContain('.service-command-grid');
+    expect(componentsCss).toContain('grid-template-columns: repeat(auto-fit, minmax(188px, 1fr));');
   });
 
   it('keeps the mode legend explicit about wavy aliases and Idol as an MCP mode', () => {

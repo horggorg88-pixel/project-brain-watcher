@@ -91,18 +91,20 @@
         </section>
 
         <section class="content-section" data-section="watcher" hidden>
-          <div class="section-head">
+          <div class="section-head service-head">
             <div>
               <p class="eyebrow">служба watcher</p>
               <h2>Команды</h2>
             </div>
-            <div class="section-actions">
+            <div class="section-actions service-status-actions">
               <span class="overall-badge" data-service-summary>Проверяем...</span>
-              <button type="button" class="ghost" data-open-service-logs>Показать логи</button>
-              <button type="button" class="ghost" data-copy-service-logs>Копировать логи</button>
+              <div class="service-log-actions">
+                <button type="button" class="ghost" data-open-service-logs>Показать логи</button>
+                <button type="button" class="ghost" data-copy-service-logs>Копировать логи</button>
+              </div>
             </div>
           </div>
-          <div class="command-list">
+          <div class="command-list service-command-grid">
             <button type="button" data-service-action="install">Установить службу</button>
             <button type="button" data-service-action="start">Запустить watcher</button>
             <button type="button" data-service-action="restart">Перезапустить watcher</button>
@@ -111,7 +113,7 @@
             <button type="button" data-service-action="stop">Остановить watcher</button>
             <button type="button" data-service-action="health">Проверить подключение</button>
           </div>
-          <pre class="code-block" data-service-status>Проверяем службу...</pre>
+          <pre class="code-block service-status-output" data-service-status>Проверяем службу...</pre>
         </section>
 
         <section class="content-section" data-section="projects" hidden>

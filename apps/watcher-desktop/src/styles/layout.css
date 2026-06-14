@@ -214,6 +214,49 @@
   gap: 12px;
 }
 
+.service-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 560px);
+  align-items: start;
+  gap: 14px;
+}
+
+.service-status-actions {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.72fr) minmax(260px, 1fr);
+  align-items: stretch;
+  justify-content: stretch;
+  gap: 8px;
+  width: 100%;
+}
+
+.service-status-actions .overall-badge {
+  width: 100%;
+  min-height: 40px;
+  justify-content: center;
+  text-align: center;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.service-log-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.service-log-actions > button {
+  width: 100%;
+  min-height: 40px;
+}
+
+.service-status-output {
+  margin-top: 12px;
+  max-height: 360px;
+  border-color: var(--line-strong);
+}
+
 .split-grid {
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
