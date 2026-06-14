@@ -223,7 +223,7 @@
 
 .service-status-actions {
   display: grid;
-  grid-template-columns: minmax(160px, 0.72fr) minmax(260px, 1fr);
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 220px);
   align-items: stretch;
   justify-content: stretch;
   gap: 8px;
@@ -241,7 +241,7 @@
 
 .service-log-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   min-width: 0;
 }

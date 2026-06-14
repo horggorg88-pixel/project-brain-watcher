@@ -281,21 +281,22 @@ describe('watcher desktop contract', () => {
     expect(serviceRunnerSource).toContain('service repair: refresh');
   });
 
-  it('exposes a copy button for service logs in the watcher panel', () => {
+  it('exposes passive service status and copy logs in the watcher panel', () => {
     const html = readFileSync(join(appRoot, 'src', 'index.html'), 'utf-8');
     const rendererSource = readFileSync(join(appRoot, 'src', 'renderer.ts'), 'utf-8');
     const layoutCss = readFileSync(join(appRoot, 'src', 'styles', 'layout.css'), 'utf-8');
     const componentsCss = readFileSync(join(appRoot, 'src', 'styles', 'components.css'), 'utf-8');
+    const watcherSectionHtml = html.match(/<section class="content-section" data-section="watcher"[\s\S]*?<\/section>/)?.[0] ?? '';
 
     expect(html).toContain('data-copy-service-logs');
-    expect(html).toContain('data-open-service-logs');
+    expect(watcherSectionHtml).not.toContain('data-open-service-logs');
     expect(html).toContain('class="section-head service-head"');
     expect(html).toContain('class="section-actions service-status-actions"');
     expect(html).toContain('class="service-log-actions"');
     expect(html).toContain('class="command-list service-command-grid"');
     expect(html).toContain('class="code-block service-status-output"');
     expect(rendererSource).toContain('copyServiceLogsButton');
-    expect(rendererSource).toContain('openServiceLogsButtons');
+    expect(rendererSource).not.toContain('openServiceLogsButtons');
     expect(rendererSource).toContain('serviceLogsText');
     expect(rendererSource).toContain('Логи службы скопированы');
     expect(rendererSource).toContain("bottomConsoleEl?.toggleAttribute('data-collapsed'");
@@ -305,7 +306,11 @@ describe('watcher desktop contract', () => {
     expect(layoutCss).toContain('color: var(--inverse-ink)');
     expect(layoutCss).toContain('.service-status-actions');
     expect(layoutCss).toContain('.service-log-actions');
+    expect(layoutCss).toContain('grid-template-columns: minmax(0, 1fr);');
     expect(layoutCss).toContain('.service-status-output');
+    expect(componentsCss).toContain('cursor: default;');
+    expect(componentsCss).toContain('pointer-events: none;');
+    expect(componentsCss).toContain('border-left: 3px solid var(--line-strong);');
     expect(componentsCss).toContain('.service-command-grid');
     expect(componentsCss).toContain('grid-template-columns: repeat(auto-fit, minmax(188px, 1fr));');
   });

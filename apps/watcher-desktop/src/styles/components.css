@@ -125,25 +125,32 @@ h3 {
 
 .overall-badge,
 .check-ok {
-  display: inline-grid;
+  display: inline-flex;
   min-height: 30px;
   align-items: center;
-  border: 1px solid var(--line-strong);
-  padding: 0 10px;
+  border: 0;
+  border-left: 3px solid var(--line-strong);
+  background: rgba(17, 17, 17, 0.045);
+  color: var(--muted);
+  cursor: default;
   font-family: var(--mono);
   font-size: 11px;
+  padding: 0 10px 0 9px;
+  pointer-events: none;
   text-transform: uppercase;
+  user-select: text;
 }
 
 .overall-badge[data-status="error"] {
   border-color: var(--danger);
-  border-width: 2px;
+  background: var(--danger-soft);
   color: var(--danger);
 }
 
 .overall-badge[data-status="action_required"] {
   background: var(--soft);
-  border-width: 2px;
+  border-color: var(--ink);
+  color: var(--ink);
 }
 
 .checklist,

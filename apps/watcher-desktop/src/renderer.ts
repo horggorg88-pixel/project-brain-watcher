@@ -58,7 +58,6 @@ const selectRootButton = document.querySelector<HTMLButtonElement>('[data-select
 const downloadConfigButton = document.querySelector<HTMLButtonElement>('[data-download-config]');
 const copyPromptButton = document.querySelector<HTMLButtonElement>('[data-copy-prompt]');
 const copyServiceLogsButton = document.querySelector<HTMLButtonElement>('[data-copy-service-logs]');
-const openServiceLogsButtons = document.querySelectorAll<HTMLButtonElement>('[data-open-service-logs]');
 const toggleThemeButton = document.querySelector<HTMLButtonElement>('[data-toggle-theme]');
 const runFullCheckButton = document.querySelector<HTMLButtonElement>('[data-run-full-check]');
 const consoleToggleButton = document.querySelector<HTMLButtonElement>('[data-console-toggle]');
@@ -155,12 +154,6 @@ copyServiceLogsButton?.addEventListener('click', () => {
   void copyText(serviceLogsText())
     .then(() => writeLog('Логи службы скопированы'))
     .catch(error => writeLog(errorMessage(error)));
-});
-
-openServiceLogsButtons.forEach(button => {
-  button.addEventListener('click', () => {
-    void openServiceLogs();
-  });
 });
 
 toggleThemeButton?.addEventListener('click', () => {
