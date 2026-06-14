@@ -295,6 +295,17 @@ describe('watcher desktop core', () => {
     expect(config.binaryPath).toBe('C:\\Users\\New\\Desktop\\MCP\\.brain\\service\\ProjectBrainWatcher-mcp-monorepo.exe');
   });
 
+  it('parses Windows service binary path from localized sc.exe qc output', () => {
+    const config = parseWindowsServiceConfigOutput([
+      '[SC] QueryServiceConfig: успех',
+      'ИМЯ_СЛУЖБЫ: ProjectBrainWatcher-mcp-monorepo',
+      '        ИМЯ_ДВОИЧНОГО_ФАЙЛА  : "C:\\Users\\New\\Desktop\\MCP\\.brain\\service\\ProjectBrainWatcher-mcp-monorepo.exe"',
+      '        ИМЯ_ЗАПУСКА_СЛУЖБЫ    : LocalSystem',
+    ].join('\n'));
+
+    expect(config.binaryPath).toBe('C:\\Users\\New\\Desktop\\MCP\\.brain\\service\\ProjectBrainWatcher-mcp-monorepo.exe');
+  });
+
   it('blocks start actions when a profile has no MCP server', async () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'repo');

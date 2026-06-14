@@ -142,7 +142,7 @@ export function parseWindowsServiceOutput(output: string): WindowsServiceState {
 
 export function parseWindowsServiceConfigOutput(output: string): WindowsServiceConfigState {
   const match = output.match(/BINARY_PATH_NAME\s*:\s*(.+)/i);
-  return { binaryPath: match ? extractExecutablePath(match[1]) : null };
+  return { binaryPath: match ? extractExecutablePath(match[1]) : extractExecutablePath(output) };
 }
 
 function parseWindowsServiceExit(output: string): string | null {
@@ -181,18 +181,14 @@ function serviceRootFromBinaryPath(path: string): string | null {
   return markerIndex === -1 ? null : path.slice(0, markerIndex);
 }
 
-function extractExecutablePath(value: string): string {
+function extractExecutablePath(value: string): string | null {
   const trimmed = value.trim();
   if (trimmed.startsWith('"')) {
     const endQuote = trimmed.indexOf('"', 1);
     if (endQuote > 0) return trimmed.slice(1, endQuote);
   }
-  const executable = trimmed.match(/^[A-Za-z]:\\.*?\.exe\b/i)?.[0];
-  return executable ?? stripSurroundingQuotes(trimmed);
-}
-
-function stripSurroundingQuotes(value: string): string {
-  return value.startsWith('"') && value.endsWith('"') ? value.slice(1, -1) : value;
+  const executable = trimmed.match(/[A-Za-z]:\\[^\r\n"]*?\.exe\b/i)?.[0];
+  return executable ?? null;
 }
 
 function emptyWindowsServiceState(): WindowsServiceState {
