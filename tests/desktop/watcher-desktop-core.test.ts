@@ -20,7 +20,7 @@ import {
 } from '../../apps/watcher-desktop/src/desktop-core.js';
 import { readDesktopServiceSecret, readDesktopServiceSecretState } from '../../apps/watcher-desktop/src/desktop-service-secret.js';
 import { stageDesktopServiceSecret } from '../../apps/watcher-desktop/src/desktop-service-secret.js';
-import { isServiceActionSettled, prepareServiceSecretForLaunch, summarizeServiceActionSettlement } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
+import { isServiceActionSettled, prepareServiceSecretForLaunch, resolveVerifiedServiceActionToken, summarizeServiceActionSettlement } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
 import { parseWindowsServiceConfigOutput, parseWindowsServiceOutput } from '../../apps/watcher-desktop/src/desktop-service-status.js';
 import { readDesktopUiState, saveDesktopUiState } from '../../apps/watcher-desktop/src/desktop-ui-state.js';
 import { defaultProfile, serviceName } from '../../apps/watcher-desktop/src/desktop-profile-store.js';
@@ -604,6 +604,37 @@ describe('watcher desktop core', () => {
 
     expect(state.configured).toBe(true);
     expect(readDesktopServiceSecret(profile)).toBe(VALID_ENV_BEARER);
+  });
+
+  it('falls back to a verified environment bearer before service actions use a stale local secret', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'repo');
+    mkdirSync(root, { recursive: true });
+    const profile = saveProfile(paths, {
+      id: 'demo',
+      name: 'Demo',
+      root,
+      indexId: 'idx-demo',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    stageDesktopServiceSecret(profile, STALE_LOCAL_BEARER);
+    vi.stubEnv('MCP_BEARER_TOKEN', VALID_ENV_BEARER);
+    const authorizations: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const authorization = new Headers(init?.headers).get('authorization') ?? '';
+      authorizations.push(authorization);
+      if (authorization !== `Bearer ${VALID_ENV_BEARER}`) return new Response('denied', { status: 401 });
+      return verifiedMcpFetch()(input, init);
+    }));
+
+    const result = await resolveVerifiedServiceActionToken(profile, STALE_LOCAL_BEARER);
+
+    expect(result.token).toBe(VALID_ENV_BEARER);
+    expect(result.serverAccess.verified).toBe(true);
+    expect(readDesktopServiceSecret(profile)).toBe(VALID_ENV_BEARER);
+    expect(authorizations[0]).toBe(`Bearer ${STALE_LOCAL_BEARER}`);
+    expect(authorizations[1]).toBe(`Bearer ${VALID_ENV_BEARER}`);
   });
 
   it('discovers an existing Codex MCP config without reading bearer values', () => {

@@ -10,14 +10,14 @@ import type {
 } from './contracts.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { applyMcpConfigToProfile, type DesktopCorePaths } from './desktop-profile-store.js';
-import { readDesktopServiceToken, stageDesktopServiceSecret, type DesktopServiceSecretState } from './desktop-service-secret.js';
+import { readDesktopEnvServiceToken, readDesktopServiceToken, stageDesktopServiceSecret, type DesktopServiceSecretState } from './desktop-service-secret.js';
 import {
   fetchReleaseVersionCheck,
   formatReleaseVersionCheck,
   readLocalDesktopVersion,
   watcherPackageVersion,
 } from './desktop-release-update.js';
-import { verifyProjectServerAccess } from './desktop-server-access.js';
+import { type DesktopServerAccessVerification, verifyProjectServerAccess } from './desktop-server-access.js';
 import {
   normalizeServiceInstallResult,
   normalizeServiceRefreshResult,
@@ -48,7 +48,7 @@ export async function runServiceAction(
   );
   if (request.action === 'health') return healthResult(paths, request.projectId);
   if (request.action === 'check_update') return checkUpdateResult(paths, request.projectId);
-  const token = profile ? readDesktopServiceToken(profile) : null;
+  let token = profile ? readDesktopServiceToken(profile) : null;
   const status = readServiceStatus(paths, request.projectId);
   if (request.action === 'start' && status.running) {
     return {
@@ -67,7 +67,9 @@ export async function runServiceAction(
     return { executed: false, policy, status: readServiceStatus(paths, request.projectId), exitCode: null, output: 'Проект не найден' };
   }
   if (request.action !== 'stop') {
-    const serverAccess = await verifyProjectServerAccess(profile, token);
+    const verifiedToken = await resolveVerifiedServiceActionToken(profile, token);
+    token = verifiedToken.token;
+    const serverAccess = verifiedToken.serverAccess;
     if (!serverAccess.verified) {
       const denied: WatcherPolicyGate = { decision: 'deny', risk: 'high', reasons: [serverAccess.message] };
       return { executed: false, policy: denied, status: readServiceStatus(paths, profile.id), exitCode: null, output: serverAccess.message };
@@ -165,6 +167,25 @@ export function prepareServiceSecretForLaunch(
 ): DesktopServiceSecretState {
   if (!token) throw new Error(`Bearer для ${profile.tokenEnv} не найден`);
   return stageDesktopServiceSecret(profile, token);
+}
+
+export interface VerifiedServiceActionToken {
+  readonly token: string | null;
+  readonly serverAccess: DesktopServerAccessVerification;
+}
+
+export async function resolveVerifiedServiceActionToken(
+  profile: SavedProjectProfile,
+  token: string | null,
+): Promise<VerifiedServiceActionToken> {
+  const serverAccess = await verifyProjectServerAccess(profile, token);
+  if (serverAccess.verified) return { token, serverAccess };
+  const envToken = readDesktopEnvServiceToken(profile);
+  if (!envToken || envToken === token) return { token, serverAccess };
+  const envAccess = await verifyProjectServerAccess(profile, envToken);
+  if (!envAccess.verified) return { token, serverAccess };
+  stageDesktopServiceSecret(profile, envToken);
+  return { token: envToken, serverAccess: envAccess };
 }
 
 export function isServiceActionSettled(
