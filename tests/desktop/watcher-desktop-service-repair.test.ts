@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SavedProjectProfile, WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
 import {
+  buildServiceImagePathRepairArgs,
   normalizeServiceInstallResult,
   normalizeServiceRefreshResult,
   readServiceLauncherRepairState,
@@ -51,6 +52,17 @@ describe('watcher desktop service repair', () => {
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain('WinSW refresh недоступен');
     expect(result.output).toContain('старый WinSW');
+  });
+
+  it('builds a Windows SCM binPath repair command for a stale installed service executable path', () => {
+    const profile = profileFixture();
+
+    expect(buildServiceImagePathRepairArgs(profile)).toEqual([
+      'config',
+      'ProjectBrainWatcher-demo',
+      'binPath=',
+      `"${join(profile.root, '.brain', 'service', 'ProjectBrainWatcher-demo.exe')}"`,
+    ]);
   });
 
   it('detects missing and legacy service launchers that still use the LocalSystem npm cache', () => {

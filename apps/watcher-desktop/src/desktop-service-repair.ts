@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SavedProjectProfile, WatcherServiceAction, WatcherServiceStatus } from './contracts.js';
-import { serviceName } from './desktop-profile-store.js';
+import { serviceExePath, serviceName } from './desktop-profile-store.js';
 
 export interface ServiceCommandResult {
   readonly exitCode: number;
@@ -75,6 +75,29 @@ export function normalizeServiceRefreshResult(exitCode: number, output: string):
     output: [
       output.trim(),
       'service repair: WinSW refresh недоступен в старый WinSW, launcher/XML обновлены, продолжаю запуск через start/restart.',
+    ].filter(Boolean).join('\n'),
+  };
+}
+
+export function buildServiceImagePathRepairArgs(profile: SavedProjectProfile): string[] {
+  return ['config', serviceName(profile.id), 'binPath=', `"${serviceExePath(profile)}"`];
+}
+
+export function normalizeServiceImagePathRepairResult(exitCode: number, output: string): ServiceCommandResult {
+  if (exitCode === 0) {
+    return {
+      exitCode,
+      output: [
+        output.trim(),
+        'service repair: Windows SCM ImagePath обновлён на exe выбранного проекта.',
+      ].filter(Boolean).join('\n'),
+    };
+  }
+  return {
+    exitCode,
+    output: [
+      output.trim(),
+      'service repair: Windows SCM ImagePath не обновлён. Запустите пульт от администратора и повторите обновление службы.',
     ].filter(Boolean).join('\n'),
   };
 }

@@ -19,6 +19,8 @@ import {
 } from './desktop-release-update.js';
 import { type DesktopServerAccessVerification, verifyProjectServerAccess } from './desktop-server-access.js';
 import {
+  buildServiceImagePathRepairArgs,
+  normalizeServiceImagePathRepairResult,
   normalizeServiceInstallResult,
   normalizeServiceRefreshResult,
   readServiceLauncherRepairState,
@@ -31,6 +33,7 @@ const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 const WATCHER_COMMAND_TIMEOUT_MS = 60_000;
 const SERVICE_INSTALL_TIMEOUT_MS = 180_000;
+const SERVICE_METADATA_REPAIR_TIMEOUT_MS = 30_000;
 const DESKTOP_UPDATE_TIMEOUT_MS = 10 * 60_000;
 
 export interface SpawnWatcherOptions {
@@ -142,7 +145,17 @@ async function repairServiceLauncherIfNeeded(
         ? 'service repair: refresh недоступен, продолжаю через start/restart'
         : 'service repair: refresh не выполнен');
     output.push(refresh.output);
-    return { exitCode: refresh.exitCode, output: output.filter(Boolean).join('\n') };
+    if (refresh.exitCode !== 0) return { exitCode: refresh.exitCode, output: output.filter(Boolean).join('\n') };
+    if (refreshRaw.exitCode !== 0) {
+      const imagePathRaw = await repairServiceImagePath(profile);
+      const imagePath = normalizeServiceImagePathRepairResult(imagePathRaw.exitCode, imagePathRaw.output);
+      output.push(imagePathRaw.exitCode === 0
+        ? 'service repair: SCM binPath обновлён'
+        : 'service repair: SCM binPath не обновлён');
+      output.push(imagePath.output);
+      return { exitCode: imagePath.exitCode, output: output.filter(Boolean).join('\n') };
+    }
+    return { exitCode: 0, output: output.filter(Boolean).join('\n') };
   }
   return {
     exitCode: 0,
@@ -158,6 +171,15 @@ async function refreshServiceMetadata(
   return spawnWatcher(command, buildServiceRefreshArgs(profile), profile.root, env, {
     timeoutMs: SERVICE_INSTALL_TIMEOUT_MS,
     timeoutLabel: 'service refresh',
+  });
+}
+
+async function repairServiceImagePath(
+  profile: SavedProjectProfile,
+): Promise<{ readonly exitCode: number; readonly output: string }> {
+  return spawnWatcher('sc.exe', buildServiceImagePathRepairArgs(profile), profile.root, {}, {
+    timeoutMs: SERVICE_METADATA_REPAIR_TIMEOUT_MS,
+    timeoutLabel: 'service image path repair',
   });
 }
 
@@ -317,6 +339,17 @@ async function runUpdateAction(
       refresh.output,
     ]);
   }
+  const imagePathRaw = refreshRaw && refreshRaw.exitCode !== 0 ? await repairServiceImagePath(profile) : null;
+  const imagePath = imagePathRaw ? normalizeServiceImagePathRepairResult(imagePathRaw.exitCode, imagePathRaw.output) : null;
+  if (imagePath && imagePath.exitCode !== 0) {
+    return updateResult(paths, profile.id, policy, imagePath.exitCode, versionReport, [
+      'Пульт обновлён',
+      install.output,
+      refresh?.output ?? '',
+      'Watcher: service repair: SCM binPath не обновлён.',
+      imagePath.output,
+    ]);
+  }
   const restart = await spawnWatcher(command, buildServiceRestartArgs(profile), profile.root, env);
   const status = await waitForServiceActionStatus(paths, 'restart', profile.id);
   const restartSettlement = summarizeServiceActionSettlement('restart', restart.exitCode, restart.output, status);
@@ -324,7 +357,7 @@ async function runUpdateAction(
     ? 'Watcher: служба установлена через текущий release.'
     : refreshRaw?.exitCode === 0
       ? 'Watcher: service repair: install already exists, launcher/XML обновлены, refresh выполнен.'
-      : 'Watcher: service repair: install already exists, launcher/XML обновлены, refresh недоступен, выполнен restart.';
+      : 'Watcher: service repair: install already exists, launcher/XML обновлены, SCM binPath обновлён, выполнен restart.';
   return {
     executed: true,
     policy,
@@ -337,6 +370,7 @@ async function runUpdateAction(
       installSummary,
       compactOutput(install.output),
       refresh ? compactOutput(refresh.output) : null,
+      imagePath ? compactOutput(imagePath.output) : null,
       'Watcher: команда перезапуска выполнена.',
       compactOutput(restartSettlement.output),
     ].filter(Boolean).join('\n\n'),
