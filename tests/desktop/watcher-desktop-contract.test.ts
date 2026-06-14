@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 const appRoot = join(process.cwd(), 'apps', 'watcher-desktop');
 
+const normalizeNewlines = (source: string): string => source.replace(/\r\n/g, '\n');
+
 describe('watcher desktop contract', () => {
   it('keeps Electron renderer isolated', () => {
     const mainSource = readFileSync(join(appRoot, 'src', 'main.ts'), 'utf-8');
@@ -167,7 +169,7 @@ describe('watcher desktop contract', () => {
 
   it('keeps project block buttons aligned without text wrapping', () => {
     const html = readFileSync(join(appRoot, 'src', 'index.html'), 'utf-8');
-    const baseCss = readFileSync(join(appRoot, 'src', 'styles', 'base.css'), 'utf-8');
+    const baseCss = normalizeNewlines(readFileSync(join(appRoot, 'src', 'styles', 'base.css'), 'utf-8'));
     const layoutCss = readFileSync(join(appRoot, 'src', 'styles', 'layout.css'), 'utf-8');
     const componentsCss = readFileSync(join(appRoot, 'src', 'styles', 'components.css'), 'utf-8');
     const topbarHtml = html.match(/<header class="topbar">[\s\S]*?<\/header>/)?.[0] ?? '';
@@ -259,7 +261,9 @@ describe('watcher desktop contract', () => {
   });
 
   it('starts service actions through the current watcher release', () => {
-    const serviceRunnerSource = readFileSync(join(appRoot, 'src', 'desktop-service-runner.ts'), 'utf-8');
+    const serviceRunnerSource = normalizeNewlines(
+      readFileSync(join(appRoot, 'src', 'desktop-service-runner.ts'), 'utf-8'),
+    );
     const watcherPackage = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8')) as {
       version?: string;
     };
@@ -391,7 +395,7 @@ describe('watcher desktop contract', () => {
     const rendererSource = readFileSync(join(appRoot, 'src', 'renderer.ts'), 'utf-8');
     const rendererViewSource = readFileSync(join(appRoot, 'src', 'renderer-view.ts'), 'utf-8');
     const layoutCss = readFileSync(join(appRoot, 'src', 'styles', 'layout.css'), 'utf-8');
-    const themesCss = readFileSync(join(appRoot, 'src', 'styles', 'themes.css'), 'utf-8');
+    const themesCss = normalizeNewlines(readFileSync(join(appRoot, 'src', 'styles', 'themes.css'), 'utf-8'));
 
     expect(rendererSource).toContain('activeModeId');
     expect(rendererSource).toContain('stepActiveMode');
