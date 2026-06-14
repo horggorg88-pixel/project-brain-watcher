@@ -29,7 +29,13 @@ export function renderShellAccess(state: DesktopAccessState, targets: ShellRende
 export function applyUiState(state: DesktopUiState, sections: NodeListOf<HTMLElement>, navButtons: NodeListOf<HTMLButtonElement>): void {
   document.body.dataset.theme = state.theme;
   sections.forEach(section => section.toggleAttribute('hidden', section.dataset.section !== state.activeSection));
-  navButtons.forEach(button => button.toggleAttribute('aria-current', button.dataset.navSection === state.activeSection));
+  navButtons.forEach(button => {
+    if (button.dataset.navSection === state.activeSection) {
+      button.setAttribute('aria-current', 'page');
+    } else {
+      button.removeAttribute('aria-current');
+    }
+  });
 }
 
 export function renderProjectSelect(
@@ -66,10 +72,11 @@ export function renderConnectionCause(check: DesktopConnectionCheck, element: HT
 export function renderOverall(check: DesktopConnectionCheck, element: HTMLElement | null): void {
   if (!element) return;
   element.dataset.status = check.overall;
-  setText(element, check.message);
+  setText(element, overallSummary(check));
 }
 
 export function renderService(status: WatcherServiceStatus, statusEl: HTMLElement | null, summaryEl: HTMLElement | null): void {
+  if (summaryEl) summaryEl.dataset.status = serviceSummaryStatus(status);
   setText(summaryEl, serviceSummary(status));
   const lines = [
     `Состояние подключения: ${healthLabel(status.health)}`,
@@ -235,6 +242,18 @@ function serviceSummary(status: WatcherServiceStatus): string {
   if (!status.installed) return 'Watcher не установлен';
   if (!status.running) return 'Watcher остановлен';
   return status.health === 'healthy' ? 'Watcher работает' : 'Watcher требует внимания';
+}
+
+function serviceSummaryStatus(status: WatcherServiceStatus): DesktopConnectionCheck['overall'] {
+  if (!status.installed || !status.running) return 'action_required';
+  return status.health === 'healthy' ? 'ready' : 'error';
+}
+
+function overallSummary(check: DesktopConnectionCheck): string {
+  if (check.overall === 'ready') return 'Подключение готово';
+  const blocker = check.nodes.find(node => node.status !== 'active');
+  const reason = blocker?.label ?? 'причина';
+  return check.overall === 'error' ? `Проверка остановлена: ${reason}` : `Нужен шаг: ${reason}`;
 }
 
 function serviceNextStep(status: WatcherServiceStatus): string {

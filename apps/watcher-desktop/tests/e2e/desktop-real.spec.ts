@@ -72,10 +72,16 @@ test('opens the real desktop control panel and proves the dry service rail', asy
 
     await page.getByRole('button', { name: 'Watcher' }).click();
     await expect(page.locator('[data-section="watcher"]')).toBeVisible();
+    await expect(page.locator('[data-service-action="install"]')).toBeVisible();
+    await expect(page.locator('[data-service-action="install"]')).toHaveAttribute('data-command-variant', 'primary');
     await expect(page.locator('[data-service-action="check_update"]')).toBeVisible();
+    await expect(page.locator('[data-service-action="update"]')).toHaveAttribute('data-command-variant', 'danger');
+    await expect(page.locator('[data-service-action="start"]')).toBeHidden();
+    await expect(page.locator('[data-service-action="restart"]')).toBeHidden();
+    await expect(page.locator('[data-service-action="stop"]')).toBeHidden();
     await page.locator('[data-service-action="health"]').click();
     await expect(page.locator('[data-service-output]')).toContainText('Проверка не пройдена');
-    for (const action of ['install', 'start', 'restart', 'stop'] as const) {
+    for (const action of ['install', 'update'] as const) {
       await page.locator(`[data-service-action="${action}"]`).click();
       await expect(page.locator('[data-service-output]')).toContainText('нажмите эту же кнопку ещё раз');
     }

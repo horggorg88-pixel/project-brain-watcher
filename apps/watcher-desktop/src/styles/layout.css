@@ -97,41 +97,36 @@
 }
 
 .topbar {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 8px;
+  row-gap: 10px;
   border: 1px solid var(--line);
   background: var(--panel);
   padding: 10px;
 }
 
 .project-picker {
-  flex: 1 1 420px;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto;
-  gap: 8px;
-  align-items: end;
+  display: contents;
 }
 
 .project-picker label {
+  grid-column: 1 / span 3;
+  min-width: 0;
   margin-bottom: 0;
 }
 
+.project-picker select {
+  min-height: 38px;
+}
+
 .topbar-actions {
-  flex: 1 1 360px;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: end;
-  justify-content: end;
+  display: contents;
 }
 
 .section-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   justify-content: end;
@@ -141,23 +136,36 @@
 .topbar-actions > button,
 .section-actions > button,
 .section-head > button {
-  min-height: 34px;
+  min-height: 38px;
   align-self: end;
 }
 
 .topbar-actions .overall-badge {
-  flex: 1 1 260px;
-  min-height: 34px;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
   justify-content: start;
   line-height: 1.25;
+  max-width: none;
+  overflow: hidden;
   overflow-wrap: anywhere;
   padding-bottom: 6px;
   padding-top: 6px;
-  white-space: normal;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.project-picker > button,
+.topbar-actions > button {
+  width: 100%;
 }
 
 .section-actions .overall-badge {
   min-height: 34px;
+  text-transform: none;
   white-space: nowrap;
 }
 
@@ -237,6 +245,7 @@
 
 .bottom-console > div {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid rgba(255, 255, 255, 0.18);
   padding: 8px 10px;
@@ -257,7 +266,8 @@
 }
 
 .bottom-console[data-collapsed] {
-  max-height: none;
+  max-height: 44px;
+  overflow: hidden;
 }
 
 .bottom-console[data-collapsed] pre {

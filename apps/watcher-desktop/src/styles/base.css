@@ -7,6 +7,8 @@
   --line-strong: rgba(17, 17, 17, 0.34);
   --panel: rgba(255, 255, 255, 0.92);
   --soft: #ededeb;
+  --danger: #8f1d18;
+  --danger-soft: rgba(143, 29, 24, 0.08);
   --inverse: #111;
   --inverse-ink: #fff;
   --mono: "Cascadia Mono", Consolas, monospace;
@@ -57,6 +59,16 @@ button {
 
 button:hover { background: #303030; }
 button:disabled { cursor: not-allowed; opacity: 0.5; }
+
+button[data-command-variant="danger"] {
+  border-color: var(--danger);
+  background: transparent;
+  color: var(--danger);
+}
+
+button[data-command-variant="danger"]:hover {
+  background: var(--danger-soft);
+}
 
 input,
 select {

@@ -1,6 +1,7 @@
-import type { WatcherPolicyDecision, WatcherServiceAction } from './contracts.js';
+import type { WatcherPolicyDecision, WatcherServiceAction, WatcherServiceStatus } from './contracts.js';
 
 const SERVICE_CONFIRMATION_TTL_MS = 15_000;
+type ServiceActionVariant = 'primary' | 'secondary' | 'danger';
 
 export interface PendingServiceActionConfirmation {
   readonly action: WatcherServiceAction;
@@ -22,6 +23,12 @@ export interface ServiceActionConfirmationRequest {
   readonly projectId: string;
 }
 
+interface ServiceActionPresentation {
+  readonly order: number;
+  readonly variant: ServiceActionVariant;
+  readonly visible: boolean;
+}
+
 export function isServiceAction(value: string | undefined): value is WatcherServiceAction {
   return value === 'health' || value === 'install' || value === 'start' || value === 'stop' || value === 'restart' || value === 'check_update' || value === 'update';
 }
@@ -29,6 +36,19 @@ export function isServiceAction(value: string | undefined): value is WatcherServ
 export function setServiceBusy(buttons: NodeListOf<HTMLButtonElement>, busy: boolean): void {
   Array.from(buttons).forEach(button => {
     button.disabled = busy;
+  });
+}
+
+export function setServiceActionState(buttons: NodeListOf<HTMLButtonElement>, status: WatcherServiceStatus): void {
+  const state = new Map<WatcherServiceAction, ServiceActionPresentation>(serviceActionPresentation(status));
+  Array.from(buttons).forEach(button => {
+    const action = button.dataset.serviceAction;
+    if (!isServiceAction(action)) return;
+    const presentation = state.get(action) ?? hiddenAction();
+    button.hidden = !presentation.visible;
+    button.style.order = String(presentation.order);
+    button.dataset.commandVariant = presentation.variant;
+    button.classList.toggle('ghost', presentation.variant !== 'primary');
   });
 }
 
@@ -90,4 +110,34 @@ function matchesPendingConfirmation(request: ServiceActionConfirmationRequest): 
     && request.pending.action === request.action
     && request.pending.projectId === request.projectId
     && request.pending.expiresAt >= request.nowMs;
+}
+
+function serviceActionPresentation(status: WatcherServiceStatus): readonly [WatcherServiceAction, ServiceActionPresentation][] {
+  if (!status.installed) return [
+    ['install', actionState(1, 'primary')],
+    ['health', actionState(2, 'secondary')],
+    ['check_update', actionState(3, 'secondary')],
+    ['update', actionState(4, 'danger')],
+  ];
+  if (!status.running) return [
+    ['start', actionState(1, 'primary')],
+    ['health', actionState(2, 'secondary')],
+    ['check_update', actionState(3, 'secondary')],
+    ['update', actionState(4, 'danger')],
+  ];
+  return [
+    ['health', actionState(1, 'primary')],
+    ['restart', actionState(2, 'secondary')],
+    ['check_update', actionState(3, 'secondary')],
+    ['update', actionState(4, 'danger')],
+    ['stop', actionState(5, 'danger')],
+  ];
+}
+
+function actionState(order: number, variant: ServiceActionVariant): ServiceActionPresentation {
+  return { order, variant, visible: true };
+}
+
+function hiddenAction(): ServiceActionPresentation {
+  return { order: 99, variant: 'secondary', visible: false };
 }

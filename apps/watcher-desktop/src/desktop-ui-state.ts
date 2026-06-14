@@ -10,7 +10,7 @@ export function defaultDesktopUiState(): DesktopUiState {
   return {
     activeSection: 'start',
     theme: 'light',
-    consoleOpen: true,
+    consoleOpen: false,
     lastProjectId: null,
     keyVisible: false,
   };
@@ -43,7 +43,7 @@ function normalizeUiState(value: unknown): DesktopUiState {
   return {
     activeSection: readSection(value.activeSection),
     theme: readTheme(value.theme),
-    consoleOpen: typeof value.consoleOpen === 'boolean' ? value.consoleOpen : true,
+    consoleOpen: typeof value.consoleOpen === 'boolean' ? value.consoleOpen : false,
     lastProjectId: typeof value.lastProjectId === 'string' && value.lastProjectId.trim() ? value.lastProjectId.trim() : null,
     keyVisible: typeof value.keyVisible === 'boolean' ? value.keyVisible : false,
   };

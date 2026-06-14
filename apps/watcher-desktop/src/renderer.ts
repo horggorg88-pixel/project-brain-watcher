@@ -32,7 +32,7 @@ import {
   sectionFrom,
   setText,
 } from './renderer-view.js';
-import { actionLabel, decisionLabel, isServiceAction, setServiceBusy } from './renderer-service-ui.js';
+import { actionLabel, decisionLabel, isServiceAction, setServiceActionState, setServiceBusy } from './renderer-service-ui.js';
 import {
   resolveServiceActionConfirmation,
   setServiceConfirmationHint,
@@ -308,6 +308,8 @@ async function refresh(): Promise<void> {
   renderConnectionCause(check, connectionCauseEl);
   renderConnectionCheck(check, checklistEl);
   renderService(check.service, serviceStatusEl, serviceSummaryEl);
+  setServiceActionState(serviceButtons, check.service);
+  setServiceConfirmationHint(serviceButtons, pendingServiceAction);
   renderCurrentPackage();
   renderProjects(currentProjects, projectListEl);
   renderModes(modes, modesEl);
@@ -544,7 +546,7 @@ function defaultUiState(): DesktopUiState {
   return {
     activeSection: 'start',
     theme: 'light',
-    consoleOpen: true,
+    consoleOpen: false,
     lastProjectId: null,
     keyVisible: false,
   };

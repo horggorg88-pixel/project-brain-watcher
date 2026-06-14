@@ -161,7 +161,9 @@ describe('watcher desktop contract', () => {
     expect(layoutCss).toContain('align-items: end;');
     expect(componentsCss).toContain('width: 100%;');
     expect(componentsCss).toContain('.window-logo');
-    expect(componentsCss).toContain('repeat(auto-fit, minmax(210px, 1fr))');
+    expect(componentsCss).toContain('.command-list button');
+    expect(componentsCss).toContain('min-width: 180px;');
+    expect(componentsCss).toContain('.command-list button[hidden]');
   });
 
   it('declares an isolated package for the desktop application', () => {

@@ -1,14 +1,24 @@
 @media (max-width: 980px) {
   .app-shell {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr) auto;
   }
 
   .sidebar {
     grid-column: 1;
     grid-row: auto;
     min-height: auto;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px 14px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
+    padding: 10px 14px;
+  }
+
+  .sidebar-head {
+    border-bottom: 0;
+    padding-bottom: 0;
   }
 
   .workspace,
@@ -18,27 +28,103 @@
   }
 
   .sidebar-nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
+    grid-column: 2;
+    gap: 6px;
+    padding: 0;
   }
 
   .sidebar-nav p {
+    display: none;
+  }
+
+  .sidebar-nav button {
+    width: auto;
+    min-height: 32px;
+    border-color: var(--line);
+    justify-content: center;
+    padding: 0 10px;
+  }
+
+  .account-card {
     grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 12px;
+    padding-top: 8px;
+  }
+
+  .account-card button {
+    justify-self: end;
+    min-width: 100px;
   }
 
   .topbar,
-  .project-picker,
-  .topbar-actions,
   .split-grid,
   .form-grid,
-  .mode-grid,
-  .command-list {
+  .mode-grid {
     grid-template-columns: 1fr;
   }
 
-  .topbar,
   .topbar-actions {
-    display: grid;
+    grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(150px, 1fr));
+  }
+
+  .topbar-actions .overall-badge {
+    max-width: none;
+  }
+
+  .project-picker label,
+  .project-picker > button,
+  .topbar-actions > * {
+    grid-column: 1;
   }
 
   .bottom-console { margin: 0 14px 14px; }
+}
+
+@media (max-width: 720px) {
+  .sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar-nav {
+    grid-column: 1;
+  }
+
+  .project-picker,
+  .topbar-actions,
+  .section-head,
+  .section-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .project-picker > button,
+  .topbar-actions > button,
+  .section-actions > button,
+  .section-head > button,
+  .command-list button {
+    width: 100%;
+  }
+
+  .account-card {
+    grid-template-columns: 1fr;
+    row-gap: 6px;
+  }
+
+  .account-card button {
+    justify-self: stretch;
+  }
+
+  .check-row {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .check-row > button,
+  .check-ok {
+    grid-column: 2;
+    justify-self: start;
+  }
 }
