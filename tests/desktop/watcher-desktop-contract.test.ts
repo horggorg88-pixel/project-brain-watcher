@@ -225,7 +225,7 @@ describe('watcher desktop contract', () => {
     expect(serviceRunnerSource).toContain("'node'");
     expect(serviceRunnerSource).toContain("'--watcher-entry'");
     expect(serviceRunnerSource).toContain('serviceWatcherEntry(profile)');
-    expect(serviceRunnerSource).toContain("'runtime-entry.js'");
+    expect(serviceRunnerSource).toContain("'runtime-entry.cjs'");
     expect(serviceRunnerSource).not.toContain("return ['--path',");
   });
 
@@ -249,7 +249,7 @@ describe('watcher desktop contract', () => {
     expect(watcherBundle).toContain('watcherEntry');
     expect(watcherBundle).toContain('runtime-install.log');
     expect(watcherBundle).toContain('runtime-staging');
-    expect(watcherBundle).toContain('runtime-entry.js');
+    expect(watcherBundle).toContain('runtime-entry.cjs');
     expect(watcherBundle).toContain('active-runtime.json');
     expect(watcherBundle).toContain('active_entry');
     expect(watcherBundle).toContain('attempt_runtime_dir');

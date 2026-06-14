@@ -518,7 +518,7 @@ function serviceArgs(profile: SavedProjectProfile): string[] {
 }
 
 function serviceWatcherEntry(profile: SavedProjectProfile): string {
-  return join(profile.root, '.brain', 'service', 'runtime-entry.js');
+  return join(profile.root, '.brain', 'service', 'runtime-entry.cjs');
 }
 
 export function spawnWatcher(

@@ -112,7 +112,7 @@ export function shouldRepairServiceLauncherBeforeAction(
 }
 
 function serviceRuntimeWatcherEntry(profile: SavedProjectProfile): string {
-  return join(profile.root, '.brain', 'service', 'runtime-entry.js');
+  return join(profile.root, '.brain', 'service', 'runtime-entry.cjs');
 }
 
 function serviceRuntimeManifestPath(profile: SavedProjectProfile): string {

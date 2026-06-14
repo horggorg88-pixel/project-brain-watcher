@@ -73,7 +73,7 @@ describe('watcher desktop service repair', () => {
     const missing = readServiceLauncherRepairState(profile);
     writeFileSync(join(serviceDir, 'launch-watcher.ps1'), '$ErrorActionPreference = "Stop"\n& npx @args\n', 'utf-8');
     const legacy = readServiceLauncherRepairState(profile);
-    const watcherEntry = join(serviceDir, 'runtime-entry.js');
+    const watcherEntry = join(serviceDir, 'runtime-entry.cjs');
     mkdirSync(serviceDir, { recursive: true });
     writeFileSync(watcherEntry, '#!/usr/bin/env node\n', 'utf-8');
     writeFileSync(join(serviceDir, 'active-runtime.json'), JSON.stringify({ entry: watcherEntry }), 'utf-8');
@@ -116,7 +116,7 @@ describe('watcher desktop service repair', () => {
   it('requires repair when a node launcher points at a missing local service runtime', () => {
     const profile = profileFixture();
     const serviceDir = join(profile.root, '.brain', 'service');
-    const watcherEntry = join(serviceDir, 'runtime-entry.js');
+    const watcherEntry = join(serviceDir, 'runtime-entry.cjs');
     mkdirSync(serviceDir, { recursive: true });
     writeFileSync(join(serviceDir, 'launch-watcher.ps1'), [
       '$ErrorActionPreference = "Stop"',
@@ -136,7 +136,7 @@ describe('watcher desktop service repair', () => {
   it('requires repair when the local service runtime manifest is missing', () => {
     const profile = profileFixture();
     const serviceDir = join(profile.root, '.brain', 'service');
-    const watcherEntry = join(serviceDir, 'runtime-entry.js');
+    const watcherEntry = join(serviceDir, 'runtime-entry.cjs');
     mkdirSync(serviceDir, { recursive: true });
     writeFileSync(watcherEntry, '#!/usr/bin/env node\n', 'utf-8');
     writeFileSync(join(serviceDir, 'launch-watcher.ps1'), [
@@ -157,7 +157,7 @@ describe('watcher desktop service repair', () => {
   it('requires repair when service XML still launches npx metadata', () => {
     const profile = profileFixture();
     const serviceDir = join(profile.root, '.brain', 'service');
-    const watcherEntry = join(serviceDir, 'runtime-entry.js');
+    const watcherEntry = join(serviceDir, 'runtime-entry.cjs');
     mkdirSync(serviceDir, { recursive: true });
     writeFileSync(watcherEntry, '#!/usr/bin/env node\n', 'utf-8');
     writeFileSync(join(serviceDir, 'active-runtime.json'), JSON.stringify({ entry: watcherEntry }), 'utf-8');
