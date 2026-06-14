@@ -1559,6 +1559,7 @@ describe('watcher desktop core', () => {
       'bearer_token_env_var = "MCP_BEARER_TOKEN"',
       'url = "http://149.33.14.250/mcp"',
     ].join('\n'), 'utf-8');
+    vi.stubGlobal('fetch', verifiedMcpFetch());
 
     const loginState = await loginAccess(paths, { email: 'client@example.com', password: 'password123' });
     const logoutState = logoutAccess(paths);
