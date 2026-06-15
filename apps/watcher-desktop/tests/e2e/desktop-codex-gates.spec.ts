@@ -31,8 +31,8 @@ test('verifies Codex settings from the real desktop control panel', async ({}, t
     await expect(codexAction).toHaveAttribute('data-tooltip', /persistent-verifier/);
 
     await codexAction.click();
-    await expect(page.locator('[data-service-output]')).toContainText('Codex plugin установлен. Открой Codex в проекте, чтобы SessionStart hook подтвердил persistent-verifier.');
-    await expect(page.locator('[data-node="codexGates"]')).toContainText('Codex plugin установлен. Открой Codex в проекте');
+    await expect(page.locator('[data-service-output]')).toContainText('Codex hooks установлены. Открой Codex в проекте и доверь hooks через /hooks, чтобы SessionStart подтвердил persistent-verifier.');
+    await expect(page.locator('[data-node="codexGates"]')).toContainText('Codex hooks установлены. Открой Codex в проекте');
     await expect(codexAction).toBeVisible();
 
     writeNativeHookEvidence(fixture.projectRoot);

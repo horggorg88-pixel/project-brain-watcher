@@ -22,6 +22,7 @@ describe('watcher desktop codex gates', () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');
     mkdirSync(root, { recursive: true });
+    stagePersistentVerifierHookFiles(paths.homePath);
     writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
     saveProfile(paths, {
       id: 'demo-project',
@@ -53,7 +54,7 @@ describe('watcher desktop codex gates', () => {
       'npm test',
     ]);
     expect(result.ready).toBe(false);
-    expect(result.message).toBe('Codex plugin установлен. Открой Codex в проекте, чтобы SessionStart hook подтвердил persistent-verifier.');
+    expect(result.message).toBe('Codex hooks установлены. Открой Codex в проекте и доверь hooks через /hooks, чтобы SessionStart подтвердил persistent-verifier.');
     expect(result.evidence.commandRuns.codexHooks).toMatchObject({
       command: 'codex plugin add persistent-verifier@claude-migrated-home',
       exitCode: 0,
@@ -71,7 +72,77 @@ describe('watcher desktop codex gates', () => {
       command: 'codex plugin remove persistent-verifier@claude-migrated-home',
       exitCode: 0,
     });
+    expect(readFileSync(join(
+      paths.homePath,
+      '.codex',
+      'plugins',
+      'cache',
+      'claude-migrated-home',
+      'persistent-verifier',
+      '0.1.0',
+      'hooks.json',
+    ), 'utf-8')).toContain('%PLUGIN_ROOT%');
+    expect(readFileSync(join(paths.homePath, '.codex', 'hooks.json'), 'utf-8')).toContain('persistent-verifier');
+    expect(readFileSync(join(paths.homePath, '.codex', 'hooks.json'), 'utf-8')).toContain('sessionstart.py');
     expect(JSON.stringify(result.evidence)).not.toContain('pb_secret_value');
+  });
+
+  it('preserves existing Codex user hooks while installing the persistent-verifier bridge', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    mkdirSync(root, { recursive: true });
+    stagePersistentVerifierHookFiles(paths.homePath);
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
+    mkdirSync(join(paths.homePath, '.codex'), { recursive: true });
+    writeFileSync(join(paths.homePath, '.codex', 'hooks.json'), JSON.stringify({
+      hooks: {
+        UserPromptSubmit: [{ hooks: [{ type: 'command', command: 'python existing.py' }] }],
+      },
+    }, null, 2), 'utf-8');
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    await verifyDesktopCodexGates(paths, 'demo-project', {
+      runner: async () => ({ exitCode: 0, output: 'ok' }),
+      now: () => new Date('2026-06-15T10:00:00.000Z'),
+    });
+
+    const userHooks = readFileSync(join(paths.homePath, '.codex', 'hooks.json'), 'utf-8');
+    expect(userHooks).toContain('python existing.py');
+    expect(userHooks).toContain('persistent-verifier');
+  });
+
+  it('blocks Codex hook setup when persistent-verifier hook files are missing', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    const result = await verifyDesktopCodexGates(paths, 'demo-project', {
+      runner: async () => ({ exitCode: 0, output: 'ok' }),
+      now: () => new Date('2026-06-15T10:00:00.000Z'),
+    });
+
+    expect(result.ready).toBe(false);
+    expect(result.message).toBe('Persistent-verifier plugin ещё не установлен или не прошёл проверку.');
+    expect(result.evidence.commandRuns.codexHooks).toMatchObject({
+      passed: false,
+      exitCode: 1,
+    });
   });
 
   it('reads native hook persistence evidence written by Codex hooks', () => {
@@ -118,6 +189,7 @@ describe('watcher desktop codex gates', () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');
     mkdirSync(root, { recursive: true });
+    stagePersistentVerifierHookFiles(paths.homePath);
     writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
     saveProfile(paths, {
       id: 'demo-project',
@@ -135,7 +207,7 @@ describe('watcher desktop codex gates', () => {
     });
 
     expect(result.ready).toBe(false);
-    expect(result.message).toBe('Codex plugin установлен. Открой Codex в проекте, чтобы SessionStart hook подтвердил persistent-verifier.');
+    expect(result.message).toBe('Codex hooks установлены. Открой Codex в проекте и доверь hooks через /hooks, чтобы SessionStart подтвердил persistent-verifier.');
     expect(result.evidence.verification.hookPersistence).toBeUndefined();
   });
 
@@ -158,4 +230,28 @@ function tempPaths(): DesktopCorePaths {
     homePath: join(root, 'home'),
     userDataPath: join(root, 'user-data'),
   };
+}
+
+function stagePersistentVerifierHookFiles(homePath: string): void {
+  const scriptDir = join(homePath, 'plugins', 'persistent-verifier', 'hooks');
+  mkdirSync(scriptDir, { recursive: true });
+  for (const name of ['sessionstart.py', 'posttooluse.py', 'stop.py']) {
+    writeFileSync(join(scriptDir, name), 'print("{}")\n', 'utf-8');
+  }
+  for (const hooksPath of [
+    join(homePath, 'plugins', 'persistent-verifier', 'hooks.json'),
+    join(homePath, '.codex', 'plugins', 'cache', 'claude-migrated-home', 'persistent-verifier', '0.1.0', 'hooks.json'),
+  ]) {
+    mkdirSync(join(hooksPath, '..'), { recursive: true });
+    writeFileSync(hooksPath, JSON.stringify({
+      hooks: {
+        SessionStart: [{ hooks: [{ type: 'command', command: 'python ./hooks/sessionstart.py', timeout: 15 }] }],
+        PostToolUse: [{
+          matcher: 'Write|Edit|MultiEdit',
+          hooks: [{ type: 'command', command: 'python ./hooks/posttooluse.py', timeout: 180 }],
+        }],
+        Stop: [{ hooks: [{ type: 'command', command: 'python ./hooks/stop.py', timeout: 15 }] }],
+      },
+    }, null, 2), 'utf-8');
+  }
 }

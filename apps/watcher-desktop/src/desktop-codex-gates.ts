@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type {
   DesktopCodexGateEvidence,
   DesktopCodexGateRunEvidence,
@@ -34,6 +34,51 @@ export interface DesktopCodexGateVerifyOptions {
 const STALE_AFTER_MS = 10 * 60 * 1000;
 const SOURCE = 'desktop-codex-gates';
 const PLUGIN_ID = 'persistent-verifier@claude-migrated-home';
+const PERSISTENT_VERIFIER_HOOKS = {
+  description: 'Runs project verifiers after edits and blocks stop while the last verification is failing',
+  hooks: {
+    SessionStart: [
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: 'python3 ${PLUGIN_ROOT}/hooks/sessionstart.py',
+            commandWindows: 'python "%PLUGIN_ROOT%\\hooks\\sessionstart.py"',
+            timeout: 15,
+            statusMessage: 'Checking Codex gate persistence',
+          },
+        ],
+      },
+    ],
+    PostToolUse: [
+      {
+        matcher: 'Write|Edit|MultiEdit',
+        hooks: [
+          {
+            type: 'command',
+            command: 'python3 ${PLUGIN_ROOT}/hooks/posttooluse.py',
+            commandWindows: 'python "%PLUGIN_ROOT%\\hooks\\posttooluse.py"',
+            timeout: 180,
+            statusMessage: 'Running persistent verifier',
+          },
+        ],
+      },
+    ],
+    Stop: [
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: 'python3 ${PLUGIN_ROOT}/hooks/stop.py',
+            commandWindows: 'python "%PLUGIN_ROOT%\\hooks\\stop.py"',
+            timeout: 15,
+            statusMessage: 'Checking last verifier result',
+          },
+        ],
+      },
+    ],
+  },
+} as const;
 const evidenceFiles = [
   join('.brain', 'service', 'quality-gate-runs.json'),
   join('.brain', 'quality-gate-runs.json'),
@@ -71,12 +116,10 @@ export async function verifyDesktopCodexGates(
     checkedAt,
     'Codex CLI проверен.',
   );
-  const codexHooks = evidenceFromResult(
-    await run(runner, profile.root, 'codex', ['plugin', 'add', PLUGIN_ID]),
-    `codex plugin add ${PLUGIN_ID}`,
-    checkedAt,
-    'Codex persistent-verifier plugin установлен или уже доступен.',
-  );
+  const codexHookInstall = await run(runner, profile.root, 'codex', ['plugin', 'add', PLUGIN_ID]);
+  const hookRepair = repairPersistentVerifierPluginHooks(paths.homePath);
+  const hookBridge = installPersistentVerifierUserHooks(paths.homePath);
+  const codexHooks = codexHooksEvidence(codexHookInstall, hookRepair, hookBridge, checkedAt);
   await run(runner, profile.root, 'codex', ['plugin', 'list']);
   await run(runner, profile.root, 'codex', ['features', 'list']);
   const smoke = evidenceFromResult(
@@ -111,6 +154,209 @@ export async function verifyDesktopCodexGates(
   };
   writeProjectEvidence(profile, evidence, checkedAt);
   return statusFromEvidence(evidence, checkedAt);
+}
+
+interface PersistentVerifierHookRepair {
+  readonly repaired: readonly string[];
+  readonly valid: readonly string[];
+  readonly missing: readonly string[];
+  readonly failed: readonly string[];
+}
+
+interface PersistentVerifierUserHookBridge {
+  readonly installed: boolean;
+  readonly path?: string;
+  readonly detail: string;
+}
+
+function repairPersistentVerifierPluginHooks(homePath: string): PersistentVerifierHookRepair {
+  const repaired: string[] = [];
+  const valid: string[] = [];
+  const missing: string[] = [];
+  const failed: string[] = [];
+  const desired = JSON.stringify(PERSISTENT_VERIFIER_HOOKS, null, 2) + '\n';
+
+  for (const path of persistentVerifierHookPaths(homePath)) {
+    if (!existsSync(path)) {
+      missing.push(path);
+      continue;
+    }
+    try {
+      const current = readFileSync(path, 'utf-8');
+      if (current.includes('%PLUGIN_ROOT%') && current.includes('${PLUGIN_ROOT}')) {
+        valid.push(path);
+        continue;
+      }
+      writeFileSync(path, desired, 'utf-8');
+      repaired.push(path);
+    } catch (error) {
+      failed.push(`${path}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  return { repaired, valid, missing, failed };
+}
+
+function installPersistentVerifierUserHooks(homePath: string): PersistentVerifierUserHookBridge {
+  const scriptRoot = resolvePersistentVerifierScriptRoot(homePath);
+  if (!scriptRoot) {
+    return {
+      installed: false,
+      detail: 'Persistent-verifier hook scripts не найдены после установки plugin.',
+    };
+  }
+
+  const path = join(homePath, '.codex', 'hooks.json');
+  const existing = readHookDocument(path);
+  if (!existing.ok) return { installed: false, path, detail: existing.error };
+
+  const next = mergePersistentVerifierUserHooks(existing.value, scriptRoot);
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify(next, null, 2) + '\n', 'utf-8');
+    return { installed: true, path, detail: 'Codex user-level hooks bridge установлен.' };
+  } catch (error) {
+    return {
+      installed: false,
+      path,
+      detail: `Codex user-level hooks bridge не записан: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+type HookDocumentReadResult =
+  | { readonly ok: true; readonly value: Record<string, unknown> }
+  | { readonly ok: false; readonly error: string };
+
+function readHookDocument(path: string): HookDocumentReadResult {
+  if (!existsSync(path)) return { ok: true, value: {} };
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path, 'utf-8'));
+    if (!isRecord(parsed)) return { ok: false, error: 'Codex hooks.json должен быть JSON object.' };
+    return { ok: true, value: parsed };
+  } catch (error) {
+    return {
+      ok: false,
+      error: `Codex hooks.json не прочитан: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+function mergePersistentVerifierUserHooks(
+  document: Record<string, unknown>,
+  scriptRoot: string,
+): Record<string, unknown> {
+  const hooks = isRecord(document['hooks']) ? { ...document['hooks'] } : {};
+  hooks['SessionStart'] = mergeHookGroup(hooks['SessionStart'], persistentVerifierUserHookGroup(
+    '',
+    commandForScript(join(scriptRoot, 'sessionstart.py')),
+  ));
+  hooks['PostToolUse'] = mergeHookGroup(hooks['PostToolUse'], persistentVerifierUserHookGroup(
+    'Write|Edit|MultiEdit',
+    commandForScript(join(scriptRoot, 'posttooluse.py')),
+  ));
+  hooks['Stop'] = mergeHookGroup(hooks['Stop'], persistentVerifierUserHookGroup(
+    '',
+    commandForScript(join(scriptRoot, 'stop.py')),
+  ));
+  return { ...document, hooks };
+}
+
+function mergeHookGroup(current: unknown, addition: Record<string, unknown>): readonly unknown[] {
+  const retained = Array.isArray(current)
+    ? current.filter(item => !containsPersistentVerifierCommand(item))
+    : [];
+  return [...retained, addition];
+}
+
+function persistentVerifierUserHookGroup(matcher: string, command: string): Record<string, unknown> {
+  return {
+    ...(matcher ? { matcher } : {}),
+    hooks: [
+      {
+        type: 'command',
+        command,
+        commandWindows: command,
+        command_windows: command,
+        timeout: matcher ? 180 : 15,
+        statusMessage: matcher ? 'Running persistent verifier' : 'Checking Codex gate persistence',
+      },
+    ],
+  };
+}
+
+function containsPersistentVerifierCommand(value: unknown): boolean {
+  const serialized = JSON.stringify(value);
+  return typeof serialized === 'string' && serialized.includes('persistent-verifier');
+}
+
+function commandForScript(scriptPath: string): string {
+  return `python "${scriptPath}"`;
+}
+
+function resolvePersistentVerifierScriptRoot(homePath: string): string | null {
+  for (const root of persistentVerifierPluginRoots(homePath)) {
+    const scriptRoot = join(root, 'hooks');
+    if (
+      existsSync(join(scriptRoot, 'sessionstart.py'))
+      && existsSync(join(scriptRoot, 'posttooluse.py'))
+      && existsSync(join(scriptRoot, 'stop.py'))
+    ) {
+      return scriptRoot;
+    }
+  }
+  return null;
+}
+
+function persistentVerifierPluginRoots(homePath: string): readonly string[] {
+  return [
+    join(homePath, 'plugins', 'persistent-verifier'),
+    join(homePath, '.codex', 'plugins', 'cache', 'claude-migrated-home', 'persistent-verifier', '0.1.0'),
+  ];
+}
+
+function persistentVerifierHookPaths(homePath: string): readonly string[] {
+  return persistentVerifierPluginRoots(homePath).map(root => join(root, 'hooks.json'));
+}
+
+function codexHooksEvidence(
+  installResult: DesktopCodexCommandResult,
+  hookRepair: PersistentVerifierHookRepair,
+  hookBridge: PersistentVerifierUserHookBridge,
+  checkedAt: string,
+): DesktopCodexGateRunEvidence {
+  const command = `codex plugin add ${PLUGIN_ID}`;
+  if (installResult.exitCode !== 0) {
+    return evidenceFromResult(installResult, command, checkedAt, 'Codex persistent-verifier plugin установлен или уже доступен.');
+  }
+  if (hookRepair.failed.length > 0) {
+    return failedEvidence(command, checkedAt, `Persistent-verifier hooks.json не удалось обновить: ${hookRepair.failed[0]}`);
+  }
+  if (!hookBridge.installed) return failedEvidence(command, checkedAt, hookBridge.detail);
+  const action = hookRepair.repaired.length > 0 ? 'обновлён под PLUGIN_ROOT' : 'проверен';
+  return {
+    available: true,
+    passed: true,
+    detail: `Codex persistent-verifier plugin установлен, hooks.json ${action}, user-level bridge готов.`,
+    checkedAt,
+    staleAfterMs: STALE_AFTER_MS,
+    source: SOURCE,
+    command,
+    exitCode: 0,
+  };
+}
+
+function failedEvidence(command: string, checkedAt: string, detail: string): DesktopCodexGateRunEvidence {
+  return {
+    available: true,
+    passed: false,
+    detail: sanitize(detail),
+    checkedAt,
+    staleAfterMs: STALE_AFTER_MS,
+    source: SOURCE,
+    command,
+    exitCode: 1,
+  };
 }
 
 async function run(
@@ -297,7 +543,7 @@ function blockerMessage(evidence: DesktopCodexGateEvidence): string {
   if (!hasPassed(evidence.verification.smoke)) return 'Smoke gate Codex ещё не прошёл.';
   if (!hasPassed(evidence.verification.rollback)) return 'Rollback-команда Codex gates не подтверждена.';
   if (hasBaseVerification(evidence)) {
-    return 'Codex plugin установлен. Открой Codex в проекте, чтобы SessionStart hook подтвердил persistent-verifier.';
+    return 'Codex hooks установлены. Открой Codex в проекте и доверь hooks через /hooks, чтобы SessionStart подтвердил persistent-verifier.';
   }
   return 'Codex gates ожидают SessionStart evidence.';
 }
