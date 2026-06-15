@@ -14,7 +14,7 @@ const fakeBearer = 'pb_e2e_codex_token_1234567890';
 test('verifies Codex settings from the real desktop control panel', async ({}, testInfo) => {
   const mcpServer = await startMockMcpServer();
   const fixture = createFixture(mcpServer.url);
-  const app = await launchDesktop(fixture.userDataPath, fixture.projectRoot, fixture.fakeBinPath);
+  const app = await launchDesktop(fixture.homePath, fixture.userDataPath, fixture.projectRoot, fixture.fakeBinPath);
   const page = await app.firstWindow();
   const rendererErrors = collectRendererErrors(page);
   const mainErrors = collectMainErrors(app);
@@ -92,17 +92,21 @@ function stopServer(server: Server): Promise<void> {
 
 function createFixture(serverUrl: string): {
   readonly fakeBinPath: string;
+  readonly homePath: string;
   readonly projectRoot: string;
   readonly rootPath: string;
   readonly userDataPath: string;
 } {
   const rootPath = mkdtempSync(join(tmpdir(), 'watcher-desktop-codex-e2e-'));
   const fakeBinPath = join(rootPath, 'fake-bin');
+  const homePath = join(rootPath, 'home');
   const userDataPath = join(rootPath, 'user-data');
   const projectRoot = join(rootPath, 'Client Project');
   mkdirSync(fakeBinPath, { recursive: true });
+  mkdirSync(homePath, { recursive: true });
   mkdirSync(userDataPath, { recursive: true });
   mkdirSync(projectRoot, { recursive: true });
+  stagePersistentVerifierHookFiles(homePath);
   writeFileSync(join(projectRoot, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
   writeFakeCommand(fakeBinPath, 'codex', 'codex fake ok');
   writeFakeCommand(fakeBinPath, 'npm', 'npm fake test ok');
@@ -115,7 +119,7 @@ function createFixture(serverUrl: string): {
     tokenEnv: 'MCP_BEARER_TOKEN',
     createdAt: new Date(0).toISOString(),
   }], null, 2), 'utf-8');
-  return { fakeBinPath, projectRoot, rootPath, userDataPath };
+  return { fakeBinPath, homePath, projectRoot, rootPath, userDataPath };
 }
 
 function writeFakeCommand(binPath: string, name: string, output: string): void {
@@ -129,6 +133,7 @@ function writeFakeCommand(binPath: string, name: string, output: string): void {
 }
 
 async function launchDesktop(
+  homePath: string,
   userDataPath: string,
   projectRoot: string,
   fakeBinPath: string,
@@ -140,6 +145,8 @@ async function launchDesktop(
     env: {
       ...process.env,
       [pathKey]: `${fakeBinPath}${delimiter}${process.env[pathKey] ?? ''}`,
+      HOME: homePath,
+      USERPROFILE: homePath,
       MCP_BEARER_TOKEN: fakeBearer,
       PROJECT_BRAIN_DESKTOP_USER_DATA_DIR: userDataPath,
       PROJECT_BRAIN_DESKTOP_DEBUG: '0',
@@ -147,6 +154,30 @@ async function launchDesktop(
       PROJECT_BRAIN_E2E_PROJECT_ROOT: projectRoot,
     },
   });
+}
+
+function stagePersistentVerifierHookFiles(homePath: string): void {
+  const scriptDir = join(homePath, 'plugins', 'persistent-verifier', 'hooks');
+  mkdirSync(scriptDir, { recursive: true });
+  for (const name of ['sessionstart.py', 'posttooluse.py', 'stop.py']) {
+    writeFileSync(join(scriptDir, name), 'print("{}")\n', 'utf-8');
+  }
+  for (const hooksPath of [
+    join(homePath, 'plugins', 'persistent-verifier', 'hooks.json'),
+    join(homePath, '.codex', 'plugins', 'cache', 'claude-migrated-home', 'persistent-verifier', '0.1.0', 'hooks.json'),
+  ]) {
+    mkdirSync(join(hooksPath, '..'), { recursive: true });
+    writeFileSync(hooksPath, JSON.stringify({
+      hooks: {
+        SessionStart: [{ hooks: [{ type: 'command', command: 'python ./hooks/sessionstart.py', timeout: 15 }] }],
+        PostToolUse: [{
+          matcher: 'Write|Edit|MultiEdit',
+          hooks: [{ type: 'command', command: 'python ./hooks/posttooluse.py', timeout: 180 }],
+        }],
+        Stop: [{ hooks: [{ type: 'command', command: 'python ./hooks/stop.py', timeout: 15 }] }],
+      },
+    }, null, 2), 'utf-8');
+  }
 }
 
 function readEvidence(projectRoot: string): CodexEvidenceFile {
