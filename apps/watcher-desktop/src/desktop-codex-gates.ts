@@ -165,7 +165,7 @@ export function resolveCodexGateSpawn(
 ): DesktopCodexGateSpawnRequest {
   const executable = resolveCodexGateExecutable(command, platform);
   if (platform === 'win32' && executable.endsWith('.cmd')) {
-    return { command: 'cmd.exe', args: ['/d', '/s', '/c', windowsCommandLine(executable, args)] };
+    return { command: 'cmd.exe', args: ['/d', '/s', '/c', executable, ...args] };
   }
   return { command: executable, args };
 }
@@ -174,14 +174,6 @@ export function resolveCodexGateExecutable(command: string, platform: NodeJS.Pla
   if (platform !== 'win32') return command;
   if (command === 'codex' || command === 'npm') return `${command}.cmd`;
   return command;
-}
-
-function windowsCommandLine(command: string, args: readonly string[]): string {
-  return [command, ...args.map(quoteWindowsArg)].join(' ');
-}
-
-function quoteWindowsArg(value: string): string {
-  return `"${value.replace(/(["^&|<>()%])/g, '^$1')}"`;
 }
 
 function resolveCodexProfile(paths: DesktopCorePaths, projectId: string): SavedProjectProfile | null {

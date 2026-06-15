@@ -120,7 +120,7 @@ describe('watcher desktop codex gates', () => {
     expect(resolveCodexGateExecutable('codex', 'linux')).toBe('codex');
     expect(resolveCodexGateSpawn('codex', ['plugin', 'add', 'persistent-verifier@claude-migrated-home'], 'win32')).toEqual({
       command: 'cmd.exe',
-      args: ['/d', '/s', '/c', 'codex.cmd "plugin" "add" "persistent-verifier@claude-migrated-home"'],
+      args: ['/d', '/s', '/c', 'codex.cmd', 'plugin', 'add', 'persistent-verifier@claude-migrated-home'],
     });
   });
 });
