@@ -74,6 +74,7 @@ function buildBrainConfig(
     ...existing,
     project_id: profile.id,
     server: profile.serverUrl,
+    ...(profile.consoleUrl ? { console_url: profile.consoleUrl } : {}),
     token_env: profile.tokenEnv,
     mcp_endpoint: endpoint,
     mcp_config_path: `${BRAIN_DIR}/${BRAIN_MCP_FILE}`,
@@ -98,6 +99,7 @@ function buildProjectMcpConfig(
   return {
     project_id: profile.id,
     endpoint,
+    ...(profile.consoleUrl ? { console_url: profile.consoleUrl } : {}),
     mcpServers: {
       'project-brain': {
         url: endpoint,

@@ -2,12 +2,14 @@ import type { AccessLoginRequest, McpConfigDiscovery, SavedProjectProfile } from
 import { normalizeMcpServerUrl } from './desktop-mcp-endpoint.js';
 import { isConcreteBearerToken } from './desktop-service-secret.js';
 
-const DEFAULT_ACCOUNT_SERVER_URL = 'http://149.33.14.250';
+const DEFAULT_MCP_SERVER_URL = 'http://149.33.14.250';
+const DEFAULT_ACCOUNT_SERVER_URL = 'http://149.33.14.250:3020';
 const AUTH_TIMEOUT_MS = 5_000;
 
 export interface DesktopAccountAuthorization {
   readonly ok: boolean;
   readonly serverUrl: string | null;
+  readonly consoleUrl: string | null;
   readonly bearerToken: string | null;
   readonly tokenEnv: string;
   readonly message: string;
@@ -41,7 +43,13 @@ function resolveAccountServerUrl(config: McpConfigDiscovery, profile: SavedProje
   const envUrl = typeof process.env.MCP_ONBOARDING_SERVER_URL === 'string'
     ? process.env.MCP_ONBOARDING_SERVER_URL
     : '';
-  const base = config.serverUrl ?? profile?.serverUrl ?? envUrl ?? DEFAULT_ACCOUNT_SERVER_URL;
+  const base = envUrl
+    || config.consoleUrl
+    || profile?.consoleUrl
+    || defaultConsoleUrlFor(config.serverUrl ?? profile?.serverUrl ?? '')
+    || config.serverUrl
+    || profile?.serverUrl
+    || DEFAULT_ACCOUNT_SERVER_URL;
   return normalizeMcpServerUrl(base) || DEFAULT_ACCOUNT_SERVER_URL;
 }
 
@@ -73,13 +81,15 @@ async function parseAuthResponse(response: Response): Promise<DesktopAccountAuth
     return denied(null, message);
   }
   const serverConfig = isRecord(parsed.serverConfig) ? parsed.serverConfig : null;
-  const serverUrl = readText(serverConfig?.serverUrl) ?? DEFAULT_ACCOUNT_SERVER_URL;
+  const serverUrl = readText(serverConfig?.serverUrl) ?? DEFAULT_MCP_SERVER_URL;
+  const consoleUrl = readText(serverConfig?.consoleUrl) ?? responseOrigin(response) ?? DEFAULT_ACCOUNT_SERVER_URL;
   const bearerToken = readText(serverConfig?.bearerToken);
   const tokenEnv = readText(serverConfig?.tokenEnv) ?? 'MCP_BEARER_TOKEN';
   if (!isConcreteBearerToken(bearerToken)) return denied(serverUrl, 'Сервер авторизации не выдал реальный bearer.');
   return {
     ok: true,
-    serverUrl: normalizeMcpServerUrl(serverUrl) || DEFAULT_ACCOUNT_SERVER_URL,
+    serverUrl: normalizeMcpServerUrl(serverUrl) || DEFAULT_MCP_SERVER_URL,
+    consoleUrl: normalizeMcpServerUrl(consoleUrl) || DEFAULT_ACCOUNT_SERVER_URL,
     bearerToken: bearerToken.trim(),
     tokenEnv,
     message: 'Серверная авторизация подтверждена, bearer получен.',
@@ -90,10 +100,23 @@ function denied(serverUrl: string | null, message: string): DesktopAccountAuthor
   return {
     ok: false,
     serverUrl: serverUrl ? normalizeMcpServerUrl(serverUrl) : null,
+    consoleUrl: null,
     bearerToken: null,
     tokenEnv: 'MCP_BEARER_TOKEN',
     message,
   };
+}
+
+function defaultConsoleUrlFor(serverUrl: string): string {
+  return normalizeMcpServerUrl(serverUrl) === DEFAULT_MCP_SERVER_URL ? DEFAULT_ACCOUNT_SERVER_URL : '';
+}
+
+function responseOrigin(response: Response): string | null {
+  try {
+    return response.url ? new URL(response.url).origin : null;
+  } catch {
+    return null;
+  }
 }
 
 function readText(value: unknown): string | null {

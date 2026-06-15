@@ -107,7 +107,7 @@ describe('watcher desktop core', () => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       requestedUrls.push(String(input));
       const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : {};
-      if (String(input) === 'http://149.33.14.250/api/auth/access') {
+      if (String(input) === 'http://149.33.14.250:3020/api/auth/access') {
         expect(body.email).toBe('client@example.com');
         expect(body.password).toBe('password123');
         return new Response(JSON.stringify({
@@ -117,6 +117,7 @@ describe('watcher desktop core', () => {
             projectPath: '',
             projectId: '',
             serverUrl: 'http://149.33.14.250',
+            consoleUrl: 'http://149.33.14.250:3020',
             bearerToken: VALID_TEST_BEARER,
             tokenEnv: 'MCP_BEARER_TOKEN',
           },
@@ -140,8 +141,9 @@ describe('watcher desktop core', () => {
     };
 
     expect(state.signedIn).toBe(true);
-    expect(requestedUrls).toContain('http://149.33.14.250/api/auth/access');
+    expect(requestedUrls).toContain('http://149.33.14.250:3020/api/auth/access');
     expect(saved.serverUrl).toBe('http://149.33.14.250');
+    expect(saved.consoleUrl).toBe('http://149.33.14.250:3020');
     expect(readDesktopServiceSecret(saved)).toBe(VALID_TEST_BEARER);
     expect(pack.configJson).toContain(`Bearer ${VALID_TEST_BEARER}`);
     expect(brainMcp.mcpServers?.['project-brain']?.headers?.Authorization).toBe(`Bearer ${VALID_TEST_BEARER}`);
@@ -193,7 +195,7 @@ describe('watcher desktop core', () => {
       },
     }), 'utf-8');
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input) === 'http://149.33.14.250/api/auth/access') {
+      if (String(input) === 'http://149.33.14.250:3020/api/auth/access') {
         const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : {};
         expect(body.email).toBe('client@example.com');
         expect(body.password).toBe('password123');
@@ -201,6 +203,7 @@ describe('watcher desktop core', () => {
           ok: true,
           serverConfig: {
             serverUrl: 'http://149.33.14.250',
+            consoleUrl: 'http://149.33.14.250:3020',
             bearerToken: VALID_TEST_BEARER,
             tokenEnv: 'MCP_BEARER_TOKEN',
           },
@@ -1062,7 +1065,7 @@ describe('watcher desktop core', () => {
 
     const body = JSON.parse(String(requests[0]?.init?.body ?? '{}')) as Record<string, unknown>;
     expect(result[0]?.sent).toBe(true);
-    expect(requests[0]?.url).toBe('http://149.33.14.250/api/onboarding/events');
+    expect(requests[0]?.url).toBe('http://149.33.14.250:3020/api/onboarding/events');
     expect(requests[0]?.init?.method).toBe('POST');
     expect((requests[0]?.init?.headers as Record<string, string>).authorization).toBe(`Bearer ${VALID_TEST_BEARER}`);
     expect(body.eventType).toBe('watcher_started');

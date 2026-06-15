@@ -12,6 +12,7 @@ interface HandoffFile {
   readonly local_path?: unknown;
   readonly endpoint?: unknown;
   readonly server_url?: unknown;
+  readonly console_url?: unknown;
   readonly token_env?: unknown;
   readonly mcpServers?: unknown;
 }
@@ -25,6 +26,7 @@ export function importProjectConfig(paths: DesktopCorePaths, sourcePath: string)
     if (!bearerToken) throw new Error('Файл MCP-доступа должен содержать реальный Bearer-токен.');
     saveDesktopAccessHandoff(paths, {
       serverUrl,
+      consoleUrl: readString(parsed.console_url),
       tokenEnv: readString(parsed.token_env) ?? 'MCP_BEARER_TOKEN',
       token: bearerToken,
     });
@@ -60,6 +62,7 @@ function toProjectDraft(file: HandoffFile): ProjectDraft {
   const localPath = readString(file.local_path);
   const endpoint = readString(file.endpoint) ?? readServerUrl(file.mcpServers);
   const serverUrl = readString(file.server_url) ?? endpointToServer(endpoint, projectId);
+  const consoleUrl = readString(file.console_url) ?? '';
   const tokenEnv = readString(file.token_env) ?? 'MCP_BEARER_TOKEN';
   if (!projectId || !localPath || !serverUrl) {
     throw new Error('Файл настройки MCP должен содержать project_id, local_path и endpoint/server_url.');
@@ -70,6 +73,7 @@ function toProjectDraft(file: HandoffFile): ProjectDraft {
     root: localPath,
     indexId: `idx-${projectId}`,
     serverUrl,
+    consoleUrl,
     tokenEnv,
   };
 }

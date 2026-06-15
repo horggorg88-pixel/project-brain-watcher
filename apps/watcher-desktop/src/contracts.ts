@@ -61,6 +61,7 @@ export interface ProjectDraft {
   readonly root: string;
   readonly indexId: string;
   readonly serverUrl: string;
+  readonly consoleUrl?: string;
   readonly tokenEnv: string;
 }
 
@@ -99,6 +100,7 @@ export interface McpConfigDiscovery {
   readonly source: McpConfigSource;
   readonly configPath: string | null;
   readonly serverUrl: string | null;
+  readonly consoleUrl: string | null;
   readonly tokenEnv: string | null;
   readonly projectId: string | null;
   readonly localPath: string | null;

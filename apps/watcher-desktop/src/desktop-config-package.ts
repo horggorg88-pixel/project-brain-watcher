@@ -26,8 +26,10 @@ export function buildDesktopConfigPackage(
   }
   const secret = readDesktopServiceSecretState(profile);
   const endpoint = buildProjectMcpEndpoint(profile.serverUrl, profile.id);
+  const consoleUrl = (profile.consoleUrl ?? '').trim();
   const prompt = buildStartPrompt(profile, endpoint);
   const payload = {
+    ...(consoleUrl ? { console_url: consoleUrl } : {}),
     mcpServers: {
       'project-brain': {
         type: 'http',
@@ -42,6 +44,7 @@ export function buildDesktopConfigPackage(
       localPath: profile.root,
       indexId: profile.indexId,
       tokenEnv: profile.tokenEnv,
+      ...(consoleUrl ? { consoleUrl } : {}),
       startPrompt: prompt,
     },
   };

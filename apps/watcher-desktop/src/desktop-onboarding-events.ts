@@ -36,6 +36,8 @@ export interface OnboardingEventReportResult {
 }
 
 const ONBOARDING_EVENTS_PATH = '/api/onboarding/events';
+const DEFAULT_MCP_SERVER_URL = 'http://149.33.14.250';
+const DEFAULT_CONSOLE_URL = 'http://149.33.14.250:3020';
 
 export function buildOnboardingEventReports(check: DesktopConnectionCheck): readonly DesktopOnboardingEventReport[] {
   const projectId = check.projectId ?? check.service.projectId ?? undefined;
@@ -93,7 +95,7 @@ export async function reportDesktopOnboardingProgress(
 export async function reportOnboardingEvents(
   input: ReportOnboardingEventsInput,
 ): Promise<readonly OnboardingEventReportResult[]> {
-  const endpoint = onboardingEventsEndpoint(input.profile.serverUrl);
+  const endpoint = onboardingEventsEndpoint(input.profile);
   if (!endpoint) return input.events.map(item => skipped(item, '', 'server_url_missing'));
   if (!input.token) return input.events.map(item => skipped(item, endpoint, 'bearer_missing'));
   const fetcher = input.fetcher ?? globalThis.fetch;
@@ -123,9 +125,17 @@ function resolveOnboardingProfile(paths: DesktopCorePaths, projectId: string): S
   return applyMcpConfigToProfile(resolveServiceProfile(paths, projectId), discoverMcpConfig(paths));
 }
 
-function onboardingEventsEndpoint(serverUrl: string): string {
-  const base = normalizeMcpServerUrl(serverUrl);
+function onboardingEventsEndpoint(profile: SavedProjectProfile): string {
+  const base = resolveOnboardingConsoleUrl(profile);
   return base ? `${base}${ONBOARDING_EVENTS_PATH}` : '';
+}
+
+function resolveOnboardingConsoleUrl(profile: SavedProjectProfile): string {
+  const configured = normalizeMcpServerUrl(profile.consoleUrl ?? '')
+    || normalizeMcpServerUrl(process.env.MCP_ONBOARDING_SERVER_URL ?? '');
+  if (configured) return configured;
+  const serverUrl = normalizeMcpServerUrl(profile.serverUrl);
+  return serverUrl === DEFAULT_MCP_SERVER_URL ? DEFAULT_CONSOLE_URL : serverUrl;
 }
 
 async function postOnboardingEvent(

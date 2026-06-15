@@ -12,12 +12,14 @@ import {
 
 export interface DesktopAccessHandoffInput {
   readonly serverUrl: string;
+  readonly consoleUrl?: string | null;
   readonly tokenEnv: string;
   readonly token: string;
 }
 
 export interface DesktopAccessHandoff {
   readonly serverUrl: string;
+  readonly consoleUrl: string | null;
   readonly tokenEnv: string;
   readonly tokenFingerprint: string;
   readonly importedAt: string;
@@ -29,10 +31,12 @@ export function saveDesktopAccessHandoff(
 ): DesktopAccessHandoff {
   const tokenEnv = normalizeTokenEnv(input.tokenEnv);
   const serverUrl = normalizeMcpServerUrl(input.serverUrl);
+  const consoleUrl = normalizeMcpServerUrl(input.consoleUrl ?? '') || null;
   if (!serverUrl) throw new Error('Личный MCP-доступ должен содержать server_url.');
   if (!isConcreteBearerToken(input.token)) throw new Error('Личный MCP-доступ должен содержать реальный Bearer-токен.');
   const handoff = {
     serverUrl,
+    consoleUrl,
     tokenEnv,
     tokenFingerprint: buildRedactedSecretFingerprint(input.token),
     importedAt: new Date().toISOString(),
@@ -78,6 +82,7 @@ export function discoverDesktopAccessHandoff(paths: DesktopCorePaths): McpConfig
     source: 'generic',
     configPath: accessHandoffPath(paths),
     serverUrl: handoff.serverUrl,
+    consoleUrl: handoff.consoleUrl,
     tokenEnv: handoff.tokenEnv,
     projectId: null,
     localPath: null,
@@ -88,11 +93,13 @@ export function discoverDesktopAccessHandoff(paths: DesktopCorePaths): McpConfig
 function toDesktopAccessHandoff(value: unknown): DesktopAccessHandoff | null {
   if (!isRecord(value)) return null;
   const serverUrl = typeof value.serverUrl === 'string' ? normalizeMcpServerUrl(value.serverUrl) : '';
+  const consoleUrl = typeof value.consoleUrl === 'string' ? normalizeMcpServerUrl(value.consoleUrl) : '';
   const tokenEnv = typeof value.tokenEnv === 'string' ? normalizeTokenEnv(value.tokenEnv) : 'MCP_BEARER_TOKEN';
   if (!serverUrl) return null;
   if (typeof value.tokenFingerprint !== 'string' || !value.tokenFingerprint.startsWith('sha256:')) return null;
   return {
     serverUrl,
+    consoleUrl: consoleUrl || null,
     tokenEnv,
     tokenFingerprint: value.tokenFingerprint,
     importedAt: typeof value.importedAt === 'string' ? value.importedAt : new Date(0).toISOString(),

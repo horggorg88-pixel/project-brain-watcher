@@ -72,6 +72,7 @@ export async function loginAccess(paths: DesktopCorePaths, request: AccessLoginR
   if (accountAccess?.ok && accountAccess.serverUrl && accountAccess.bearerToken) {
     saveDesktopAccessHandoff(paths, {
       serverUrl: accountAccess.serverUrl,
+      consoleUrl: accountAccess.consoleUrl,
       tokenEnv: accountAccess.tokenEnv,
       token: accountAccess.bearerToken,
     });
@@ -79,6 +80,7 @@ export async function loginAccess(paths: DesktopCorePaths, request: AccessLoginR
       activeProfile = {
         ...profile,
         serverUrl: profile.serverUrl || accountAccess.serverUrl,
+        consoleUrl: profile.consoleUrl || accountAccess.consoleUrl || '',
         tokenEnv: profile.tokenEnv || accountAccess.tokenEnv,
       };
       secretState = stageDesktopServiceSecret(activeProfile, accountAccess.bearerToken);

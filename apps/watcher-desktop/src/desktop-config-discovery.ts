@@ -29,6 +29,7 @@ function readSavedProfileConfig(paths: DesktopCorePaths): McpConfigDiscovery {
     source: 'generic',
     configPath: join(paths.userDataPath, 'project-profiles.json'),
     serverUrl: profile.serverUrl || null,
+    consoleUrl: profile.consoleUrl || null,
     tokenEnv: profile.tokenEnv,
     projectId: profile.id,
     localPath: profile.root,
@@ -51,6 +52,7 @@ function readCodexConfig(path: string): McpConfigDiscovery {
     source: 'codex',
     configPath: path,
     serverUrl: normalizeServerUrl(server.url),
+    consoleUrl: null,
     tokenEnv: server.tokenEnv,
     projectId: null,
     localPath: null,
@@ -73,6 +75,7 @@ function readJsonConfig(source: Exclude<McpConfigSource, 'codex' | 'generic' | '
     source,
     configPath: path,
     serverUrl: normalizeServerUrl(server.url),
+    consoleUrl: normalizeServerUrl(server.consoleUrl),
     tokenEnv: server.tokenEnv,
     projectId: server.projectId,
     localPath: server.localPath,
@@ -82,6 +85,7 @@ function readJsonConfig(source: Exclude<McpConfigSource, 'codex' | 'generic' | '
 
 function readProjectBrainServer(value: unknown): {
   readonly url: string | null;
+  readonly consoleUrl: string | null;
   readonly tokenEnv: string | null;
   readonly projectId: string | null;
   readonly localPath: string | null;
@@ -92,6 +96,7 @@ function readProjectBrainServer(value: unknown): {
   const args = Array.isArray(server.args) ? server.args.filter(isString) : [];
   return {
     url: typeof server.url === 'string' ? server.url : findArgValue(args, '--server'),
+    consoleUrl: typeof value.console_url === 'string' ? value.console_url : null,
     tokenEnv: findArgValue(args, '--token-env') ?? findArgValue(args, '--tokenEnv'),
     projectId: findArgValue(args, '--project'),
     localPath: findArgValue(args, '--path'),
@@ -104,6 +109,7 @@ function missingConfig(paths: DesktopCorePaths): McpConfigDiscovery {
     source: 'none',
     configPath: null,
     serverUrl: null,
+    consoleUrl: null,
     tokenEnv: null,
     projectId: null,
     localPath: null,
@@ -121,6 +127,7 @@ function notFound(source: Exclude<McpConfigSource, 'none'>, path: string): McpCo
     source,
     configPath: path,
     serverUrl: null,
+    consoleUrl: null,
     tokenEnv: null,
     projectId: null,
     localPath: null,

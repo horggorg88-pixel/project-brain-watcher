@@ -25,10 +25,12 @@ export function readProfiles(paths: DesktopCorePaths): readonly SavedProjectProf
 export function saveProfile(paths: DesktopCorePaths, project: ProjectDraft): SavedProjectProfile {
   const handoff = readDesktopAccessHandoff(paths);
   const serverUrl = project.serverUrl.trim() || handoff?.serverUrl || '';
+  const consoleUrl = project.consoleUrl?.trim() || handoff?.consoleUrl || '';
   const tokenEnv = project.tokenEnv.trim() || handoff?.tokenEnv || 'MCP_BEARER_TOKEN';
   const normalized = normalizeProject({
     ...project,
     serverUrl,
+    consoleUrl,
     tokenEnv,
   });
   const profiles = readProfiles(paths).filter(item => item.id !== normalized.id);
@@ -49,6 +51,7 @@ export function defaultProfile(paths: DesktopCorePaths): SavedProjectProfile | n
     root,
     indexId: 'idx-mcp-monorepo',
     serverUrl: '',
+    consoleUrl: '',
     tokenEnv: 'MCP_BEARER_TOKEN',
     createdAt: new Date(0).toISOString(),
   };
@@ -62,6 +65,7 @@ export function applyMcpConfigToProfile(
   return {
     ...profile,
     serverUrl: profile.serverUrl || normalizeMcpServerUrl(config.serverUrl ?? ''),
+    consoleUrl: profile.consoleUrl || normalizeMcpServerUrl(config.consoleUrl ?? ''),
     tokenEnv: profile.tokenEnv || config.tokenEnv || 'MCP_BEARER_TOKEN',
   };
 }
@@ -86,6 +90,7 @@ function normalizeProject(project: ProjectDraft): ProjectDraft {
     root: project.root.trim(),
     indexId: project.indexId.trim(),
     serverUrl: normalizeMcpServerUrl(project.serverUrl),
+    consoleUrl: normalizeMcpServerUrl(project.consoleUrl ?? ''),
     tokenEnv: project.tokenEnv.trim() || 'MCP_BEARER_TOKEN',
   };
   if (!normalized.id || !normalized.name || !normalized.root || !normalized.indexId) {
@@ -102,6 +107,7 @@ function toSavedProfile(value: unknown): SavedProjectProfile[] {
     root: typeof value.root === 'string' ? value.root : '',
     indexId: typeof value.indexId === 'string' ? value.indexId : '',
     serverUrl: typeof value.serverUrl === 'string' ? value.serverUrl : '',
+    consoleUrl: typeof value.consoleUrl === 'string' ? value.consoleUrl : '',
     tokenEnv: typeof value.tokenEnv === 'string' ? value.tokenEnv : 'MCP_BEARER_TOKEN',
   };
   try {
