@@ -300,7 +300,7 @@ async function handleCheckAction(value: string | undefined): Promise<void> {
       writeLog('Проверка завершена. Результат обновлён в обзорном чеклисте.');
       return;
     case 'verify_codex_gates': {
-      writeLog('Проверяем Codex CLI, persistent-verifier, smoke и rollback...');
+      writeLog('Проверяем Codex CLI, persistent-verifier, smoke, rollback и native SessionStart evidence...');
       const result = await window.watcherDesktop.codexGates.verify(currentProjectId());
       writeLog(result.message);
       await refresh();

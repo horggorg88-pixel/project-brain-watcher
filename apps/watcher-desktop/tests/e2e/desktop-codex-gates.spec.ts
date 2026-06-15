@@ -31,7 +31,13 @@ test('verifies Codex settings from the real desktop control panel', async ({}, t
     await expect(codexAction).toHaveAttribute('data-tooltip', /persistent-verifier/);
 
     await codexAction.click();
-    await expect(page.locator('[data-service-output]')).toContainText('Codex CLI, plugin, smoke и rollback проверены локально.');
+    await expect(page.locator('[data-service-output]')).toContainText('Codex plugin установлен. Открой Codex в проекте, чтобы SessionStart hook подтвердил persistent-verifier.');
+    await expect(page.locator('[data-node="codexGates"]')).toContainText('Codex plugin установлен. Открой Codex в проекте');
+    await expect(codexAction).toBeVisible();
+
+    writeNativeHookEvidence(fixture.projectRoot);
+    await codexAction.click();
+    await expect(page.locator('[data-service-output]')).toContainText('Codex SessionStart hook подтвердил persistent-verifier.');
     await expect(page.locator('[data-node="codexGates"]')).toContainText('Активен');
     await expect(codexAction).toHaveCount(0);
 
@@ -40,6 +46,7 @@ test('verifies Codex settings from the real desktop control panel', async ({}, t
     expect(evidence.commandRuns?.codexHooks?.command).toBe('codex plugin add persistent-verifier@claude-migrated-home');
     expect(evidence.commandRuns?.codexHooks?.exitCode).toBe(0);
     expect(evidence.verification?.codexRuntime?.command).toBe('codex --version');
+    expect(evidence.verification?.hookPersistence?.source).toBe('persistent-verifier');
     expect(evidence.verification?.smoke?.command).toBe('npm test');
     expect(evidence.verification?.rollback?.command).toBe('codex plugin remove persistent-verifier@claude-migrated-home');
     expect(JSON.stringify(evidence)).not.toContain(fakeBearer);
@@ -146,6 +153,32 @@ function readEvidence(projectRoot: string): CodexEvidenceFile {
   return JSON.parse(readFileSync(join(projectRoot, '.brain', 'service', 'quality-gate-runs.json'), 'utf-8')) as CodexEvidenceFile;
 }
 
+function writeNativeHookEvidence(projectRoot: string): void {
+  const checkedAt = new Date('2026-06-15T10:00:00.000Z').toISOString();
+  const codexDir = join(projectRoot, '.codex');
+  mkdirSync(codexDir, { recursive: true });
+  writeFileSync(join(codexDir, 'quality-gate-runs.json'), JSON.stringify({
+    schemaVersion: 1,
+    projectId: 'client-project',
+    projectRoot,
+    checkedAt,
+    staleAfterMs: 600000,
+    verification: {
+      hookPersistence: {
+        available: true,
+        passed: true,
+        detail: 'Codex SessionStart hook loaded persistent-verifier.',
+        checkedAt,
+        staleAfterMs: 600000,
+        source: 'persistent-verifier',
+        command: 'codex features list',
+        exitCode: 0,
+        runId: 'hookPersistence-e2e',
+      },
+    },
+  }, null, 2), 'utf-8');
+}
+
 function collectRendererErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on('console', message => {
@@ -180,6 +213,7 @@ interface CodexEvidenceFile {
   };
   readonly verification?: {
     readonly codexRuntime?: CodexEvidenceRun;
+    readonly hookPersistence?: CodexEvidenceRun;
     readonly rollback?: CodexEvidenceRun;
     readonly smoke?: CodexEvidenceRun;
   };

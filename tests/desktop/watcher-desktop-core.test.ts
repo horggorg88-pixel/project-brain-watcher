@@ -1014,7 +1014,7 @@ describe('watcher desktop core', () => {
       ],
       codexGates: {
         ready: true,
-        message: 'Codex CLI, plugin, smoke и rollback проверены локально.',
+        message: 'Codex SessionStart hook подтвердил persistent-verifier.',
         checkedAt: new Date().toISOString(),
         evidence: {
           commandRuns: {
@@ -1027,7 +1027,16 @@ describe('watcher desktop core', () => {
               exitCode: 0,
             },
           },
-          verification: {},
+          verification: {
+            hookPersistence: {
+              available: true,
+              passed: true,
+              detail: 'Codex SessionStart hook loaded persistent-verifier.',
+              source: 'persistent-verifier',
+              command: 'codex features list',
+              exitCode: 0,
+            },
+          },
         },
       },
       service: statusFixture({ projectId: 'client-project', running: true, health: 'healthy', readOnly: false }),

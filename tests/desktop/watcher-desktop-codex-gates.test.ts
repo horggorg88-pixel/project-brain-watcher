@@ -52,7 +52,8 @@ describe('watcher desktop codex gates', () => {
       'codex features list',
       'npm test',
     ]);
-    expect(result.ready).toBe(true);
+    expect(result.ready).toBe(false);
+    expect(result.message).toBe('Codex plugin установлен. Открой Codex в проекте, чтобы SessionStart hook подтвердил persistent-verifier.');
     expect(result.evidence.commandRuns.codexHooks).toMatchObject({
       command: 'codex plugin add persistent-verifier@claude-migrated-home',
       exitCode: 0,
@@ -111,6 +112,31 @@ describe('watcher desktop codex gates', () => {
       exitCode: 0,
       source: 'persistent-verifier',
     });
+  });
+
+  it('keeps Codex gates pending until native SessionStart hook evidence exists', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const runner: DesktopCodexCommandRunner = async () => ({ exitCode: 0, output: 'ok' });
+
+    const result = await verifyDesktopCodexGates(paths, 'demo-project', {
+      runner,
+      now: () => new Date('2026-06-15T10:00:00.000Z'),
+    });
+
+    expect(result.ready).toBe(false);
+    expect(result.message).toBe('Codex plugin установлен. Открой Codex в проекте, чтобы SessionStart hook подтвердил persistent-verifier.');
+    expect(result.evidence.verification.hookPersistence).toBeUndefined();
   });
 
   it('uses Windows command shims for Codex CLI and npm gates', () => {

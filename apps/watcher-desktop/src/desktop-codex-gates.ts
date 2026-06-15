@@ -275,7 +275,7 @@ function writeProjectEvidence(
 }
 
 function statusFromEvidence(evidence: DesktopCodexGateEvidence, checkedAt: string): DesktopCodexGateStatus {
-  const ready = hasPassed(evidence.verification.hookPersistence) || hasBaseVerification(evidence);
+  const ready = hasPassed(evidence.verification.hookPersistence);
   return {
     ready,
     message: ready ? readyMessage(evidence) : blockerMessage(evidence),
@@ -288,7 +288,7 @@ function readyMessage(evidence: DesktopCodexGateEvidence): string {
   if (hasPassed(evidence.verification.hookPersistence)) {
     return 'Codex SessionStart hook подтвердил persistent-verifier.';
   }
-  return 'Codex CLI, plugin, smoke и rollback проверены локально.';
+  return 'Codex native hook подтверждён.';
 }
 
 function blockerMessage(evidence: DesktopCodexGateEvidence): string {
@@ -296,6 +296,9 @@ function blockerMessage(evidence: DesktopCodexGateEvidence): string {
   if (!hasPassed(evidence.commandRuns.codexHooks)) return 'Persistent-verifier plugin ещё не установлен или не прошёл проверку.';
   if (!hasPassed(evidence.verification.smoke)) return 'Smoke gate Codex ещё не прошёл.';
   if (!hasPassed(evidence.verification.rollback)) return 'Rollback-команда Codex gates не подтверждена.';
+  if (hasBaseVerification(evidence)) {
+    return 'Codex plugin установлен. Открой Codex в проекте, чтобы SessionStart hook подтвердил persistent-verifier.';
+  }
   return 'Codex gates ожидают SessionStart evidence.';
 }
 

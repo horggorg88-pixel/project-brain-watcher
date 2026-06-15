@@ -214,7 +214,7 @@ function checkActionTooltip(action: string): string {
     select_project: 'Открыть профиль проекта и выбрать рабочую папку',
     start_service: 'Запустить watcher для выбранного проекта',
     verify: 'Повторить проверку MCP-сервера, ключа и watcher',
-    verify_codex_gates: 'Проверить Codex CLI, persistent-verifier, smoke и rollback локально',
+    verify_codex_gates: 'Установить persistent-verifier и проверить native Codex SessionStart hook',
   };
   return labels[action] ?? 'Выполнить действие чеклиста';
 }
