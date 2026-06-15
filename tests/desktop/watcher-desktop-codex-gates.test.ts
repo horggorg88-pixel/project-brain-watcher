@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   readDesktopCodexGateEvidence,
+  resolveCodexGateExecutable,
+  resolveCodexGateSpawn,
   verifyDesktopCodexGates,
   type DesktopCodexCommandRunner,
 } from '../../apps/watcher-desktop/src/desktop-codex-gates.js';
@@ -108,6 +110,17 @@ describe('watcher desktop codex gates', () => {
       command: 'codex features list',
       exitCode: 0,
       source: 'persistent-verifier',
+    });
+  });
+
+  it('uses Windows command shims for Codex CLI and npm gates', () => {
+    expect(resolveCodexGateExecutable('codex', 'win32')).toBe('codex.cmd');
+    expect(resolveCodexGateExecutable('npm', 'win32')).toBe('npm.cmd');
+    expect(resolveCodexGateExecutable('git', 'win32')).toBe('git');
+    expect(resolveCodexGateExecutable('codex', 'linux')).toBe('codex');
+    expect(resolveCodexGateSpawn('codex', ['plugin', 'add', 'persistent-verifier@claude-migrated-home'], 'win32')).toEqual({
+      command: 'cmd.exe',
+      args: ['/d', '/s', '/c', 'codex.cmd "plugin" "add" "persistent-verifier@claude-migrated-home"'],
     });
   });
 });

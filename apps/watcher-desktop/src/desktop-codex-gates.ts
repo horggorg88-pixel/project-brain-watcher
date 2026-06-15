@@ -130,11 +130,9 @@ async function run(
 }
 
 function defaultRunner(request: DesktopCodexCommandRequest): Promise<DesktopCodexCommandResult> {
-  const executable = process.platform === 'win32' && request.command === 'npm'
-    ? 'npm.cmd'
-    : request.command;
+  const spawnRequest = resolveCodexGateSpawn(request.command, request.args);
   return new Promise(resolve => {
-    const child = spawn(executable, [...request.args], {
+    const child = spawn(spawnRequest.command, [...spawnRequest.args], {
       cwd: request.cwd,
       env: process.env,
       windowsHide: true,
@@ -153,6 +151,37 @@ function defaultRunner(request: DesktopCodexCommandRequest): Promise<DesktopCode
       });
     });
   });
+}
+
+export interface DesktopCodexGateSpawnRequest {
+  readonly command: string;
+  readonly args: readonly string[];
+}
+
+export function resolveCodexGateSpawn(
+  command: string,
+  args: readonly string[],
+  platform: NodeJS.Platform = process.platform,
+): DesktopCodexGateSpawnRequest {
+  const executable = resolveCodexGateExecutable(command, platform);
+  if (platform === 'win32' && executable.endsWith('.cmd')) {
+    return { command: 'cmd.exe', args: ['/d', '/s', '/c', windowsCommandLine(executable, args)] };
+  }
+  return { command: executable, args };
+}
+
+export function resolveCodexGateExecutable(command: string, platform: NodeJS.Platform = process.platform): string {
+  if (platform !== 'win32') return command;
+  if (command === 'codex' || command === 'npm') return `${command}.cmd`;
+  return command;
+}
+
+function windowsCommandLine(command: string, args: readonly string[]): string {
+  return [command, ...args.map(quoteWindowsArg)].join(' ');
+}
+
+function quoteWindowsArg(value: string): string {
+  return `"${value.replace(/(["^&|<>()%])/g, '^$1')}"`;
 }
 
 function resolveCodexProfile(paths: DesktopCorePaths, projectId: string): SavedProjectProfile | null {
