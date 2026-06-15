@@ -299,6 +299,13 @@ async function handleCheckAction(value: string | undefined): Promise<void> {
       await refresh();
       writeLog('Проверка завершена. Результат обновлён в обзорном чеклисте.');
       return;
+    case 'verify_codex_gates': {
+      writeLog('Проверяем Codex CLI, persistent-verifier, smoke и rollback...');
+      const result = await window.watcherDesktop.codexGates.verify(currentProjectId());
+      writeLog(result.message);
+      await refresh();
+      return;
+    }
     case 'open_logs':
       await openServiceLogs();
       return;
@@ -647,6 +654,12 @@ function fallbackCheck(message: string): DesktopConnectionCheck {
     projectId: null,
     checkedAt: new Date().toISOString(),
     nodes: [{ id: 'runtime', label: 'Проверка подключения', status: 'error', detail: message, action: 'open_logs', actionLabel: 'Показать логи' }],
+    codexGates: {
+      ready: false,
+      message: 'Codex gates не проверены: общий full check не завершился.',
+      checkedAt: new Date().toISOString(),
+      evidence: { commandRuns: {}, verification: {} },
+    },
     service: fallbackStatus(message),
     diagnostics,
   };
@@ -739,6 +752,7 @@ function checkActionFrom(value: string | undefined): DesktopCheckAction | null {
     'install_service',
     'start_service',
     'open_logs',
+    'verify_codex_gates',
     'verify',
   ];
   return typeof value === 'string' && actions.includes(value as DesktopCheckAction)

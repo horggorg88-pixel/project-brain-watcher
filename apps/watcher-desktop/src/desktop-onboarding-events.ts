@@ -9,6 +9,7 @@ export type DesktopOnboardingEventType =
   | 'desktop_opened'
   | 'project_selected'
   | 'config_ready'
+  | 'codex_gates_verified'
   | 'watcher_started';
 
 export type DesktopOnboardingEventSource = 'desktop' | 'watcher';
@@ -57,6 +58,12 @@ export function buildOnboardingEventReports(check: DesktopConnectionCheck): read
     events.push(event('config_ready', 'desktop', projectId, {
       checkedAt: check.checkedAt,
       serverVerified: nodeActive(check.nodes, 'server'),
+    }));
+  }
+  if (check.codexGates?.ready) {
+    events.push(event('codex_gates_verified', 'desktop', projectId, {
+      commandRuns: check.codexGates.evidence.commandRuns,
+      verification: check.codexGates.evidence.verification,
     }));
   }
   if (check.service.running && check.service.health === 'healthy') {

@@ -15,6 +15,7 @@ export type DesktopCheckAction =
   | 'install_service'
   | 'start_service'
   | 'open_logs'
+  | 'verify_codex_gates'
   | 'verify';
 export type DesktopModeStatus = 'ready' | 'action_required' | 'error';
 export type AccessStatus =
@@ -160,12 +161,44 @@ export interface DesktopCheckNode {
   readonly actionLabel: string | null;
 }
 
+export interface DesktopCodexGateRunEvidence {
+  readonly available: boolean;
+  readonly passed?: boolean;
+  readonly detail: string;
+  readonly checkedAt?: string;
+  readonly staleAfterMs?: number;
+  readonly source: string;
+  readonly command: string;
+  readonly exitCode?: number;
+  readonly runId?: string;
+}
+
+export interface DesktopCodexGateEvidence {
+  readonly commandRuns: {
+    readonly codexHooks?: DesktopCodexGateRunEvidence;
+  };
+  readonly verification: {
+    readonly codexRuntime?: DesktopCodexGateRunEvidence;
+    readonly hookPersistence?: DesktopCodexGateRunEvidence;
+    readonly smoke?: DesktopCodexGateRunEvidence;
+    readonly rollback?: DesktopCodexGateRunEvidence;
+  };
+}
+
+export interface DesktopCodexGateStatus {
+  readonly ready: boolean;
+  readonly message: string;
+  readonly checkedAt: string;
+  readonly evidence: DesktopCodexGateEvidence;
+}
+
 export interface DesktopConnectionCheck {
   readonly overall: DesktopOverallStatus;
   readonly message: string;
   readonly projectId: string | null;
   readonly checkedAt: string;
   readonly nodes: readonly DesktopCheckNode[];
+  readonly codexGates: DesktopCodexGateStatus;
   readonly service: WatcherServiceStatus;
   readonly diagnostics: DiagnosticsPreview;
 }
@@ -229,6 +262,10 @@ export interface WatcherDesktopApi {
     status(projectId?: string): Promise<WatcherServiceStatus>;
     run(request: WatcherServiceActionRequest): Promise<WatcherServiceActionResult>;
     fullCheck(projectId: string): Promise<DesktopConnectionCheck>;
+  };
+  readonly codexGates: {
+    status(projectId: string): Promise<DesktopCodexGateStatus>;
+    verify(projectId: string): Promise<DesktopCodexGateStatus>;
   };
   readonly projects: {
     list(): Promise<readonly SavedProjectProfile[]>;

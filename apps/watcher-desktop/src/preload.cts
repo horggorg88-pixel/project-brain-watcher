@@ -3,6 +3,7 @@ import type {
   AccessLoginRequest,
   DesktopConfigPackage,
   DesktopConfigSaveResult,
+  DesktopCodexGateStatus,
   DesktopConnectionCheck,
   DesktopAccessState,
   DesktopModeSummary,
@@ -39,6 +40,14 @@ const api: WatcherDesktopApi = {
     ),
     fullCheck: (projectId: string) => (
       ipcRenderer.invoke('service:full-check', projectId) as Promise<DesktopConnectionCheck>
+    ),
+  },
+  codexGates: {
+    status: (projectId: string) => (
+      ipcRenderer.invoke('codex-gates:status', projectId) as Promise<DesktopCodexGateStatus>
+    ),
+    verify: (projectId: string) => (
+      ipcRenderer.invoke('codex-gates:verify', projectId) as Promise<DesktopCodexGateStatus>
     ),
   },
   projects: {

@@ -5,6 +5,7 @@ import type {
   SavedProjectProfile,
   WatcherServiceStatus,
 } from './contracts.js';
+import { readDesktopCodexGateEvidence } from './desktop-codex-gates.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { previewDiagnostics } from './desktop-core.js';
 import { applyMcpConfigToProfile, type DesktopCorePaths } from './desktop-profile-store.js';
@@ -29,12 +30,15 @@ export async function buildDesktopConnectionCheck(
   const service = readServiceStatus(paths, scopedProjectId);
   const diagnostics = previewDiagnostics(paths, scopedProjectId);
   const server = profile ? await verifyProjectServerAccess(profile, token) : null;
+  const codexGates = readDesktopCodexGateEvidence(paths, scopedProjectId);
   const nodes = buildNodes({
     profile,
     configFound: config.found,
     secretConfigured: secret.configured,
     serverMessage: server?.message ?? null,
     serverVerified: server?.verified ?? false,
+    codexGatesReady: codexGates.ready,
+    codexGatesMessage: codexGates.message,
     service,
   });
   const overall = resolveOverall(nodes);
@@ -44,6 +48,7 @@ export async function buildDesktopConnectionCheck(
     projectId: profile?.id ?? null,
     checkedAt: new Date().toISOString(),
     nodes,
+    codexGates,
     service,
     diagnostics,
   };
@@ -55,6 +60,8 @@ function buildNodes(input: {
   readonly secretConfigured: boolean;
   readonly serverMessage: string | null;
   readonly serverVerified: boolean;
+  readonly codexGatesReady: boolean;
+  readonly codexGatesMessage: string;
   readonly service: WatcherServiceStatus;
 }): readonly DesktopCheckNode[] {
   const serverDetail = input.serverVerified
@@ -65,6 +72,7 @@ function buildNodes(input: {
     node('config', 'Файл настройки', input.configFound, input.configFound ? 'Файл настройки принят' : 'Импортируйте файл из личного кабинета', 'import_config', 'Импортировать файл'),
     node('key', 'Ключ доступа', input.secretConfigured, input.secretConfigured ? 'Ключ сохранён локально' : 'Пульт не нашёл локальный ключ', 'download_config', 'Скачать пакет'),
     node('server', 'MCP-сервер', input.serverVerified, serverDetail, 'open_logs', input.serverVerified ? 'Проверить MCP' : 'Показать причину'),
+    node('codexGates', 'Codex Gates', input.codexGatesReady, input.codexGatesMessage, 'verify_codex_gates', 'Проверить Codex'),
     node('watcher', 'Watcher', input.service.running && input.service.health === 'healthy', serviceDetail(input.service), serviceAction(input.service), serviceActionLabel(input.service)),
   ];
 }

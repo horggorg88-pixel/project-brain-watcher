@@ -990,9 +990,10 @@ describe('watcher desktop core', () => {
 
     const check = await buildDesktopConnectionCheck(paths, 'checklist-project');
 
-    expect(check.nodes.map(node => node.id)).toEqual(['project', 'config', 'key', 'server', 'watcher']);
-    expect(check.nodes.map(node => node.label)).toEqual(['Проект', 'Файл настройки', 'Ключ доступа', 'MCP-сервер', 'Watcher']);
+    expect(check.nodes.map(node => node.id)).toEqual(['project', 'config', 'key', 'server', 'codexGates', 'watcher']);
+    expect(check.nodes.map(node => node.label)).toEqual(['Проект', 'Файл настройки', 'Ключ доступа', 'MCP-сервер', 'Codex Gates', 'Watcher']);
     expect(check.nodes.find(node => node.id === 'server')?.status).toBe('active');
+    expect(check.nodes.find(node => node.id === 'codexGates')?.actionLabel).toBe('Проверить Codex');
     expect(check.nodes.find(node => node.id === 'watcher')?.actionLabel).toBe('Установить службу');
     expect(check.overall).toBe('action_required');
   });
@@ -1008,8 +1009,27 @@ describe('watcher desktop core', () => {
         { id: 'config', label: 'Файл настройки', status: 'active', detail: 'ready', action: 'none', actionLabel: null },
         { id: 'key', label: 'Ключ доступа', status: 'active', detail: 'ready', action: 'none', actionLabel: null },
         { id: 'server', label: 'MCP-сервер', status: 'active', detail: 'ready', action: 'none', actionLabel: null },
+        { id: 'codexGates', label: 'Codex Gates', status: 'active', detail: 'ready', action: 'none', actionLabel: null },
         { id: 'watcher', label: 'Watcher', status: 'active', detail: 'ready', action: 'none', actionLabel: null },
       ],
+      codexGates: {
+        ready: true,
+        message: 'Codex CLI, plugin, smoke и rollback проверены локально.',
+        checkedAt: new Date().toISOString(),
+        evidence: {
+          commandRuns: {
+            codexHooks: {
+              available: true,
+              passed: true,
+              detail: 'Plugin installed',
+              source: 'desktop-codex-gates',
+              command: 'codex plugin add persistent-verifier@claude-migrated-home',
+              exitCode: 0,
+            },
+          },
+          verification: {},
+        },
+      },
       service: statusFixture({ projectId: 'client-project', running: true, health: 'healthy', readOnly: false }),
       diagnostics: {
         blocked: false,
@@ -1028,9 +1048,11 @@ describe('watcher desktop core', () => {
       'desktop_opened',
       'project_selected',
       'config_ready',
+      'codex_gates_verified',
       'watcher_started',
     ]);
     expect(events.map(event => event.projectId)).toEqual([
+      'client-project',
       'client-project',
       'client-project',
       'client-project',

@@ -5,6 +5,7 @@ import { loginAccess, logoutAccess, readAccessState } from './desktop-access.js'
 import { resolveDesktopAppAssetPaths } from './desktop-app-paths.js';
 import { buildDesktopConfigPackage } from './desktop-config-package.js';
 import { buildDesktopConnectionCheck } from './desktop-connection-check.js';
+import { readDesktopCodexGateEvidence, verifyDesktopCodexGates } from './desktop-codex-gates.js';
 import { importProjectConfig } from './desktop-config-import.js';
 import { listDesktopModeSummaries } from './desktop-mode-summary.js';
 import { reportDesktopOnboardingProgress } from './desktop-onboarding-events.js';
@@ -126,6 +127,12 @@ function registerIpcHandlers(): void {
     void reportDesktopOnboardingProgress(paths, projectId, check);
     return check;
   });
+  ipcMain.handle('codex-gates:status', (_event, projectId: string) => (
+    readDesktopCodexGateEvidence(corePaths(), projectId)
+  ));
+  ipcMain.handle('codex-gates:verify', async (_event, projectId: string) => (
+    verifyDesktopCodexGates(corePaths(), projectId)
+  ));
   ipcMain.handle('projects:list', () => listDesktopProjectProfiles(corePaths()));
   ipcMain.handle('projects:save', (_event, project: ProjectDraft) => saveProfile(corePaths(), project));
   ipcMain.handle('projects:select-root', async () => {

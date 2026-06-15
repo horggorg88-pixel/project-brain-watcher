@@ -1,0 +1,122 @@
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  readDesktopCodexGateEvidence,
+  verifyDesktopCodexGates,
+  type DesktopCodexCommandRunner,
+} from '../../apps/watcher-desktop/src/desktop-codex-gates.js';
+import { saveProfile, type DesktopCorePaths } from '../../apps/watcher-desktop/src/desktop-core.js';
+
+const tempDirs: string[] = [];
+
+afterEach(() => {
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
+describe('watcher desktop codex gates', () => {
+  it('runs the local Codex verifier setup and returns redacted evidence', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const commands: string[] = [];
+    const runner: DesktopCodexCommandRunner = async request => {
+      commands.push([request.command, ...request.args].join(' '));
+      return {
+        exitCode: 0,
+        output: request.args.includes('test') ? 'ok TOKEN=pb_secret_value' : 'ok',
+      };
+    };
+
+    const result = await verifyDesktopCodexGates(paths, 'demo-project', {
+      runner,
+      now: () => new Date('2026-06-15T10:00:00.000Z'),
+    });
+
+    expect(commands).toEqual([
+      'codex --version',
+      'codex plugin add persistent-verifier@claude-migrated-home',
+      'codex plugin list',
+      'codex features list',
+      'npm test',
+    ]);
+    expect(result.ready).toBe(true);
+    expect(result.evidence.commandRuns.codexHooks).toMatchObject({
+      command: 'codex plugin add persistent-verifier@claude-migrated-home',
+      exitCode: 0,
+      source: 'desktop-codex-gates',
+    });
+    expect(result.evidence.verification.codexRuntime).toMatchObject({
+      command: 'codex --version',
+      exitCode: 0,
+    });
+    expect(result.evidence.verification.smoke).toMatchObject({
+      command: 'npm test',
+      exitCode: 0,
+    });
+    expect(result.evidence.verification.rollback).toMatchObject({
+      command: 'codex plugin remove persistent-verifier@claude-migrated-home',
+      exitCode: 0,
+    });
+    expect(JSON.stringify(result.evidence)).not.toContain('pb_secret_value');
+  });
+
+  it('reads native hook persistence evidence written by Codex hooks', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    mkdirSync(join(root, '.codex'), { recursive: true });
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    writeFileSync(join(root, '.codex', 'quality-gate-runs.json'), JSON.stringify({
+      schemaVersion: 1,
+      projectId: 'demo-project',
+      verification: {
+        hookPersistence: {
+          available: true,
+          passed: true,
+          detail: 'Codex SessionStart hook loaded persistent-verifier.',
+          checkedAt: '2026-06-15T10:00:00.000Z',
+          staleAfterMs: 600000,
+          source: 'persistent-verifier',
+          command: 'codex features list',
+          exitCode: 0,
+          runId: 'hookPersistence-1',
+        },
+      },
+    }), 'utf-8');
+
+    const result = readDesktopCodexGateEvidence(paths, 'demo-project');
+
+    expect(result.ready).toBe(true);
+    expect(result.evidence.verification.hookPersistence).toMatchObject({
+      command: 'codex features list',
+      exitCode: 0,
+      source: 'persistent-verifier',
+    });
+  });
+});
+
+function tempPaths(): DesktopCorePaths {
+  const root = mkdtempSync(join(tmpdir(), 'watcher-desktop-codex-gates-'));
+  tempDirs.push(root);
+  return {
+    homePath: join(root, 'home'),
+    userDataPath: join(root, 'user-data'),
+  };
+}
