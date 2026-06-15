@@ -148,6 +148,7 @@ async function launchDesktop(
       HOME: homePath,
       USERPROFILE: homePath,
       MCP_BEARER_TOKEN: fakeBearer,
+      PROJECT_BRAIN_DESKTOP_HOME_DIR: homePath,
       PROJECT_BRAIN_DESKTOP_USER_DATA_DIR: userDataPath,
       PROJECT_BRAIN_DESKTOP_DEBUG: '0',
       PROJECT_BRAIN_DESKTOP_DEVTOOLS: '0',

@@ -16,6 +16,7 @@ const DEBUG_PORT = '9223';
 const desktopDebugEnabled = process.env.PROJECT_BRAIN_DESKTOP_DEBUG === '1';
 const desktopDevToolsEnabled = process.env.PROJECT_BRAIN_DESKTOP_DEVTOOLS === '1';
 const desktopUserDataPath = process.env.PROJECT_BRAIN_DESKTOP_USER_DATA_DIR?.trim();
+const desktopHomePath = process.env.PROJECT_BRAIN_DESKTOP_HOME_DIR?.trim();
 
 if (desktopUserDataPath) app.setPath('userData', desktopUserDataPath);
 
@@ -191,7 +192,7 @@ function registerIpcHandlers(): void {
 
 function corePaths(): DesktopCorePaths {
   return {
-    homePath: app.getPath('home'),
+    homePath: desktopHomePath || app.getPath('home'),
     userDataPath: desktopUserDataPath || app.getPath('userData'),
   };
 }
