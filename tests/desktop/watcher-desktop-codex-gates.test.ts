@@ -92,6 +92,7 @@ describe('watcher desktop codex gates', () => {
     expect(managedRequirements).toContain('windows_managed_dir');
     expect(managedRequirements).toContain('sessionstart.py');
     expect(managedRequirements).toContain('posttooluse.py');
+    expect(managedRequirements).toContain('qualitygate.py');
     expect(managedRequirements).toContain('stop.py');
     const pluginHooks = readFileSync(join(
       paths.homePath,
@@ -112,7 +113,11 @@ describe('watcher desktop codex gates', () => {
     const userHooks = readFileSync(join(paths.homePath, '.codex', 'hooks.json'), 'utf-8');
     expect(userHooks).toContain('persistent-verifier');
     expect(userHooks).toContain('project-brain-hooks');
+    expect(userHooks).toContain('Write|Edit|MultiEdit|apply_patch');
     expect(userHooks).toContain('sessionstart.py');
+    expect(userHooks).toContain('qualitygate.py');
+    expect(pluginHooks).toContain('qualitygate.py');
+    expect(pluginHooks).toContain('Write|Edit|MultiEdit|apply_patch');
     const bridgeScript = readFileSync(join(paths.homePath, '.codex', 'project-brain-hooks', 'sessionstart.py'), 'utf-8');
     expect(bridgeScript).toContain('registry_projects');
     expect(bridgeScript).toContain('def succeed()');
@@ -124,6 +129,10 @@ describe('watcher desktop codex gates', () => {
     };
     expect(registry.projects.map(project => project.root)).toContain(root);
     expect(JSON.stringify(result.evidence)).not.toContain('pb_secret_value');
+    const qualityGateScript = readFileSync(join(paths.homePath, 'plugins', 'persistent-verifier', 'hooks', 'qualitygate.py'), 'utf-8');
+    expect(qualityGateScript).toContain('QUALITY_GATE_ORDER');
+    expect(qualityGateScript).toContain('("test",');
+    expect(qualityGateScript).toContain('("build",');
   });
 
   it('preserves existing Codex user hooks while installing the persistent-verifier bridge', async () => {

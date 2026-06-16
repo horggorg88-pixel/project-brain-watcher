@@ -11,6 +11,7 @@ import type {
 import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { applyMcpConfigToProfile, type DesktopCorePaths } from './desktop-profile-store.js';
 import { resolveServiceProfile } from './desktop-service-status.js';
+import { QUALITY_GATE_HOOK_SCRIPT } from './desktop-codex-quality-gate-script.js';
 
 export interface DesktopCodexCommandRequest {
   readonly command: string;
@@ -55,7 +56,7 @@ const PERSISTENT_VERIFIER_HOOKS = {
     ],
     PostToolUse: [
       {
-        matcher: 'Write|Edit|MultiEdit',
+        matcher: 'Write|Edit|MultiEdit|apply_patch',
         hooks: [
           {
             type: 'command',
@@ -70,6 +71,13 @@ const PERSISTENT_VERIFIER_HOOKS = {
     Stop: [
       {
         hooks: [
+          {
+            type: 'command',
+            command: 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/qualitygate.py"',
+            commandWindows: 'python "${CLAUDE_PLUGIN_ROOT}/hooks/qualitygate.py"',
+            timeout: 900,
+            statusMessage: 'Running project quality gates',
+          },
           {
             type: 'command',
             command: 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/stop.py"',
@@ -337,6 +345,7 @@ interface PersistentVerifierUserHookBridge {
   readonly path?: string;
   readonly scriptRoot?: string;
   readonly sessionStartScript?: string;
+  readonly qualityGateScript?: string;
   readonly registryPath?: string;
   readonly detail: string;
 }
@@ -358,6 +367,8 @@ function repairPersistentVerifierPluginHooks(homePath: string): PersistentVerifi
       if (
         current.includes('${CLAUDE_PLUGIN_ROOT}')
         && current.includes('commandWindows')
+        && current.includes('qualitygate.py')
+        && current.includes('apply_patch')
         && !current.includes('"description"')
         && !current.includes('command_windows')
         && !current.includes('${PLUGIN_ROOT}')
@@ -384,6 +395,8 @@ function installPersistentVerifierUserHooks(homePath: string, profile: SavedProj
       detail: 'Persistent-verifier hook scripts не найдены после установки plugin.',
     };
   }
+  const qualityGateScript = writeQualityGateHookScript(scriptRoot);
+  if (!qualityGateScript.installed) return qualityGateScript;
 
   const sessionStartBridge = writeSessionStartBridge(homePath, profile);
   if (!sessionStartBridge.installed) return sessionStartBridge;
@@ -401,6 +414,7 @@ function installPersistentVerifierUserHooks(homePath: string, profile: SavedProj
       path,
       scriptRoot,
       sessionStartScript: sessionStartBridge.sessionStartScript,
+      qualityGateScript: qualityGateScript.qualityGateScript,
       registryPath: sessionStartBridge.registryPath,
       detail: 'Codex user-level hooks bridge установлен.',
     };
@@ -409,6 +423,27 @@ function installPersistentVerifierUserHooks(homePath: string, profile: SavedProj
       installed: false,
       path,
       detail: `Codex user-level hooks bridge не записан: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+function writeQualityGateHookScript(scriptRoot: string): PersistentVerifierUserHookBridge {
+  const qualityGateScript = join(scriptRoot, 'qualitygate.py');
+  try {
+    mkdirSync(scriptRoot, { recursive: true });
+    writeFileSync(qualityGateScript, QUALITY_GATE_HOOK_SCRIPT, 'utf-8');
+    return {
+      installed: true,
+      path: qualityGateScript,
+      scriptRoot,
+      qualityGateScript,
+      detail: 'Codex quality gate hook установлен.',
+    };
+  } catch (error) {
+    return {
+      installed: false,
+      path: qualityGateScript,
+      detail: `Codex quality gate hook не установлен: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 }
@@ -541,6 +576,7 @@ function mergeManagedRequirements(current: string, desiredBlock: string): string
 function managedRequirementsToml(scriptRoot: string): string {
   const sessionStart = join(scriptRoot, 'sessionstart.py');
   const postToolUse = join(scriptRoot, 'posttooluse.py');
+  const qualityGate = join(scriptRoot, 'qualitygate.py');
   const stop = join(scriptRoot, 'stop.py');
   return `${MANAGED_HOOKS_START}
 [features]
@@ -570,6 +606,13 @@ timeout = 180
 statusMessage = 'Running persistent verifier'
 
 [[hooks.Stop]]
+
+[[hooks.Stop.hooks]]
+type = 'command'
+command = ${tomlString(`python3 ${toPortablePath(qualityGate)}`)}
+commandWindows = ${tomlString(`python "${qualityGate}"`)}
+timeout = 900
+statusMessage = 'Running project quality gates'
 
 [[hooks.Stop.hooks]]
 type = 'command'
@@ -659,13 +702,10 @@ function mergePersistentVerifierUserHooks(
     commandForScript(sessionStartScript ?? join(scriptRoot, 'sessionstart.py')),
   ));
   hooks['PostToolUse'] = mergeHookGroup(hooks['PostToolUse'], persistentVerifierUserHookGroup(
-    'Write|Edit|MultiEdit',
+    'Write|Edit|MultiEdit|apply_patch',
     commandForScript(join(scriptRoot, 'posttooluse.py')),
   ));
-  hooks['Stop'] = mergeHookGroup(hooks['Stop'], persistentVerifierUserHookGroup(
-    '',
-    commandForScript(join(scriptRoot, 'stop.py')),
-  ));
+  hooks['Stop'] = mergeHookGroup(hooks['Stop'], persistentVerifierUserStopHookGroup(scriptRoot));
   return { ...document, hooks };
 }
 
@@ -686,6 +726,27 @@ function persistentVerifierUserHookGroup(matcher: string, command: string): Reco
         commandWindows: command,
         timeout: matcher ? 180 : 15,
         statusMessage: matcher ? 'Running persistent verifier' : 'Checking Codex gate persistence',
+      },
+    ],
+  };
+}
+
+function persistentVerifierUserStopHookGroup(scriptRoot: string): Record<string, unknown> {
+  return {
+    hooks: [
+      {
+        type: 'command',
+        command: commandForScript(join(scriptRoot, 'qualitygate.py')),
+        commandWindows: commandForScript(join(scriptRoot, 'qualitygate.py')),
+        timeout: 900,
+        statusMessage: 'Running project quality gates',
+      },
+      {
+        type: 'command',
+        command: commandForScript(join(scriptRoot, 'stop.py')),
+        commandWindows: commandForScript(join(scriptRoot, 'stop.py')),
+        timeout: 15,
+        statusMessage: 'Checking last verifier result',
       },
     ],
   };
