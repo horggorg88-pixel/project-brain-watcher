@@ -157,6 +157,8 @@ function createFixture(serverUrl: string): { readonly rootPath: string; readonly
   mkdirSync(userDataPath, { recursive: true });
   mkdirSync(join(projectRoot, '.brain'), { recursive: true });
   mkdirSync(clientProjectRoot, { recursive: true });
+  writeReadyCodexEvidence(projectRoot, 'mcp-monorepo');
+  writeReadyCodexEvidence(clientProjectRoot, 'client-project');
   writeFileSync(join(userDataPath, 'project-profiles.json'), JSON.stringify([{
     id: 'mcp-monorepo',
     name: 'MCP Monorepo',
@@ -175,6 +177,52 @@ function createFixture(serverUrl: string): { readonly rootPath: string; readonly
     createdAt: new Date(1).toISOString(),
   }], null, 2), 'utf-8');
   return { rootPath, userDataPath, projectRoot };
+}
+
+function writeReadyCodexEvidence(projectRoot: string, projectId: string): void {
+  const checkedAt = new Date().toISOString();
+  const target = join(projectRoot, '.codex');
+  mkdirSync(target, { recursive: true });
+  writeFileSync(join(target, 'quality-gate-runs.json'), JSON.stringify({
+    schemaVersion: 1,
+    projectId,
+    projectRoot,
+    checkedAt,
+    staleAfterMs: 600000,
+    commandRuns: {
+      codexHooks: readyRun('Codex persistent-verifier plugin установлен.', 'desktop-codex-gates', 'codex plugin add persistent-verifier@claude-migrated-home', checkedAt),
+    },
+    verification: {
+      codexTrust: readyRun('Codex project trust подтверждён.', 'desktop-codex-gates', 'read ~/.codex/config.toml projects trust', checkedAt),
+      codexRuntime: readyRun('Codex CLI проверен.', 'desktop-codex-gates', 'codex --version', checkedAt),
+      hookPersistence: {
+        available: true,
+        passed: true,
+        detail: 'Codex SessionStart hook loaded persistent-verifier.',
+        checkedAt,
+        staleAfterMs: 600000,
+        source: 'persistent-verifier',
+        command: 'codex features list',
+        exitCode: 0,
+        runId: 'hookPersistence-e2e-ready',
+      },
+      smoke: readyRun('Проектный smoke gate выполнен.', 'desktop-codex-gates', 'npm test', checkedAt),
+      rollback: readyRun('Rollback-команда доступна.', 'desktop-codex-gates', 'codex plugin remove persistent-verifier@claude-migrated-home', checkedAt),
+    },
+  }, null, 2), 'utf-8');
+}
+
+function readyRun(detail: string, source: string, command: string, checkedAt: string) {
+  return {
+    available: true,
+    passed: true,
+    detail,
+    checkedAt,
+    staleAfterMs: 600000,
+    source,
+    command,
+    exitCode: 0,
+  };
 }
 
 async function launchDesktop(userDataPath: string, projectRoot: string): Promise<ElectronApplication> {

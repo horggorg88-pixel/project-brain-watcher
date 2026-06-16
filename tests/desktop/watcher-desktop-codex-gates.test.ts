@@ -9,6 +9,7 @@ import {
   verifyDesktopCodexGates,
   type DesktopCodexCommandRunner,
 } from '../../apps/watcher-desktop/src/desktop-codex-gates.js';
+import type { DesktopCodexGateRunEvidence } from '../../apps/watcher-desktop/src/contracts.js';
 import { saveProfile, type DesktopCorePaths } from '../../apps/watcher-desktop/src/desktop-core.js';
 
 const tempDirs: string[] = [];
@@ -22,6 +23,7 @@ describe('watcher desktop codex gates', () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');
     mkdirSync(root, { recursive: true });
+    writeTrustedCodexProject(paths.homePath, root);
     stagePersistentVerifierHookFiles(paths.homePath);
     writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
     saveProfile(paths, {
@@ -33,6 +35,7 @@ describe('watcher desktop codex gates', () => {
       tokenEnv: 'MCP_BEARER_TOKEN',
     });
     const commands: string[] = [];
+    const managedRequirementsPath = join(paths.homePath, 'program-data', 'OpenAI', 'Codex', 'requirements.toml');
     const runner: DesktopCodexCommandRunner = async request => {
       commands.push([request.command, ...request.args].join(' '));
       return {
@@ -44,6 +47,7 @@ describe('watcher desktop codex gates', () => {
     const result = await verifyDesktopCodexGates(paths, 'demo-project', {
       runner,
       now: () => new Date('2026-06-15T10:00:00.000Z'),
+      managedRequirementsPath,
     });
 
     expect(commands).toEqual([
@@ -54,7 +58,7 @@ describe('watcher desktop codex gates', () => {
       'npm test',
     ]);
     expect(result.ready).toBe(false);
-    expect(result.message).toBe('Codex hooks установлены. Открой Codex в проекте и доверь hooks через /hooks, чтобы SessionStart подтвердил persistent-verifier.');
+    expect(result.message).toBe('Codex hooks установлены. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.');
     expect(result.evidence.commandRuns.codexHooks).toMatchObject({
       command: 'codex plugin add persistent-verifier@claude-migrated-home',
       exitCode: 0,
@@ -72,7 +76,24 @@ describe('watcher desktop codex gates', () => {
       command: 'codex plugin remove persistent-verifier@claude-migrated-home',
       exitCode: 0,
     });
-    expect(readFileSync(join(
+    expect(result.evidence.verification.desktopBootstrap).toMatchObject({
+      command: 'verify persistent-verifier desktop bridge',
+      exitCode: 0,
+      source: 'desktop-codex-gates',
+    });
+    expect(result.evidence.verification.managedHooks).toMatchObject({
+      passed: true,
+      command: 'write %ProgramData%/OpenAI/Codex/requirements.toml managed hooks',
+      source: 'desktop-codex-gates',
+    });
+    expect(result.evidence.verification.hookPersistence).toBeUndefined();
+    const managedRequirements = readFileSync(managedRequirementsPath, 'utf-8');
+    expect(managedRequirements).toContain('project-brain-managed-hooks:start');
+    expect(managedRequirements).toContain('windows_managed_dir');
+    expect(managedRequirements).toContain('sessionstart.py');
+    expect(managedRequirements).toContain('posttooluse.py');
+    expect(managedRequirements).toContain('stop.py');
+    const pluginHooks = readFileSync(join(
       paths.homePath,
       '.codex',
       'plugins',
@@ -81,9 +102,27 @@ describe('watcher desktop codex gates', () => {
       'persistent-verifier',
       '0.1.0',
       'hooks.json',
-    ), 'utf-8')).toContain('%PLUGIN_ROOT%');
-    expect(readFileSync(join(paths.homePath, '.codex', 'hooks.json'), 'utf-8')).toContain('persistent-verifier');
-    expect(readFileSync(join(paths.homePath, '.codex', 'hooks.json'), 'utf-8')).toContain('sessionstart.py');
+    ), 'utf-8');
+    expect(pluginHooks).toContain('${CLAUDE_PLUGIN_ROOT}');
+    expect(pluginHooks).not.toContain('%PLUGIN_ROOT%');
+    expect(pluginHooks).not.toContain('${PLUGIN_ROOT}');
+    expect(pluginHooks).toContain('commandWindows');
+    expect(pluginHooks).not.toContain('command_windows');
+    expect(pluginHooks).not.toContain('"description"');
+    const userHooks = readFileSync(join(paths.homePath, '.codex', 'hooks.json'), 'utf-8');
+    expect(userHooks).toContain('persistent-verifier');
+    expect(userHooks).toContain('project-brain-hooks');
+    expect(userHooks).toContain('sessionstart.py');
+    const bridgeScript = readFileSync(join(paths.homePath, '.codex', 'project-brain-hooks', 'sessionstart.py'), 'utf-8');
+    expect(bridgeScript).toContain('registry_projects');
+    expect(bridgeScript).toContain('def succeed()');
+    expect(bridgeScript).toContain('succeed()');
+    expect(bridgeScript).not.toContain('emit({})');
+    expect(bridgeScript).not.toContain('emit({"projects":');
+    const registry = JSON.parse(readFileSync(join(paths.homePath, '.codex', 'project-brain-hooks', 'sessionstart-projects.json'), 'utf-8')) as {
+      readonly projects: readonly { readonly root: string }[];
+    };
+    expect(registry.projects.map(project => project.root)).toContain(root);
     expect(JSON.stringify(result.evidence)).not.toContain('pb_secret_value');
   });
 
@@ -91,6 +130,7 @@ describe('watcher desktop codex gates', () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');
     mkdirSync(root, { recursive: true });
+    writeTrustedCodexProject(paths.homePath, root);
     stagePersistentVerifierHookFiles(paths.homePath);
     writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
     mkdirSync(join(paths.homePath, '.codex'), { recursive: true });
@@ -108,20 +148,25 @@ describe('watcher desktop codex gates', () => {
       tokenEnv: 'MCP_BEARER_TOKEN',
     });
 
-    await verifyDesktopCodexGates(paths, 'demo-project', {
+    const verifyOptions = {
       runner: async () => ({ exitCode: 0, output: 'ok' }),
       now: () => new Date('2026-06-15T10:00:00.000Z'),
-    });
+    };
+    await verifyDesktopCodexGates(paths, 'demo-project', verifyOptions);
+    await verifyDesktopCodexGates(paths, 'demo-project', verifyOptions);
 
     const userHooks = readFileSync(join(paths.homePath, '.codex', 'hooks.json'), 'utf-8');
     expect(userHooks).toContain('python existing.py');
     expect(userHooks).toContain('persistent-verifier');
+    const parsedHooks = JSON.parse(userHooks) as { readonly hooks: { readonly SessionStart: readonly unknown[] } };
+    expect(parsedHooks.hooks.SessionStart).toHaveLength(1);
   });
 
   it('blocks Codex hook setup when persistent-verifier hook files are missing', async () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');
     mkdirSync(root, { recursive: true });
+    writeTrustedCodexProject(paths.homePath, root);
     writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
     saveProfile(paths, {
       id: 'demo-project',
@@ -145,9 +190,42 @@ describe('watcher desktop codex gates', () => {
     });
   });
 
+  it('does not run project commands automatically when the Codex project is not trusted', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    mkdirSync(root, { recursive: true });
+    stagePersistentVerifierHookFiles(paths.homePath);
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const commands: string[] = [];
+
+    const result = await verifyDesktopCodexGates(paths, 'demo-project', {
+      runner: async request => {
+        commands.push([request.command, ...request.args].join(' '));
+        return { exitCode: 0, output: 'ok' };
+      },
+      now: () => new Date('2026-06-15T10:00:00.000Z'),
+    });
+
+    expect(commands).toEqual([]);
+    expect(result.ready).toBe(false);
+    expect(result.message).toBe('Codex project trust не найден для выбранной папки; пульт не запускает проектные команды автоматически.');
+    expect(result.evidence.verification.codexTrust).toMatchObject({
+      passed: false,
+      command: 'read ~/.codex/config.toml projects trust',
+    });
+  });
+
   it('reads native hook persistence evidence written by Codex hooks', () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');
+    const checkedAt = new Date().toISOString();
     mkdirSync(join(root, '.codex'), { recursive: true });
     saveProfile(paths, {
       id: 'demo-project',
@@ -160,18 +238,25 @@ describe('watcher desktop codex gates', () => {
     writeFileSync(join(root, '.codex', 'quality-gate-runs.json'), JSON.stringify({
       schemaVersion: 1,
       projectId: 'demo-project',
+      commandRuns: {
+        codexHooks: passedRun('Codex persistent-verifier plugin установлен.', 'desktop-codex-gates', 'codex plugin add persistent-verifier@claude-migrated-home', checkedAt),
+      },
       verification: {
+        codexTrust: passedRun('Codex project trust подтверждён.', 'desktop-codex-gates', 'read ~/.codex/config.toml projects trust', checkedAt),
+        codexRuntime: passedRun('Codex CLI проверен.', 'desktop-codex-gates', 'codex --version', checkedAt),
         hookPersistence: {
           available: true,
           passed: true,
           detail: 'Codex SessionStart hook loaded persistent-verifier.',
-          checkedAt: '2026-06-15T10:00:00.000Z',
+          checkedAt,
           staleAfterMs: 600000,
           source: 'persistent-verifier',
           command: 'codex features list',
           exitCode: 0,
           runId: 'hookPersistence-1',
         },
+        smoke: passedRun('Проектный smoke gate выполнен.', 'desktop-codex-gates', 'npm test', checkedAt),
+        rollback: passedRun('Rollback-команда доступна.', 'desktop-codex-gates', 'codex plugin remove persistent-verifier@claude-migrated-home', checkedAt),
       },
     }), 'utf-8');
 
@@ -185,10 +270,55 @@ describe('watcher desktop codex gates', () => {
     });
   });
 
+  it('does not accept stale native hook persistence evidence as ready', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    const checkedAt = new Date().toISOString();
+    mkdirSync(join(root, '.codex'), { recursive: true });
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    writeFileSync(join(root, '.codex', 'quality-gate-runs.json'), JSON.stringify({
+      schemaVersion: 1,
+      projectId: 'demo-project',
+      commandRuns: {
+        codexHooks: passedRun('Codex persistent-verifier plugin установлен.', 'desktop-codex-gates', 'codex plugin add persistent-verifier@claude-migrated-home', checkedAt),
+      },
+      verification: {
+        codexTrust: passedRun('Codex project trust подтверждён.', 'desktop-codex-gates', 'read ~/.codex/config.toml projects trust', checkedAt),
+        codexRuntime: passedRun('Codex CLI проверен.', 'desktop-codex-gates', 'codex --version', checkedAt),
+        hookPersistence: {
+          available: true,
+          passed: true,
+          detail: 'Codex SessionStart hook loaded persistent-verifier.',
+          checkedAt: '2000-01-01T00:00:00.000Z',
+          staleAfterMs: 600000,
+          source: 'persistent-verifier',
+          command: 'codex features list',
+          exitCode: 0,
+          runId: 'hookPersistence-stale',
+        },
+        smoke: passedRun('Проектный smoke gate выполнен.', 'desktop-codex-gates', 'npm test', checkedAt),
+        rollback: passedRun('Rollback-команда доступна.', 'desktop-codex-gates', 'codex plugin remove persistent-verifier@claude-migrated-home', checkedAt),
+      },
+    }), 'utf-8');
+
+    const result = readDesktopCodexGateEvidence(paths, 'demo-project');
+
+    expect(result.ready).toBe(false);
+    expect(result.message).toBe('Codex SessionStart evidence устарел. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.');
+  });
+
   it('keeps Codex gates pending until native SessionStart hook evidence exists', async () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');
     mkdirSync(root, { recursive: true });
+    writeTrustedCodexProject(paths.homePath, root);
     stagePersistentVerifierHookFiles(paths.homePath);
     writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
     saveProfile(paths, {
@@ -207,7 +337,12 @@ describe('watcher desktop codex gates', () => {
     });
 
     expect(result.ready).toBe(false);
-    expect(result.message).toBe('Codex hooks установлены. Открой Codex в проекте и доверь hooks через /hooks, чтобы SessionStart подтвердил persistent-verifier.');
+    expect(result.message).toBe('Codex hooks установлены. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.');
+    expect(result.evidence.verification.desktopBootstrap).toMatchObject({
+      passed: true,
+      detail: 'Desktop bootstrap persistent-verifier проверен; native SessionStart evidence ожидается от Codex.',
+      source: 'desktop-codex-gates',
+    });
     expect(result.evidence.verification.hookPersistence).toBeUndefined();
   });
 
@@ -229,6 +364,33 @@ function tempPaths(): DesktopCorePaths {
   return {
     homePath: join(root, 'home'),
     userDataPath: join(root, 'user-data'),
+  };
+}
+
+function writeTrustedCodexProject(homePath: string, root: string): void {
+  mkdirSync(join(homePath, '.codex'), { recursive: true });
+  writeFileSync(join(homePath, '.codex', 'config.toml'), [
+    `[projects.${JSON.stringify(root)}]`,
+    'trust_level = "trusted"',
+    '',
+  ].join('\n'), 'utf-8');
+}
+
+function passedRun(
+  detail: string,
+  source: string,
+  command: string,
+  checkedAt = '2026-06-15T10:00:00.000Z',
+): DesktopCodexGateRunEvidence {
+  return {
+    available: true,
+    passed: true,
+    detail,
+    checkedAt,
+    staleAfterMs: 600000,
+    source,
+    command,
+    exitCode: 0,
   };
 }
 

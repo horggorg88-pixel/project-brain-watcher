@@ -76,11 +76,24 @@ export function renderConnectionCheck(check: DesktopConnectionCheck, element: HT
   if (!element) return;
   element.innerHTML = check.nodes.map(node => (
     `<article class="check-row" data-node="${escapeHtml(node.id)}">
-      <span class="toggle ${node.status === 'active' ? 'on' : 'off'}" aria-hidden="true"></span>
+      <span class="toggle ${toggleClass(node.status)}" aria-hidden="true"></span>
       <div><strong>${escapeHtml(node.label)}</strong><p>${escapeHtml(node.detail)}</p></div>
-      ${node.actionLabel ? `<button type="button" class="ghost" data-check-action="${node.action}" title="${escapeHtml(checkActionTooltip(node.action))}" data-tooltip="${escapeHtml(checkActionTooltip(node.action))}">${escapeHtml(node.actionLabel)}</button>` : '<span class="check-ok">Активен</span>'}
+      ${node.actionLabel ? `<button type="button" class="ghost" data-check-action="${node.action}" title="${escapeHtml(checkActionTooltip(node.action))}" data-tooltip="${escapeHtml(checkActionTooltip(node.action))}">${escapeHtml(node.actionLabel)}</button>` : `<span class="check-ok" data-status="${escapeHtml(node.status)}">${escapeHtml(checkStatusLabel(node.status))}</span>`}
     </article>`
   )).join('');
+}
+
+function toggleClass(status: string): string {
+  if (status === 'active') return 'on';
+  if (status === 'waiting') return 'wait';
+  return 'off';
+}
+
+function checkStatusLabel(status: string): string {
+  if (status === 'active') return 'Активен';
+  if (status === 'waiting') return 'Ожидает';
+  if (status === 'error') return 'Ошибка';
+  return 'Нет действия';
 }
 
 export function renderConnectionCause(check: DesktopConnectionCheck, element: HTMLElement | null): void {

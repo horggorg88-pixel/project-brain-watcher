@@ -1,6 +1,7 @@
 import type {
   DesktopAccessState,
   DesktopCheckAction,
+  DesktopCodexGateRunEvidence,
   DesktopConfigPackage,
   DesktopConfigSaveResult,
   DesktopConnectionCheck,
@@ -83,6 +84,8 @@ let currentModes: readonly DesktopModeSummary[] = [];
 let activeModeId: string | null = null;
 let currentPackage: DesktopConfigPackage | null = null;
 let pendingServiceAction: PendingServiceActionConfirmation | null = null;
+let automaticCodexGateRunning = false;
+const automaticCodexGateAttempts = new Set<string>();
 
 void refresh();
 
@@ -393,6 +396,85 @@ async function refresh(): Promise<void> {
   renderCurrentPackage();
   renderProjects(currentProjects, projectListEl);
   renderModes(currentModes, modesEl, activeModeId);
+  scheduleAutomaticCodexGateVerification(check);
+}
+
+function scheduleAutomaticCodexGateVerification(check: DesktopConnectionCheck): void {
+  if (!needsAutomaticCodexGateVerification(check)) return;
+  const projectId = check.projectId ?? currentProjectId();
+  const attemptKey = `${projectId}:${check.codexGates.message}`;
+  if (automaticCodexGateRunning || automaticCodexGateAttempts.has(attemptKey)) return;
+  automaticCodexGateAttempts.add(attemptKey);
+  automaticCodexGateRunning = true;
+  window.setTimeout(() => {
+    void runAutomaticCodexGateVerification(projectId);
+  }, 0);
+}
+
+function needsAutomaticCodexGateVerification(check: DesktopConnectionCheck): boolean {
+  if (!accessState?.signedIn || check.codexGates.ready) return false;
+  if (!check.projectId) return false;
+  if (hasCodexGateFailure(check)) return false;
+  return hasTrustedCodexProject(check) && !hasCodexBaseVerification(check);
+}
+
+function hasCodexBaseVerification(check: DesktopConnectionCheck): boolean {
+  const evidence = check.codexGates.evidence;
+  return isCurrentPassed(evidence.verification.codexTrust, check.codexGates.checkedAt)
+    && isCurrentPassed(evidence.verification.codexRuntime, check.codexGates.checkedAt)
+    && isCurrentPassed(evidence.commandRuns.codexHooks, check.codexGates.checkedAt)
+    && isCurrentPassed(evidence.verification.smoke, check.codexGates.checkedAt)
+    && isCurrentPassed(evidence.verification.rollback, check.codexGates.checkedAt);
+}
+
+function hasCodexGateFailure(check: DesktopConnectionCheck): boolean {
+  const evidence = check.codexGates.evidence;
+  return [
+    evidence.verification.codexTrust,
+    evidence.verification.codexRuntime,
+    evidence.commandRuns.codexHooks,
+    evidence.verification.desktopBootstrap,
+    evidence.verification.hookPersistence,
+    evidence.verification.smoke,
+    evidence.verification.rollback,
+  ].some(item => item?.available === true && item.passed === false);
+}
+
+function hasTrustedCodexProject(check: DesktopConnectionCheck): boolean {
+  const trust = check.codexGates.evidence.verification.codexTrust;
+  return trust === undefined || isCurrentPassed(trust, check.codexGates.checkedAt);
+}
+
+function isPassed(value: DesktopCodexGateRunEvidence | undefined): boolean {
+  return value?.available === true && value.passed === true;
+}
+
+function isCurrentPassed(value: DesktopCodexGateRunEvidence | undefined, checkedAt: string): boolean {
+  return isPassed(value) && !isStale(value, checkedAt);
+}
+
+function isStale(value: DesktopCodexGateRunEvidence | undefined, checkedAt: string): boolean {
+  if (!value || value.checkedAt === undefined || value.staleAfterMs === undefined) return false;
+  const valueTime = Date.parse(value.checkedAt);
+  const referenceTime = Date.parse(checkedAt);
+  if (!Number.isFinite(valueTime) || !Number.isFinite(referenceTime)) return true;
+  return referenceTime - valueTime > value.staleAfterMs;
+}
+
+async function runAutomaticCodexGateVerification(projectId: string): Promise<void> {
+  writeLog('Автоматически настраиваем Codex: CLI, persistent-verifier, smoke, rollback и SessionStart evidence...');
+  try {
+    const result = await window.watcherDesktop.codexGates.verify(projectId);
+    writeLog(result.message);
+    await refresh();
+  } catch (error) {
+    writeLog(`Автонастройка Codex не завершилась: ${errorMessage(error)}`);
+    for (const key of [...automaticCodexGateAttempts]) {
+      if (key.startsWith(`${projectId}:`)) automaticCodexGateAttempts.delete(key);
+    }
+  } finally {
+    automaticCodexGateRunning = false;
+  }
 }
 
 async function safeAccessStatus(): Promise<DesktopAccessState> {

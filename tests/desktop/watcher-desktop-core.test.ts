@@ -25,7 +25,7 @@ import { isServiceActionSettled, prepareServiceSecretForLaunch, resolveVerifiedS
 import { parseWindowsServiceConfigOutput, parseWindowsServiceOutput } from '../../apps/watcher-desktop/src/desktop-service-status.js';
 import { readDesktopUiState, saveDesktopUiState } from '../../apps/watcher-desktop/src/desktop-ui-state.js';
 import { defaultProfile, serviceName } from '../../apps/watcher-desktop/src/desktop-profile-store.js';
-import type { WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
+import type { DesktopCodexGateRunEvidence, WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
 
 const tempDirs: string[] = [];
 const VALID_TEST_BEARER = 'valid_test_bearer_12345678901234567890';
@@ -993,9 +993,58 @@ describe('watcher desktop core', () => {
     expect(check.nodes.map(node => node.id)).toEqual(['project', 'config', 'key', 'server', 'codexGates', 'watcher']);
     expect(check.nodes.map(node => node.label)).toEqual(['Проект', 'Файл настройки', 'Ключ доступа', 'MCP-сервер', 'Codex Gates', 'Watcher']);
     expect(check.nodes.find(node => node.id === 'server')?.status).toBe('active');
-    expect(check.nodes.find(node => node.id === 'codexGates')?.actionLabel).toBe('Проверить Codex');
+    expect(check.nodes.find(node => node.id === 'codexGates')?.status).toBe('waiting');
+    expect(check.nodes.find(node => node.id === 'codexGates')?.actionLabel).toBeNull();
     expect(check.nodes.find(node => node.id === 'watcher')?.actionLabel).toBe('Установить службу');
     expect(check.overall).toBe('action_required');
+  });
+
+  it('keeps a retry action visible when native Codex hook evidence failed', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'repo');
+    const source = join(paths.homePath, 'codex-failed-hook-mcp-config.json');
+    mkdirSync(join(root, '.brain', 'service'), { recursive: true });
+    writeFileSync(source, JSON.stringify({
+      project_id: 'codex-failed-hook',
+      endpoint: 'http://149.33.14.250/mcp/p/codex-failed-hook',
+      local_path: root,
+      token_env: 'MCP_BEARER_TOKEN',
+      mcpServers: {
+        'project-brain': {
+          url: 'http://149.33.14.250/mcp/p/codex-failed-hook',
+          headers: { Authorization: `Bearer ${VALID_TEST_BEARER}` },
+        },
+      },
+    }), 'utf-8');
+    importProjectConfig(paths, source);
+    writeFileSync(join(root, '.brain', 'service', 'quality-gate-runs.json'), JSON.stringify({
+      schemaVersion: 1,
+      projectId: 'codex-failed-hook',
+      commandRuns: {
+        codexHooks: codexGateRun('Codex hooks ready', 'codex plugin add persistent-verifier@claude-migrated-home'),
+      },
+      verification: {
+        codexTrust: codexGateRun('Codex project trust подтверждён.', 'read ~/.codex/config.toml projects trust'),
+        codexRuntime: codexGateRun('Codex CLI проверен.', 'codex --version'),
+        desktopBootstrap: codexGateRun('Desktop bootstrap проверен.', 'verify persistent-verifier desktop bridge'),
+        hookPersistence: {
+          ...codexGateRun('Native hook failed', 'codex features list'),
+          passed: false,
+          exitCode: 1,
+        },
+        smoke: codexGateRun('Smoke gate Codex прошёл.', 'npm test'),
+        rollback: codexGateRun('Rollback доступен.', 'codex plugin remove persistent-verifier@claude-migrated-home'),
+      },
+    }), 'utf-8');
+    vi.stubGlobal('fetch', verifiedMcpFetch());
+
+    const check = await buildDesktopConnectionCheck(paths, 'codex-failed-hook');
+    const node = check.nodes.find(item => item.id === 'codexGates');
+
+    expect(node?.status).toBe('inactive');
+    expect(node?.action).toBe('verify_codex_gates');
+    expect(node?.actionLabel).toBe('Повторить');
+    expect(node?.detail).toBe('Native hook failed');
   });
 
   it('builds onboarding events from completed desktop connection steps', () => {
@@ -1686,6 +1735,19 @@ function statusFixture(overrides: Partial<WatcherServiceStatus>): WatcherService
     running: false,
     logs: null,
     ...overrides,
+  };
+}
+
+function codexGateRun(detail: string, command: string): DesktopCodexGateRunEvidence {
+  return {
+    available: true,
+    passed: true,
+    detail,
+    checkedAt: new Date().toISOString(),
+    staleAfterMs: 600000,
+    source: 'desktop-codex-gates',
+    command,
+    exitCode: 0,
   };
 }
 

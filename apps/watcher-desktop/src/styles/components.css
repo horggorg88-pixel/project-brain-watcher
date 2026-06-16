@@ -307,6 +307,17 @@ h3 {
   color: var(--ink);
 }
 
+.check-ok[data-status="waiting"] {
+  border-color: var(--line-strong);
+  background: var(--soft);
+  color: var(--ink);
+}
+
+.check-ok[data-status="inactive"] {
+  border-color: var(--line);
+  color: var(--muted);
+}
+
 .checklist,
 .command-list,
 .diagnostic-list,
@@ -376,6 +387,10 @@ h3 {
 
 .toggle.on::after {
   transform: translateX(16px);
+}
+
+.toggle.wait::after {
+  transform: translateX(8px);
 }
 
 .check-row p,

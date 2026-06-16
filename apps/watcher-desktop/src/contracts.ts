@@ -178,7 +178,10 @@ export interface DesktopCodexGateEvidence {
     readonly codexHooks?: DesktopCodexGateRunEvidence;
   };
   readonly verification: {
+    readonly codexTrust?: DesktopCodexGateRunEvidence;
     readonly codexRuntime?: DesktopCodexGateRunEvidence;
+    readonly desktopBootstrap?: DesktopCodexGateRunEvidence;
+    readonly managedHooks?: DesktopCodexGateRunEvidence;
     readonly hookPersistence?: DesktopCodexGateRunEvidence;
     readonly smoke?: DesktopCodexGateRunEvidence;
     readonly rollback?: DesktopCodexGateRunEvidence;

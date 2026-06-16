@@ -1,5 +1,7 @@
 import type {
   DesktopCheckNode,
+  DesktopCodexGateRunEvidence,
+  DesktopCodexGateStatus,
   DesktopConnectionCheck,
   DiagnosticsPreview,
   SavedProjectProfile,
@@ -37,8 +39,7 @@ export async function buildDesktopConnectionCheck(
     secretConfigured: secret.configured,
     serverMessage: server?.message ?? null,
     serverVerified: server?.verified ?? false,
-    codexGatesReady: codexGates.ready,
-    codexGatesMessage: codexGates.message,
+    codexGates,
     service,
   });
   const overall = resolveOverall(nodes);
@@ -60,8 +61,7 @@ function buildNodes(input: {
   readonly secretConfigured: boolean;
   readonly serverMessage: string | null;
   readonly serverVerified: boolean;
-  readonly codexGatesReady: boolean;
-  readonly codexGatesMessage: string;
+  readonly codexGates: DesktopCodexGateStatus;
   readonly service: WatcherServiceStatus;
 }): readonly DesktopCheckNode[] {
   const serverDetail = input.serverVerified
@@ -72,9 +72,116 @@ function buildNodes(input: {
     node('config', 'Файл настройки', input.configFound, input.configFound ? 'Файл настройки принят' : 'Импортируйте файл из личного кабинета', 'import_config', 'Импортировать файл'),
     node('key', 'Ключ доступа', input.secretConfigured, input.secretConfigured ? 'Ключ сохранён локально' : 'Пульт не нашёл локальный ключ', 'download_config', 'Скачать пакет'),
     node('server', 'MCP-сервер', input.serverVerified, serverDetail, 'open_logs', input.serverVerified ? 'Проверить MCP' : 'Показать причину'),
-    node('codexGates', 'Codex Gates', input.codexGatesReady, input.codexGatesMessage, 'verify_codex_gates', 'Проверить Codex'),
+    codexGateNode(input.codexGates),
     node('watcher', 'Watcher', input.service.running && input.service.health === 'healthy', serviceDetail(input.service), serviceAction(input.service), serviceActionLabel(input.service)),
   ];
+}
+
+function codexGateNode(status: DesktopCodexGateStatus): DesktopCheckNode {
+  if (status.ready) {
+    return {
+      id: 'codexGates',
+      label: 'Codex Gates',
+      status: 'active',
+      detail: status.message,
+      action: 'none',
+      actionLabel: null,
+    };
+  }
+  if (hasCodexGateFailure(status)) {
+    return {
+      id: 'codexGates',
+      label: 'Codex Gates',
+      status: 'inactive',
+      detail: status.message,
+      action: 'verify_codex_gates',
+      actionLabel: 'Повторить',
+    };
+  }
+  if (!hasCodexVerifierAttempt(status) && isInitialCodexGateMessage(status.message)) {
+    return {
+      id: 'codexGates',
+      label: 'Codex Gates',
+      status: 'waiting',
+      detail: 'Пульт проверяет Codex trust и настраивает gates автоматически.',
+      action: 'none',
+      actionLabel: null,
+    };
+  }
+  if (hasCodexBaseVerification(status)) {
+    return {
+      id: 'codexGates',
+      label: 'Codex Gates',
+      status: 'waiting',
+      detail: status.message,
+      action: 'none',
+      actionLabel: null,
+    };
+  }
+  return {
+    id: 'codexGates',
+    label: 'Codex Gates',
+    status: 'waiting',
+    detail: status.message,
+    action: 'none',
+    actionLabel: null,
+  };
+}
+
+function isInitialCodexGateMessage(message: string): boolean {
+  return message === 'Codex CLI ещё не проверен.'
+    || message === 'Codex project trust ещё не подтверждён.';
+}
+
+function hasCodexVerifierAttempt(status: DesktopCodexGateStatus): boolean {
+  const evidence = status.evidence;
+  return Boolean(
+    evidence.commandRuns.codexHooks
+    || evidence.verification.codexTrust
+    || evidence.verification.codexRuntime
+    || evidence.verification.desktopBootstrap
+    || evidence.verification.hookPersistence
+    || evidence.verification.smoke
+    || evidence.verification.rollback,
+  );
+}
+
+function hasCodexBaseVerification(status: DesktopCodexGateStatus): boolean {
+  const evidence = status.evidence;
+  return hasCurrentPassed(evidence.verification.codexTrust, status.checkedAt)
+    && hasCurrentPassed(evidence.verification.codexRuntime, status.checkedAt)
+    && hasCurrentPassed(evidence.commandRuns.codexHooks, status.checkedAt)
+    && hasCurrentPassed(evidence.verification.smoke, status.checkedAt)
+    && hasCurrentPassed(evidence.verification.rollback, status.checkedAt);
+}
+
+function hasCodexGateFailure(status: DesktopCodexGateStatus): boolean {
+  const evidence = status.evidence;
+  return [
+    evidence.verification.codexTrust,
+    evidence.verification.codexRuntime,
+    evidence.commandRuns.codexHooks,
+    evidence.verification.desktopBootstrap,
+    evidence.verification.hookPersistence,
+    evidence.verification.smoke,
+    evidence.verification.rollback,
+  ].some(item => item?.available === true && item.passed === false);
+}
+
+function hasPassed(value: DesktopCodexGateRunEvidence | undefined): boolean {
+  return value?.available === true && value.passed === true;
+}
+
+function hasCurrentPassed(value: DesktopCodexGateRunEvidence | undefined, checkedAt: string): boolean {
+  return hasPassed(value) && !isStale(value, checkedAt);
+}
+
+function isStale(value: DesktopCodexGateRunEvidence | undefined, checkedAt: string): boolean {
+  if (!value || value.checkedAt === undefined || value.staleAfterMs === undefined) return false;
+  const valueTime = Date.parse(value.checkedAt);
+  const referenceTime = Date.parse(checkedAt);
+  if (!Number.isFinite(valueTime) || !Number.isFinite(referenceTime)) return true;
+  return referenceTime - valueTime > value.staleAfterMs;
 }
 
 function node(
