@@ -180,8 +180,9 @@ def registry_projects():
     return result
 
 
-def write_evidence(root, project_id):
+def write_evidence(root, project_id, hook_event_name):
     checked_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    event_name = hook_event_name if isinstance(hook_event_name, str) and hook_event_name else "SessionStart"
     payload = {
         "schemaVersion": 1,
         "projectId": project_id,
@@ -200,7 +201,28 @@ def write_evidence(root, project_id):
                 "exitCode": 0,
                 "runId": f"hookPersistence-{int(time.time())}",
             },
+            "runtimeContext": {
+                "available": True,
+                "passed": True,
+                "detail": f"Codex Runtime Context proof recorded by native {event_name} hook.",
+                "checkedAt": checked_at,
+                "staleAfterMs": STALE_AFTER_MS,
+                "source": "project-brain-runtime-context",
+                "command": "project-brain runtime context proof",
+                "exitCode": 0,
+                "runId": f"runtimeContext-{int(time.time())}",
+            },
         },
+    }
+    context_payload = {
+        "schemaVersion": 1,
+        "projectId": project_id,
+        "projectRoot": str(root),
+        "checkedAt": checked_at,
+        "hookEventName": event_name,
+        "source": "project-brain-runtime-context",
+        "verdict": "ready",
+        "proofCount": 2,
     }
     output_dir = root / ".codex"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -208,12 +230,16 @@ def write_evidence(root, project_id):
         json.dumps(payload, ensure_ascii=False, indent=2) + "\\n",
         encoding="utf-8",
     )
+    (output_dir / "runtime-context.json").write_text(
+        json.dumps(context_payload, ensure_ascii=False, indent=2) + "\\n",
+        encoding="utf-8",
+    )
 
 
 def main():
     input_data = read_input()
     hook_event_name = input_data.get("hookEventName") or input_data.get("hook_event_name")
-    if input_data and hook_event_name not in {"SessionStart", "session_start"}:
+    if input_data and hook_event_name not in {"SessionStart", "session_start", "UserPromptSubmit", "user_prompt_submit", "SubagentStart", "subagent_start"}:
         succeed()
     candidates = []
     cwd_root = find_root(input_cwd(input_data).resolve())
@@ -230,7 +256,7 @@ def main():
         if key in seen or not resolved.exists():
             continue
         seen.add(key)
-        write_evidence(resolved, project_id or read_project_id(resolved))
+        write_evidence(resolved, project_id or read_project_id(resolved), hook_event_name)
     succeed()
 
 
@@ -287,7 +313,7 @@ export async function verifyDesktopCodexGates(
   const hookRepair = repairPersistentVerifierPluginHooks(paths.homePath);
   const hookBridge = installPersistentVerifierUserHooks(paths.homePath, profile);
   const managedHooks = installManagedPersistentVerifierHooks(
-    hookBridge.scriptRoot,
+    hookBridge,
     options.managedRequirementsPath ?? (options.runner ? null : defaultManagedRequirementsPath()),
     checkedAt,
   );
@@ -345,6 +371,7 @@ interface PersistentVerifierUserHookBridge {
   readonly path?: string;
   readonly scriptRoot?: string;
   readonly sessionStartScript?: string;
+  readonly runtimeContextScript?: string;
   readonly qualityGateScript?: string;
   readonly registryPath?: string;
   readonly detail: string;
@@ -405,7 +432,12 @@ function installPersistentVerifierUserHooks(homePath: string, profile: SavedProj
   const existing = readHookDocument(path);
   if (!existing.ok) return { installed: false, path, detail: existing.error };
 
-  const next = mergePersistentVerifierUserHooks(existing.value, scriptRoot, sessionStartBridge.sessionStartScript);
+  const next = mergePersistentVerifierUserHooks(
+    existing.value,
+    scriptRoot,
+    sessionStartBridge.sessionStartScript,
+    sessionStartBridge.runtimeContextScript,
+  );
   try {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, JSON.stringify(next, null, 2) + '\n', 'utf-8');
@@ -414,6 +446,7 @@ function installPersistentVerifierUserHooks(homePath: string, profile: SavedProj
       path,
       scriptRoot,
       sessionStartScript: sessionStartBridge.sessionStartScript,
+      runtimeContextScript: sessionStartBridge.runtimeContextScript,
       qualityGateScript: qualityGateScript.qualityGateScript,
       registryPath: sessionStartBridge.registryPath,
       detail: 'Codex user-level hooks bridge установлен.',
@@ -451,18 +484,21 @@ function writeQualityGateHookScript(scriptRoot: string): PersistentVerifierUserH
 function writeSessionStartBridge(homePath: string, profile: SavedProjectProfile): PersistentVerifierUserHookBridge {
   const bridgeRoot = join(homePath, '.codex', 'project-brain-hooks');
   const sessionStartScript = join(bridgeRoot, 'sessionstart.py');
+  const runtimeContextScript = join(bridgeRoot, 'runtimecontext.py');
   const registryPath = join(bridgeRoot, 'sessionstart-projects.json');
   try {
     mkdirSync(bridgeRoot, { recursive: true });
     writeFileSync(sessionStartScript, SESSION_START_BRIDGE_SCRIPT, 'utf-8');
+    writeFileSync(runtimeContextScript, SESSION_START_BRIDGE_SCRIPT, 'utf-8');
     writeFileSync(registryPath, JSON.stringify(updateSessionStartRegistry(readJson(registryPath), profile), null, 2) + '\n', 'utf-8');
     return {
       installed: true,
       path: join(homePath, '.codex', 'hooks.json'),
       scriptRoot: bridgeRoot,
       sessionStartScript,
+      runtimeContextScript,
       registryPath,
-      detail: 'Codex SessionStart bridge зарегистрировал выбранный проект.',
+      detail: 'Codex Runtime Context bridge зарегистрировал выбранный проект.',
     };
   } catch (error) {
     return {
@@ -500,7 +536,7 @@ function desktopBootstrapEvidence(
   return {
     available: true,
     passed: true,
-    detail: 'Desktop bootstrap persistent-verifier проверен; native SessionStart evidence ожидается от Codex.',
+    detail: 'Desktop bootstrap persistent-verifier проверен; native Runtime Context evidence ожидается от Codex.',
     checkedAt,
     staleAfterMs: STALE_AFTER_MS,
     source: SOURCE,
@@ -510,17 +546,17 @@ function desktopBootstrapEvidence(
 }
 
 function installManagedPersistentVerifierHooks(
-  scriptRoot: string | undefined,
+  hookBridge: PersistentVerifierUserHookBridge,
   requirementsPath: string | null,
   checkedAt: string,
 ): DesktopCodexGateRunEvidence | undefined {
   const command = 'write %ProgramData%/OpenAI/Codex/requirements.toml managed hooks';
   if (!requirementsPath) return undefined;
-  if (!scriptRoot) {
+  if (!hookBridge.scriptRoot) {
     return failedEvidence(command, checkedAt, 'Managed Codex hooks не установлены: persistent-verifier scripts не найдены.');
   }
 
-  const desired = managedRequirementsToml(scriptRoot);
+  const desired = managedRequirementsToml(hookBridge);
   try {
     const current = existsSync(requirementsPath) ? readFileSync(requirementsPath, 'utf-8') : '';
     const next = mergeManagedRequirements(current, desired);
@@ -573,8 +609,10 @@ function mergeManagedRequirements(current: string, desiredBlock: string): string
   return null;
 }
 
-function managedRequirementsToml(scriptRoot: string): string {
-  const sessionStart = join(scriptRoot, 'sessionstart.py');
+function managedRequirementsToml(hookBridge: PersistentVerifierUserHookBridge): string {
+  const scriptRoot = hookBridge.scriptRoot ?? '';
+  const sessionStart = hookBridge.sessionStartScript ?? join(scriptRoot, 'sessionstart.py');
+  const runtimeContext = hookBridge.runtimeContextScript ?? sessionStart;
   const postToolUse = join(scriptRoot, 'posttooluse.py');
   const qualityGate = join(scriptRoot, 'qualitygate.py');
   const stop = join(scriptRoot, 'stop.py');
@@ -594,6 +632,24 @@ command = ${tomlString(`python3 ${toPortablePath(sessionStart)}`)}
 commandWindows = ${tomlString(`python "${sessionStart}"`)}
 timeout = 15
 statusMessage = 'Checking Codex gate persistence'
+
+[[hooks.UserPromptSubmit]]
+
+[[hooks.UserPromptSubmit.hooks]]
+type = 'command'
+command = ${tomlString(`python3 ${toPortablePath(runtimeContext)}`)}
+commandWindows = ${tomlString(`python "${runtimeContext}"`)}
+timeout = 15
+statusMessage = 'Hydrating Project Brain runtime context'
+
+[[hooks.SubagentStart]]
+
+[[hooks.SubagentStart.hooks]]
+type = 'command'
+command = ${tomlString(`python3 ${toPortablePath(runtimeContext)}`)}
+commandWindows = ${tomlString(`python "${runtimeContext}"`)}
+timeout = 15
+statusMessage = 'Hydrating Project Brain runtime context'
 
 [[hooks.PostToolUse]]
 matcher = 'Write|Edit|MultiEdit|apply_patch'
@@ -695,11 +751,18 @@ function mergePersistentVerifierUserHooks(
   document: Record<string, unknown>,
   scriptRoot: string,
   sessionStartScript: string | undefined,
+  runtimeContextScript: string | undefined,
 ): Record<string, unknown> {
   const hooks = isRecord(document['hooks']) ? { ...document['hooks'] } : {};
   hooks['SessionStart'] = mergeHookGroup(hooks['SessionStart'], persistentVerifierUserHookGroup(
     '',
     commandForScript(sessionStartScript ?? join(scriptRoot, 'sessionstart.py')),
+  ));
+  hooks['UserPromptSubmit'] = mergeHookGroup(hooks['UserPromptSubmit'], persistentVerifierUserRuntimeHookGroup(
+    commandForScript(runtimeContextScript ?? sessionStartScript ?? join(scriptRoot, 'sessionstart.py')),
+  ));
+  hooks['SubagentStart'] = mergeHookGroup(hooks['SubagentStart'], persistentVerifierUserRuntimeHookGroup(
+    commandForScript(runtimeContextScript ?? sessionStartScript ?? join(scriptRoot, 'sessionstart.py')),
   ));
   hooks['PostToolUse'] = mergeHookGroup(hooks['PostToolUse'], persistentVerifierUserHookGroup(
     'Write|Edit|MultiEdit|apply_patch',
@@ -726,6 +789,20 @@ function persistentVerifierUserHookGroup(matcher: string, command: string): Reco
         commandWindows: command,
         timeout: matcher ? 180 : 15,
         statusMessage: matcher ? 'Running persistent verifier' : 'Checking Codex gate persistence',
+      },
+    ],
+  };
+}
+
+function persistentVerifierUserRuntimeHookGroup(command: string): Record<string, unknown> {
+  return {
+    hooks: [
+      {
+        type: 'command',
+        command,
+        commandWindows: command,
+        timeout: 15,
+        statusMessage: 'Hydrating Project Brain runtime context',
       },
     ],
   };
@@ -810,7 +887,7 @@ function codexHooksEvidence(
   return {
     available: true,
     passed: true,
-    detail: `Codex persistent-verifier plugin установлен, hooks.json ${action}, user-level bridge готов${managed}.`,
+    detail: `Codex persistent-verifier plugin установлен, hooks.json ${action}, user-level Runtime Context bridge готов${managed}.`,
     checkedAt,
     staleAfterMs: STALE_AFTER_MS,
     source: SOURCE,
@@ -921,7 +998,7 @@ function mergeEvidence(target: MutableEvidence, value: unknown, expectedProjectI
   }
 
   const verification = isRecord(value['verification']) ? value['verification'] : {};
-  for (const id of ['codexTrust', 'codexRuntime', 'desktopBootstrap', 'managedHooks', 'hookPersistence', 'smoke', 'rollback'] as const) {
+  for (const id of ['codexTrust', 'codexRuntime', 'desktopBootstrap', 'managedHooks', 'hookPersistence', 'runtimeContext', 'smoke', 'rollback'] as const) {
     const evidence = parseRunEvidence(verification[id], fileProjectId, expectedProjectId);
     if (evidence && isNewer(evidence, target.verification[id])) {
       target.verification[id] = evidence;
@@ -996,7 +1073,8 @@ function writeProjectEvidence(
 
 function statusFromEvidence(evidence: DesktopCodexGateEvidence, checkedAt: string): DesktopCodexGateStatus {
   const ready = hasBaseVerification(evidence, checkedAt)
-    && hasCurrentPassed(evidence.verification.hookPersistence, checkedAt);
+    && hasCurrentPassed(evidence.verification.hookPersistence, checkedAt)
+    && hasCurrentPassed(evidence.verification.runtimeContext, checkedAt);
   return {
     ready,
     message: ready ? readyMessage(evidence, checkedAt) : blockerMessage(evidence, checkedAt),
@@ -1006,6 +1084,9 @@ function statusFromEvidence(evidence: DesktopCodexGateEvidence, checkedAt: strin
 }
 
 function readyMessage(evidence: DesktopCodexGateEvidence, checkedAt: string): string {
+  if (hasCurrentPassed(evidence.verification.runtimeContext, checkedAt)) {
+    return 'Codex Runtime Context proof подтверждён native hooks.';
+  }
   if (hasCurrentPassed(evidence.verification.hookPersistence, checkedAt)) {
     return 'Codex SessionStart hook подтвердил persistent-verifier.';
   }
@@ -1029,6 +1110,15 @@ function blockerMessage(evidence: DesktopCodexGateEvidence, checkedAt: string): 
   }
   if (hasPassed(evidence.verification.hookPersistence) && isStale(evidence.verification.hookPersistence, checkedAt)) {
     return 'Codex SessionStart evidence устарел. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.';
+  }
+  if (evidence.verification.runtimeContext?.available === true && evidence.verification.runtimeContext.passed === false) {
+    return evidence.verification.runtimeContext.detail;
+  }
+  if (hasPassed(evidence.verification.runtimeContext) && isStale(evidence.verification.runtimeContext, checkedAt)) {
+    return 'Codex Runtime Context evidence устарел. Отправь сообщение или перезапусти Codex в проекте, чтобы native hooks обновили proof.';
+  }
+  if (hasCurrentPassed(evidence.verification.hookPersistence, checkedAt)) {
+    return 'Codex Runtime Context proof ещё не записан. Отправь сообщение или запусти subagent в проекте, чтобы native hooks подтвердили контекст.';
   }
   if (hasBaseVerification(evidence, checkedAt)) {
     return 'Codex hooks установлены. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.';
@@ -1077,6 +1167,7 @@ type MutableEvidence = {
     desktopBootstrap?: DesktopCodexGateRunEvidence;
     managedHooks?: DesktopCodexGateRunEvidence;
     hookPersistence?: DesktopCodexGateRunEvidence;
+    runtimeContext?: DesktopCodexGateRunEvidence;
     smoke?: DesktopCodexGateRunEvidence;
     rollback?: DesktopCodexGateRunEvidence;
   };

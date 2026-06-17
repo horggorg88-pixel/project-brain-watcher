@@ -183,6 +183,7 @@ export interface DesktopCodexGateEvidence {
     readonly desktopBootstrap?: DesktopCodexGateRunEvidence;
     readonly managedHooks?: DesktopCodexGateRunEvidence;
     readonly hookPersistence?: DesktopCodexGateRunEvidence;
+    readonly runtimeContext?: DesktopCodexGateRunEvidence;
     readonly smoke?: DesktopCodexGateRunEvidence;
     readonly rollback?: DesktopCodexGateRunEvidence;
   };

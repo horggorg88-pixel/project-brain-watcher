@@ -141,6 +141,7 @@ function hasCodexVerifierAttempt(status: DesktopCodexGateStatus): boolean {
     || evidence.verification.codexRuntime
     || evidence.verification.desktopBootstrap
     || evidence.verification.hookPersistence
+    || evidence.verification.runtimeContext
     || evidence.verification.smoke
     || evidence.verification.rollback,
   );
@@ -163,6 +164,7 @@ function hasCodexGateFailure(status: DesktopCodexGateStatus): boolean {
     evidence.commandRuns.codexHooks,
     evidence.verification.desktopBootstrap,
     evidence.verification.hookPersistence,
+    evidence.verification.runtimeContext,
     evidence.verification.smoke,
     evidence.verification.rollback,
   ].some(item => item?.available === true && item.passed === false);

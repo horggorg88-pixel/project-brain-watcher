@@ -303,7 +303,7 @@ async function handleCheckAction(value: string | undefined): Promise<void> {
       writeLog('Проверка завершена. Результат обновлён в обзорном чеклисте.');
       return;
     case 'verify_codex_gates': {
-      writeLog('Проверяем Codex CLI, persistent-verifier, smoke, rollback и native SessionStart evidence...');
+      writeLog('Проверяем Codex CLI, persistent-verifier, Runtime Context hooks, smoke и rollback...');
       const result = await window.watcherDesktop.codexGates.verify(currentProjectId());
       writeLog(result.message);
       await refresh();
@@ -435,6 +435,7 @@ function hasCodexGateFailure(check: DesktopConnectionCheck): boolean {
     evidence.commandRuns.codexHooks,
     evidence.verification.desktopBootstrap,
     evidence.verification.hookPersistence,
+    evidence.verification.runtimeContext,
     evidence.verification.smoke,
     evidence.verification.rollback,
   ].some(item => item?.available === true && item.passed === false);
@@ -462,7 +463,7 @@ function isStale(value: DesktopCodexGateRunEvidence | undefined, checkedAt: stri
 }
 
 async function runAutomaticCodexGateVerification(projectId: string): Promise<void> {
-  writeLog('Автоматически настраиваем Codex: CLI, persistent-verifier, smoke, rollback и SessionStart evidence...');
+  writeLog('Автоматически настраиваем Codex: CLI, persistent-verifier, Runtime Context hooks, smoke и rollback...');
   try {
     const result = await window.watcherDesktop.codexGates.verify(projectId);
     writeLog(result.message);

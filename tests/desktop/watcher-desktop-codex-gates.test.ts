@@ -87,10 +87,14 @@ describe('watcher desktop codex gates', () => {
       source: 'desktop-codex-gates',
     });
     expect(result.evidence.verification.hookPersistence).toBeUndefined();
+    expect(result.evidence.verification.runtimeContext).toBeUndefined();
     const managedRequirements = readFileSync(managedRequirementsPath, 'utf-8');
     expect(managedRequirements).toContain('project-brain-managed-hooks:start');
     expect(managedRequirements).toContain('windows_managed_dir');
     expect(managedRequirements).toContain('sessionstart.py');
+    expect(managedRequirements).toContain('runtimecontext.py');
+    expect(managedRequirements).toContain('UserPromptSubmit');
+    expect(managedRequirements).toContain('SubagentStart');
     expect(managedRequirements).toContain('posttooluse.py');
     expect(managedRequirements).toContain('qualitygate.py');
     expect(managedRequirements).toContain('stop.py');
@@ -115,6 +119,9 @@ describe('watcher desktop codex gates', () => {
     expect(userHooks).toContain('project-brain-hooks');
     expect(userHooks).toContain('Write|Edit|MultiEdit|apply_patch');
     expect(userHooks).toContain('sessionstart.py');
+    expect(userHooks).toContain('runtimecontext.py');
+    expect(userHooks).toContain('UserPromptSubmit');
+    expect(userHooks).toContain('SubagentStart');
     expect(userHooks).toContain('qualitygate.py');
     expect(pluginHooks).toContain('qualitygate.py');
     expect(pluginHooks).toContain('Write|Edit|MultiEdit|apply_patch');
@@ -122,8 +129,13 @@ describe('watcher desktop codex gates', () => {
     expect(bridgeScript).toContain('registry_projects');
     expect(bridgeScript).toContain('def succeed()');
     expect(bridgeScript).toContain('succeed()');
+    expect(bridgeScript).toContain('runtime-context.json');
+    expect(bridgeScript).toContain('runtimeContext');
     expect(bridgeScript).not.toContain('emit({})');
     expect(bridgeScript).not.toContain('emit({"projects":');
+    const runtimeContextScript = readFileSync(join(paths.homePath, '.codex', 'project-brain-hooks', 'runtimecontext.py'), 'utf-8');
+    expect(runtimeContextScript).toContain('UserPromptSubmit');
+    expect(runtimeContextScript).toContain('SubagentStart');
     const registry = JSON.parse(readFileSync(join(paths.homePath, '.codex', 'project-brain-hooks', 'sessionstart-projects.json'), 'utf-8')) as {
       readonly projects: readonly { readonly root: string }[];
     };
@@ -167,8 +179,14 @@ describe('watcher desktop codex gates', () => {
     const userHooks = readFileSync(join(paths.homePath, '.codex', 'hooks.json'), 'utf-8');
     expect(userHooks).toContain('python existing.py');
     expect(userHooks).toContain('persistent-verifier');
-    const parsedHooks = JSON.parse(userHooks) as { readonly hooks: { readonly SessionStart: readonly unknown[] } };
+    const parsedHooks = JSON.parse(userHooks) as {
+      readonly hooks: {
+        readonly SessionStart: readonly unknown[];
+        readonly UserPromptSubmit: readonly unknown[];
+      };
+    };
     expect(parsedHooks.hooks.SessionStart).toHaveLength(1);
+    expect(parsedHooks.hooks.UserPromptSubmit).toHaveLength(2);
   });
 
   it('blocks Codex hook setup when persistent-verifier hook files are missing', async () => {
@@ -264,6 +282,17 @@ describe('watcher desktop codex gates', () => {
           exitCode: 0,
           runId: 'hookPersistence-1',
         },
+        runtimeContext: {
+          available: true,
+          passed: true,
+          detail: 'Codex Runtime Context proof recorded by native UserPromptSubmit hook.',
+          checkedAt,
+          staleAfterMs: 600000,
+          source: 'project-brain-runtime-context',
+          command: 'project-brain runtime context proof',
+          exitCode: 0,
+          runId: 'runtimeContext-1',
+        },
         smoke: passedRun('Проектный smoke gate выполнен.', 'desktop-codex-gates', 'npm test', checkedAt),
         rollback: passedRun('Rollback-команда доступна.', 'desktop-codex-gates', 'codex plugin remove persistent-verifier@claude-migrated-home', checkedAt),
       },
@@ -272,11 +301,61 @@ describe('watcher desktop codex gates', () => {
     const result = readDesktopCodexGateEvidence(paths, 'demo-project');
 
     expect(result.ready).toBe(true);
+    expect(result.message).toBe('Codex Runtime Context proof подтверждён native hooks.');
     expect(result.evidence.verification.hookPersistence).toMatchObject({
       command: 'codex features list',
       exitCode: 0,
       source: 'persistent-verifier',
     });
+    expect(result.evidence.verification.runtimeContext).toMatchObject({
+      command: 'project-brain runtime context proof',
+      exitCode: 0,
+      source: 'project-brain-runtime-context',
+    });
+  });
+
+  it('keeps Codex gates pending when runtime context proof is missing', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    const checkedAt = new Date().toISOString();
+    mkdirSync(join(root, '.codex'), { recursive: true });
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    writeFileSync(join(root, '.codex', 'quality-gate-runs.json'), JSON.stringify({
+      schemaVersion: 1,
+      projectId: 'demo-project',
+      commandRuns: {
+        codexHooks: passedRun('Codex persistent-verifier plugin установлен.', 'desktop-codex-gates', 'codex plugin add persistent-verifier@claude-migrated-home', checkedAt),
+      },
+      verification: {
+        codexTrust: passedRun('Codex project trust подтверждён.', 'desktop-codex-gates', 'read ~/.codex/config.toml projects trust', checkedAt),
+        codexRuntime: passedRun('Codex CLI проверен.', 'desktop-codex-gates', 'codex --version', checkedAt),
+        hookPersistence: {
+          available: true,
+          passed: true,
+          detail: 'Codex SessionStart hook loaded persistent-verifier.',
+          checkedAt,
+          staleAfterMs: 600000,
+          source: 'persistent-verifier',
+          command: 'codex features list',
+          exitCode: 0,
+          runId: 'hookPersistence-1',
+        },
+        smoke: passedRun('Проектный smoke gate выполнен.', 'desktop-codex-gates', 'npm test', checkedAt),
+        rollback: passedRun('Rollback-команда доступна.', 'desktop-codex-gates', 'codex plugin remove persistent-verifier@claude-migrated-home', checkedAt),
+      },
+    }), 'utf-8');
+
+    const result = readDesktopCodexGateEvidence(paths, 'demo-project');
+
+    expect(result.ready).toBe(false);
+    expect(result.message).toBe('Codex Runtime Context proof ещё не записан. Отправь сообщение или запусти subagent в проекте, чтобы native hooks подтвердили контекст.');
   });
 
   it('does not accept stale native hook persistence evidence as ready', () => {
@@ -349,10 +428,11 @@ describe('watcher desktop codex gates', () => {
     expect(result.message).toBe('Codex hooks установлены. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.');
     expect(result.evidence.verification.desktopBootstrap).toMatchObject({
       passed: true,
-      detail: 'Desktop bootstrap persistent-verifier проверен; native SessionStart evidence ожидается от Codex.',
+      detail: 'Desktop bootstrap persistent-verifier проверен; native Runtime Context evidence ожидается от Codex.',
       source: 'desktop-codex-gates',
     });
     expect(result.evidence.verification.hookPersistence).toBeUndefined();
+    expect(result.evidence.verification.runtimeContext).toBeUndefined();
   });
 
   it('uses Windows command shims for Codex CLI and npm gates', () => {
