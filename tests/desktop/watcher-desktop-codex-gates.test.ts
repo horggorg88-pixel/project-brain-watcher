@@ -252,7 +252,7 @@ describe('watcher desktop codex gates', () => {
   it('reads native hook persistence evidence written by Codex hooks', () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');
-    const checkedAt = new Date().toISOString();
+    const setupCheckedAt = new Date(Date.now() - 20 * 60 * 1000).toISOString();
     const nativeCheckedAt = new Date(Date.now() - 20 * 60 * 1000).toISOString();
     mkdirSync(join(root, '.codex'), { recursive: true });
     saveProfile(paths, {
@@ -267,11 +267,11 @@ describe('watcher desktop codex gates', () => {
       schemaVersion: 1,
       projectId: 'demo-project',
       commandRuns: {
-        codexHooks: passedRun('Codex persistent-verifier plugin установлен.', 'desktop-codex-gates', 'codex plugin add persistent-verifier@claude-migrated-home', checkedAt),
+        codexHooks: passedRun('Codex persistent-verifier plugin установлен.', 'desktop-codex-gates', 'codex plugin add persistent-verifier@claude-migrated-home', setupCheckedAt),
       },
       verification: {
-        codexTrust: passedRun('Codex project trust подтверждён.', 'desktop-codex-gates', 'read ~/.codex/config.toml projects trust', checkedAt),
-        codexRuntime: passedRun('Codex CLI проверен.', 'desktop-codex-gates', 'codex --version', checkedAt),
+        codexTrust: passedRun('Codex project trust подтверждён.', 'desktop-codex-gates', 'read ~/.codex/config.toml projects trust', setupCheckedAt),
+        codexRuntime: passedRun('Codex CLI проверен.', 'desktop-codex-gates', 'codex --version', setupCheckedAt),
         hookPersistence: {
           available: true,
           passed: true,
@@ -294,8 +294,8 @@ describe('watcher desktop codex gates', () => {
           exitCode: 0,
           runId: 'runtimeContext-1',
         },
-        smoke: passedRun('Проектный smoke gate выполнен.', 'desktop-codex-gates', 'npm test', checkedAt),
-        rollback: passedRun('Rollback-команда доступна.', 'desktop-codex-gates', 'codex plugin remove persistent-verifier@claude-migrated-home', checkedAt),
+        smoke: passedRun('Проектный smoke gate выполнен.', 'desktop-codex-gates', 'npm test', setupCheckedAt),
+        rollback: passedRun('Rollback-команда доступна.', 'desktop-codex-gates', 'codex plugin remove persistent-verifier@claude-migrated-home', setupCheckedAt),
       },
     }), 'utf-8');
 
@@ -313,6 +313,22 @@ describe('watcher desktop codex gates', () => {
       command: 'project-brain runtime context proof',
       exitCode: 0,
       source: 'project-brain-runtime-context',
+      staleAfterMs: 86_400_000,
+    });
+    expect(result.evidence.commandRuns.codexHooks).toMatchObject({
+      command: 'codex plugin add persistent-verifier@claude-migrated-home',
+      staleAfterMs: 86_400_000,
+    });
+    expect(result.evidence.verification.codexRuntime).toMatchObject({
+      command: 'codex --version',
+      staleAfterMs: 86_400_000,
+    });
+    expect(result.evidence.verification.smoke).toMatchObject({
+      command: 'npm test',
+      staleAfterMs: 86_400_000,
+    });
+    expect(result.evidence.verification.rollback).toMatchObject({
+      command: 'codex plugin remove persistent-verifier@claude-migrated-home',
       staleAfterMs: 86_400_000,
     });
   });

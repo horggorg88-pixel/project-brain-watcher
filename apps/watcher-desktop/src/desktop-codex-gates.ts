@@ -36,6 +36,7 @@ export interface DesktopCodexGateVerifyOptions {
 
 const STALE_AFTER_MS = 10 * 60 * 1000;
 const NATIVE_HOOK_EVIDENCE_TTL_MS = 24 * 60 * 60 * 1000;
+const CODEX_SETUP_EVIDENCE_TTL_MS = NATIVE_HOOK_EVIDENCE_TTL_MS;
 const SOURCE = 'desktop-codex-gates';
 const PLUGIN_ID = 'persistent-verifier@claude-migrated-home';
 const MANAGED_HOOKS_START = '# project-brain-managed-hooks:start';
@@ -309,6 +310,7 @@ export async function verifyDesktopCodexGates(
     'codex --version',
     checkedAt,
     'Codex CLI проверен.',
+    CODEX_SETUP_EVIDENCE_TTL_MS,
   );
   const codexHookInstall = await run(runner, profile.root, 'codex', ['plugin', 'add', PLUGIN_ID]);
   const hookRepair = repairPersistentVerifierPluginHooks(paths.homePath);
@@ -326,13 +328,14 @@ export async function verifyDesktopCodexGates(
     'npm test',
     checkedAt,
     'Проектный smoke gate выполнен.',
+    CODEX_SETUP_EVIDENCE_TTL_MS,
   );
   const rollback = {
     available: true,
     passed: true,
     detail: 'Rollback-команда доступна для ручного отката persistent-verifier.',
     checkedAt,
-    staleAfterMs: STALE_AFTER_MS,
+    staleAfterMs: CODEX_SETUP_EVIDENCE_TTL_MS,
     source: SOURCE,
     command: `codex plugin remove ${PLUGIN_ID}`,
     exitCode: 0,
@@ -539,7 +542,7 @@ function desktopBootstrapEvidence(
     passed: true,
     detail: 'Desktop bootstrap persistent-verifier проверен; native Runtime Context evidence ожидается от Codex.',
     checkedAt,
-    staleAfterMs: STALE_AFTER_MS,
+    staleAfterMs: CODEX_SETUP_EVIDENCE_TTL_MS,
     source: SOURCE,
     command,
     exitCode: 0,
@@ -575,7 +578,7 @@ function installManagedPersistentVerifierHooks(
       passed: true,
       detail: 'Codex managed hooks установлены в системный requirements.toml; native hooks не требуют ручного /hooks trust.',
       checkedAt,
-      staleAfterMs: STALE_AFTER_MS,
+      staleAfterMs: CODEX_SETUP_EVIDENCE_TTL_MS,
       source: SOURCE,
       command,
       exitCode: 0,
@@ -699,7 +702,7 @@ function codexTrustEvidence(homePath: string, projectRoot: string, checkedAt: st
       ? 'Codex project trust подтверждён для выбранной папки.'
       : 'Codex project trust не найден для выбранной папки; пульт не запускает проектные команды автоматически.',
     checkedAt,
-    staleAfterMs: STALE_AFTER_MS,
+    staleAfterMs: trusted ? CODEX_SETUP_EVIDENCE_TTL_MS : STALE_AFTER_MS,
     source: SOURCE,
     command,
     exitCode: trusted ? 0 : 1,
@@ -890,7 +893,7 @@ function codexHooksEvidence(
     passed: true,
     detail: `Codex persistent-verifier plugin установлен, hooks.json ${action}, user-level Runtime Context bridge готов${managed}.`,
     checkedAt,
-    staleAfterMs: STALE_AFTER_MS,
+    staleAfterMs: CODEX_SETUP_EVIDENCE_TTL_MS,
     source: SOURCE,
     command,
     exitCode: 0,
@@ -993,22 +996,27 @@ function mergeEvidence(target: MutableEvidence, value: unknown, expectedProjectI
   const fileProjectId = readString(value, 'projectId') ?? readString(value, 'project_id');
   if (expectedProjectId && fileProjectId && fileProjectId !== expectedProjectId) return;
   const commandRuns = isRecord(value['commandRuns']) ? value['commandRuns'] : {};
-  const codexHooks = parseRunEvidence(commandRuns['codexHooks'], fileProjectId, expectedProjectId);
+  const codexHooks = normalizeCodexGateEvidence(
+    'codexHooks',
+    parseRunEvidence(commandRuns['codexHooks'], fileProjectId, expectedProjectId),
+  );
   if (codexHooks && isNewer(codexHooks, target.commandRuns.codexHooks)) {
     target.commandRuns.codexHooks = codexHooks;
   }
 
   const verification = isRecord(value['verification']) ? value['verification'] : {};
   for (const id of ['codexTrust', 'codexRuntime', 'desktopBootstrap', 'managedHooks', 'hookPersistence', 'runtimeContext', 'smoke', 'rollback'] as const) {
-    const evidence = normalizeNativeHookEvidence(id, parseRunEvidence(verification[id], fileProjectId, expectedProjectId));
+    const evidence = normalizeCodexGateEvidence(id, parseRunEvidence(verification[id], fileProjectId, expectedProjectId));
     if (evidence && isNewer(evidence, target.verification[id])) {
       target.verification[id] = evidence;
     }
   }
 }
 
-function normalizeNativeHookEvidence(
-  id: keyof MutableEvidence['verification'],
+type CodexEvidenceId = 'codexHooks' | keyof MutableEvidence['verification'];
+
+function normalizeCodexGateEvidence(
+  id: CodexEvidenceId,
   evidence: DesktopCodexGateRunEvidence | null,
 ): DesktopCodexGateRunEvidence | null {
   if (!evidence || evidence.passed !== true) return evidence;
@@ -1018,7 +1026,21 @@ function normalizeNativeHookEvidence(
   if (id === 'runtimeContext' && evidence.source === 'project-brain-runtime-context') {
     return evidenceWithMinimumTtl(evidence, NATIVE_HOOK_EVIDENCE_TTL_MS);
   }
+  if (evidence.source === SOURCE && evidence.command === expectedDurableCodexSetupCommand(id)) {
+    return evidenceWithMinimumTtl(evidence, CODEX_SETUP_EVIDENCE_TTL_MS);
+  }
   return evidence;
+}
+
+function expectedDurableCodexSetupCommand(id: CodexEvidenceId): string | null {
+  if (id === 'codexTrust') return 'read ~/.codex/config.toml projects trust';
+  if (id === 'codexRuntime') return 'codex --version';
+  if (id === 'desktopBootstrap') return 'verify persistent-verifier desktop bridge';
+  if (id === 'managedHooks') return 'write %ProgramData%/OpenAI/Codex/requirements.toml managed hooks';
+  if (id === 'codexHooks') return `codex plugin add ${PLUGIN_ID}`;
+  if (id === 'smoke') return 'npm test';
+  if (id === 'rollback') return `codex plugin remove ${PLUGIN_ID}`;
+  return null;
 }
 
 function evidenceWithMinimumTtl(
@@ -1062,6 +1084,7 @@ function evidenceFromResult(
   command: string,
   checkedAt: string,
   successDetail: string,
+  staleAfterMs = STALE_AFTER_MS,
 ): DesktopCodexGateRunEvidence {
   const passed = result.exitCode === 0;
   return {
@@ -1069,7 +1092,7 @@ function evidenceFromResult(
     passed,
     detail: passed ? successDetail : `Команда завершилась с ошибкой: ${sanitize(result.output).slice(0, 240)}`,
     checkedAt,
-    staleAfterMs: STALE_AFTER_MS,
+    staleAfterMs,
     source: SOURCE,
     command,
     exitCode: result.exitCode,
