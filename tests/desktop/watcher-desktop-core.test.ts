@@ -1180,6 +1180,7 @@ describe('watcher desktop core', () => {
         files: 12,
         symbols: 18,
         embeddings: 18,
+        watcherActive: true,
       },
       verification: {
         serverAuth: {

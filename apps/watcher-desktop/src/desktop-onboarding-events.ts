@@ -1,4 +1,4 @@
-import type { DesktopCheckNode, DesktopConnectionCheck, SavedProjectProfile } from './contracts.js';
+import type { DesktopCheckNode, DesktopConnectionCheck, DesktopMcpIndexSnapshot, SavedProjectProfile } from './contracts.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { normalizeMcpServerUrl } from './desktop-mcp-endpoint.js';
 import { applyMcpConfigToProfile, type DesktopCorePaths } from './desktop-profile-store.js';
@@ -67,7 +67,7 @@ export function buildOnboardingEventReports(check: DesktopConnectionCheck): read
         ...check.codexGates.evidence.verification,
         serverAuth: serverAuthEvidence(check),
       },
-      ...(check.mcpIndex ? { mcpIndex: check.mcpIndex } : {}),
+      ...(check.mcpIndex ? { mcpIndex: mcpIndexEvidence(check.mcpIndex, check) } : {}),
     }));
   }
   if (check.service.running && check.service.health === 'healthy') {
@@ -142,6 +142,15 @@ function serverAuthEvidence(check: DesktopConnectionCheck): Record<string, unkno
     checkedAt: check.checkedAt,
     staleAfterMs: 10 * 60 * 1000,
     source: 'desktop-connection-check',
+  };
+}
+
+function mcpIndexEvidence(index: DesktopMcpIndexSnapshot, check: DesktopConnectionCheck): Record<string, unknown> {
+  return {
+    ...index,
+    watcherActive: check.service.running && check.service.health === 'healthy',
+    watcherHeartbeatAt: check.service.lastSyncAt ?? check.checkedAt,
+    source: index.source,
   };
 }
 
