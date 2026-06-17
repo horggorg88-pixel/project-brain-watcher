@@ -97,6 +97,19 @@ const evidenceFiles = [
   join('.brain', 'quality-gate-runs.json'),
   join('.codex', 'quality-gate-runs.json'),
 ] as const;
+const commandRunIds = [
+  'typecheck',
+  'lint',
+  'format',
+  'test',
+  'coverage',
+  'e2e',
+  'build',
+  'noAny',
+  'securityScan',
+  'dependencyAudit',
+  'codexHooks',
+] as const;
 const SESSION_START_BRIDGE_SCRIPT = `#!/usr/bin/env python3
 import json
 import sys
@@ -996,12 +1009,12 @@ function mergeEvidence(target: MutableEvidence, value: unknown, expectedProjectI
   const fileProjectId = readString(value, 'projectId') ?? readString(value, 'project_id');
   if (expectedProjectId && fileProjectId && fileProjectId !== expectedProjectId) return;
   const commandRuns = isRecord(value['commandRuns']) ? value['commandRuns'] : {};
-  const codexHooks = normalizeCodexGateEvidence(
-    'codexHooks',
-    parseRunEvidence(commandRuns['codexHooks'], fileProjectId, expectedProjectId),
-  );
-  if (codexHooks && isNewer(codexHooks, target.commandRuns.codexHooks)) {
-    target.commandRuns.codexHooks = codexHooks;
+  for (const id of commandRunIds) {
+    const parsed = parseRunEvidence(commandRuns[id], fileProjectId, expectedProjectId);
+    const evidence = id === 'codexHooks' ? normalizeCodexGateEvidence('codexHooks', parsed) : parsed;
+    if (evidence && isNewer(evidence, target.commandRuns[id])) {
+      target.commandRuns[id] = evidence;
+    }
   }
 
   const verification = isRecord(value['verification']) ? value['verification'] : {};
@@ -1204,9 +1217,7 @@ function emptyStatus(ready: boolean, message: string, checkedAt: string): Deskto
 }
 
 type MutableEvidence = {
-  commandRuns: {
-    codexHooks?: DesktopCodexGateRunEvidence;
-  };
+  commandRuns: DesktopCodexGateEvidence['commandRuns'];
   verification: {
     codexTrust?: DesktopCodexGateRunEvidence;
     codexRuntime?: DesktopCodexGateRunEvidence;

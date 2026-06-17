@@ -63,7 +63,11 @@ export function buildOnboardingEventReports(check: DesktopConnectionCheck): read
   if (check.codexGates?.ready) {
     events.push(event('codex_gates_verified', 'desktop', projectId, {
       commandRuns: check.codexGates.evidence.commandRuns,
-      verification: check.codexGates.evidence.verification,
+      verification: {
+        ...check.codexGates.evidence.verification,
+        serverAuth: serverAuthEvidence(check),
+      },
+      ...(check.mcpIndex ? { mcpIndex: check.mcpIndex } : {}),
     }));
   }
   if (check.service.running && check.service.health === 'healthy') {
@@ -126,6 +130,19 @@ function event(
 
 function nodeActive(nodes: readonly DesktopCheckNode[], id: string): boolean {
   return nodes.some(node => node.id === id && node.status === 'active');
+}
+
+function serverAuthEvidence(check: DesktopConnectionCheck): Record<string, unknown> {
+  const server = check.nodes.find(node => node.id === 'server');
+  const passed = server?.status === 'active';
+  return {
+    available: true,
+    passed,
+    detail: server?.detail ?? 'MCP-сервер не проверен.',
+    checkedAt: check.checkedAt,
+    staleAfterMs: 10 * 60 * 1000,
+    source: 'desktop-connection-check',
+  };
 }
 
 function resolveOnboardingProfile(paths: DesktopCorePaths, projectId: string): SavedProjectProfile | null {

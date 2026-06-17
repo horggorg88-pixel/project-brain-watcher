@@ -1138,6 +1138,14 @@ describe('watcher desktop core', () => {
           },
         },
       },
+      mcpIndex: {
+        files: 12,
+        symbols: 18,
+        embeddings: 18,
+        checkedAt: new Date().toISOString(),
+        staleAfterMs: 600000,
+        source: 'mcp brain_status',
+      },
       service: statusFixture({ projectId: 'client-project', running: true, health: 'healthy', readOnly: false }),
       diagnostics: {
         blocked: false,
@@ -1166,6 +1174,22 @@ describe('watcher desktop core', () => {
       'client-project',
       'client-project',
     ]);
+    const codexEvent = events.find(event => event.eventType === 'codex_gates_verified');
+    expect(codexEvent?.payload).toMatchObject({
+      mcpIndex: {
+        files: 12,
+        symbols: 18,
+        embeddings: 18,
+      },
+      verification: {
+        serverAuth: {
+          available: true,
+          passed: true,
+          detail: 'ready',
+          source: 'desktop-connection-check',
+        },
+      },
+    });
   });
 
   it('posts onboarding events to the web server with the local bearer token', async () => {

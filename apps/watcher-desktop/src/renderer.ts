@@ -85,9 +85,14 @@ let activeModeId: string | null = null;
 let currentPackage: DesktopConfigPackage | null = null;
 let pendingServiceAction: PendingServiceActionConfirmation | null = null;
 let automaticCodexGateRunning = false;
+let refreshInFlight: Promise<void> | null = null;
 const automaticCodexGateAttempts = new Set<string>();
+const serverHeartbeatRefreshMs = 60 * 1000;
 
 void refresh();
+window.setInterval(() => {
+  if (accessState?.signedIn) void refresh();
+}, serverHeartbeatRefreshMs);
 
 authForm?.addEventListener('submit', event => {
   event.preventDefault();
@@ -371,6 +376,14 @@ async function goToSection(activeSection: DesktopSection): Promise<void> {
 }
 
 async function refresh(): Promise<void> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = refreshInternal().finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
+}
+
+async function refreshInternal(): Promise<void> {
   accessState = await safeAccessStatus();
   uiState = await safeUiState();
   renderShellAccess(accessState, { accountEl, appShellEl, authStatusEl, loginScreenEl });

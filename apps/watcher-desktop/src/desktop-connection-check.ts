@@ -50,6 +50,7 @@ export async function buildDesktopConnectionCheck(
     checkedAt: new Date().toISOString(),
     nodes,
     codexGates,
+    mcpIndex: server?.mcpIndex ?? null,
     service,
     diagnostics,
   };

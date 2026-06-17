@@ -145,6 +145,10 @@ describe('watcher desktop codex gates', () => {
     expect(qualityGateScript).toContain('QUALITY_GATE_ORDER');
     expect(qualityGateScript).toContain('("test",');
     expect(qualityGateScript).toContain('("build",');
+    expect(qualityGateScript).toContain('return shutil.which("npm.cmd") or shutil.which("npm") or "npm.cmd"');
+    expect(qualityGateScript).toContain('return shutil.which("npx.cmd") or shutil.which("npx") or "npx.cmd"');
+    expect(qualityGateScript).toContain('seen = {canonical_command for _, _, canonical_command in commands}');
+    expect(qualityGateScript).toContain('shell=use_shell');
   });
 
   it('preserves existing Codex user hooks while installing the persistent-verifier bridge', async () => {
@@ -462,6 +466,40 @@ describe('watcher desktop codex gates', () => {
     expect(resolveCodexGateSpawn('codex', ['plugin', 'add', 'persistent-verifier@claude-migrated-home'], 'win32')).toEqual({
       command: 'cmd.exe',
       args: ['/d', '/s', '/c', 'codex.cmd', 'plugin', 'add', 'persistent-verifier@claude-migrated-home'],
+    });
+  });
+
+  it('reads durable project command gate evidence written by native hooks', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    const checkedAt = new Date().toISOString();
+    mkdirSync(join(root, '.codex'), { recursive: true });
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    writeFileSync(join(root, '.codex', 'quality-gate-runs.json'), JSON.stringify({
+      schemaVersion: 1,
+      projectId: 'demo-project',
+      commandRuns: {
+        codexHooks: passedRun('Codex persistent-verifier plugin установлен.', 'desktop-codex-gates', 'codex plugin add persistent-verifier@claude-migrated-home', checkedAt),
+        typecheck: passedRun('Typecheck passed from native qualitygate hook.', 'quality-gate-runner', 'npm run typecheck', checkedAt),
+      },
+    }), 'utf-8');
+
+    const result = readDesktopCodexGateEvidence(paths, 'demo-project');
+
+    expect(result.evidence.commandRuns.typecheck).toMatchObject({
+      command: 'npm run typecheck',
+      exitCode: 0,
+      source: 'quality-gate-runner',
+    });
+    expect(result.evidence.commandRuns.codexHooks).toMatchObject({
+      command: 'codex plugin add persistent-verifier@claude-migrated-home',
     });
   });
 });

@@ -173,10 +173,30 @@ export interface DesktopCodexGateRunEvidence {
   readonly runId?: string;
 }
 
+export interface DesktopMcpIndexSnapshot {
+  readonly files: number;
+  readonly symbols: number;
+  readonly embeddings: number;
+  readonly checkedAt: string;
+  readonly staleAfterMs: number;
+  readonly source: string;
+}
+
+export type DesktopCodexCommandRunId =
+  | 'typecheck'
+  | 'lint'
+  | 'format'
+  | 'test'
+  | 'coverage'
+  | 'e2e'
+  | 'build'
+  | 'noAny'
+  | 'securityScan'
+  | 'dependencyAudit'
+  | 'codexHooks';
+
 export interface DesktopCodexGateEvidence {
-  readonly commandRuns: {
-    readonly codexHooks?: DesktopCodexGateRunEvidence;
-  };
+  readonly commandRuns: Partial<Record<DesktopCodexCommandRunId, DesktopCodexGateRunEvidence>>;
   readonly verification: {
     readonly codexTrust?: DesktopCodexGateRunEvidence;
     readonly codexRuntime?: DesktopCodexGateRunEvidence;
@@ -203,6 +223,7 @@ export interface DesktopConnectionCheck {
   readonly checkedAt: string;
   readonly nodes: readonly DesktopCheckNode[];
   readonly codexGates: DesktopCodexGateStatus;
+  readonly mcpIndex?: DesktopMcpIndexSnapshot | null;
   readonly service: WatcherServiceStatus;
   readonly diagnostics: DiagnosticsPreview;
 }
