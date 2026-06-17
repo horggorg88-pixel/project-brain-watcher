@@ -35,6 +35,7 @@ export interface DesktopCodexGateVerifyOptions {
 }
 
 const STALE_AFTER_MS = 10 * 60 * 1000;
+const NATIVE_HOOK_EVIDENCE_TTL_MS = 24 * 60 * 60 * 1000;
 const SOURCE = 'desktop-codex-gates';
 const PLUGIN_ID = 'persistent-verifier@claude-migrated-home';
 const MANAGED_HOOKS_START = '# project-brain-managed-hooks:start';
@@ -101,7 +102,7 @@ import sys
 import time
 from pathlib import Path
 
-STALE_AFTER_MS = 10 * 60 * 1000
+NATIVE_HOOK_EVIDENCE_TTL_MS = 24 * 60 * 60 * 1000
 ROOT_MARKERS = (
     "package.json",
     "tsconfig.json",
@@ -188,14 +189,14 @@ def write_evidence(root, project_id, hook_event_name):
         "projectId": project_id,
         "projectRoot": str(root),
         "checkedAt": checked_at,
-        "staleAfterMs": STALE_AFTER_MS,
+        "staleAfterMs": NATIVE_HOOK_EVIDENCE_TTL_MS,
         "verification": {
             "hookPersistence": {
                 "available": True,
                 "passed": True,
                 "detail": "Codex SessionStart hook loaded persistent-verifier.",
                 "checkedAt": checked_at,
-                "staleAfterMs": STALE_AFTER_MS,
+                "staleAfterMs": NATIVE_HOOK_EVIDENCE_TTL_MS,
                 "source": "persistent-verifier",
                 "command": "codex features list",
                 "exitCode": 0,
@@ -206,7 +207,7 @@ def write_evidence(root, project_id, hook_event_name):
                 "passed": True,
                 "detail": f"Codex Runtime Context proof recorded by native {event_name} hook.",
                 "checkedAt": checked_at,
-                "staleAfterMs": STALE_AFTER_MS,
+                "staleAfterMs": NATIVE_HOOK_EVIDENCE_TTL_MS,
                 "source": "project-brain-runtime-context",
                 "command": "project-brain runtime context proof",
                 "exitCode": 0,
@@ -999,11 +1000,33 @@ function mergeEvidence(target: MutableEvidence, value: unknown, expectedProjectI
 
   const verification = isRecord(value['verification']) ? value['verification'] : {};
   for (const id of ['codexTrust', 'codexRuntime', 'desktopBootstrap', 'managedHooks', 'hookPersistence', 'runtimeContext', 'smoke', 'rollback'] as const) {
-    const evidence = parseRunEvidence(verification[id], fileProjectId, expectedProjectId);
+    const evidence = normalizeNativeHookEvidence(id, parseRunEvidence(verification[id], fileProjectId, expectedProjectId));
     if (evidence && isNewer(evidence, target.verification[id])) {
       target.verification[id] = evidence;
     }
   }
+}
+
+function normalizeNativeHookEvidence(
+  id: keyof MutableEvidence['verification'],
+  evidence: DesktopCodexGateRunEvidence | null,
+): DesktopCodexGateRunEvidence | null {
+  if (!evidence || evidence.passed !== true) return evidence;
+  if (id === 'hookPersistence' && evidence.source === 'persistent-verifier') {
+    return evidenceWithMinimumTtl(evidence, NATIVE_HOOK_EVIDENCE_TTL_MS);
+  }
+  if (id === 'runtimeContext' && evidence.source === 'project-brain-runtime-context') {
+    return evidenceWithMinimumTtl(evidence, NATIVE_HOOK_EVIDENCE_TTL_MS);
+  }
+  return evidence;
+}
+
+function evidenceWithMinimumTtl(
+  evidence: DesktopCodexGateRunEvidence,
+  minimumTtlMs: number,
+): DesktopCodexGateRunEvidence {
+  const staleAfterMs = Math.max(evidence.staleAfterMs ?? 0, minimumTtlMs);
+  return staleAfterMs === evidence.staleAfterMs ? evidence : { ...evidence, staleAfterMs };
 }
 
 function parseRunEvidence(

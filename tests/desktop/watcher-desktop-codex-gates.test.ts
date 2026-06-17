@@ -253,6 +253,7 @@ describe('watcher desktop codex gates', () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');
     const checkedAt = new Date().toISOString();
+    const nativeCheckedAt = new Date(Date.now() - 20 * 60 * 1000).toISOString();
     mkdirSync(join(root, '.codex'), { recursive: true });
     saveProfile(paths, {
       id: 'demo-project',
@@ -275,7 +276,7 @@ describe('watcher desktop codex gates', () => {
           available: true,
           passed: true,
           detail: 'Codex SessionStart hook loaded persistent-verifier.',
-          checkedAt,
+          checkedAt: nativeCheckedAt,
           staleAfterMs: 600000,
           source: 'persistent-verifier',
           command: 'codex features list',
@@ -286,7 +287,7 @@ describe('watcher desktop codex gates', () => {
           available: true,
           passed: true,
           detail: 'Codex Runtime Context proof recorded by native UserPromptSubmit hook.',
-          checkedAt,
+          checkedAt: nativeCheckedAt,
           staleAfterMs: 600000,
           source: 'project-brain-runtime-context',
           command: 'project-brain runtime context proof',
@@ -306,11 +307,13 @@ describe('watcher desktop codex gates', () => {
       command: 'codex features list',
       exitCode: 0,
       source: 'persistent-verifier',
+      staleAfterMs: 86_400_000,
     });
     expect(result.evidence.verification.runtimeContext).toMatchObject({
       command: 'project-brain runtime context proof',
       exitCode: 0,
       source: 'project-brain-runtime-context',
+      staleAfterMs: 86_400_000,
     });
   });
 
