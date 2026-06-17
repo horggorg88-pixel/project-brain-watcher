@@ -333,14 +333,16 @@ function accessLabel(value: DesktopAccessState['status']): string {
 }
 
 function serviceSummary(status: WatcherServiceStatus): string {
+  if (status.running && status.health === 'healthy') return 'Watcher работает';
   if (!status.installed) return 'Watcher не установлен';
   if (!status.running) return 'Watcher остановлен';
-  return status.health === 'healthy' ? 'Watcher работает' : 'Watcher требует внимания';
+  return 'Watcher требует внимания';
 }
 
 function serviceSummaryStatus(status: WatcherServiceStatus): DesktopConnectionCheck['overall'] {
+  if (status.running && status.health === 'healthy') return 'ready';
   if (!status.installed || !status.running) return 'action_required';
-  return status.health === 'healthy' ? 'ready' : 'error';
+  return 'error';
 }
 
 function overallSummary(check: DesktopConnectionCheck): string {
@@ -351,10 +353,11 @@ function overallSummary(check: DesktopConnectionCheck): string {
 }
 
 function serviceNextStep(status: WatcherServiceStatus): string {
+  if (status.running && status.health === 'healthy') return 'Можно работать через MCP';
   if (!status.installed) return 'Установите службу watcher';
   if (!status.running) return 'Запустите watcher';
   if (status.health !== 'healthy') return 'Проверьте обзорный чеклист и MCP-доступ';
-  return 'Можно работать через MCP';
+  return 'Проверьте обзорный чеклист и MCP-доступ';
 }
 
 function serviceLogLines(status: WatcherServiceStatus): readonly string[] {

@@ -256,10 +256,11 @@ function statusMessage(overall: DesktopConnectionCheck['overall'], nodes: readon
 }
 
 function serviceDetail(service: WatcherServiceStatus): string {
+  if (service.running && service.health === 'healthy') return 'Watcher работает';
   if (!service.installed) return 'Watcher не установлен';
   if (!service.running) return 'Watcher остановлен';
   if (service.lastError) return `Watcher сообщает: ${service.lastError}`;
-  return 'Watcher работает';
+  return 'Watcher требует внимания';
 }
 
 function serviceAction(service: WatcherServiceStatus): DesktopCheckNode['action'] {
