@@ -990,13 +990,63 @@ describe('watcher desktop core', () => {
 
     const check = await buildDesktopConnectionCheck(paths, 'checklist-project');
 
-    expect(check.nodes.map(node => node.id)).toEqual(['project', 'config', 'key', 'server', 'codexGates', 'watcher']);
-    expect(check.nodes.map(node => node.label)).toEqual(['Проект', 'Файл настройки', 'Ключ доступа', 'MCP-сервер', 'Codex Gates', 'Watcher']);
+    expect(check.nodes.map(node => node.id)).toEqual(['project', 'config', 'key', 'server', 'codexTrust', 'codexGates', 'watcher']);
+    expect(check.nodes.map(node => node.label)).toEqual(['Проект', 'Файл настройки', 'Ключ доступа', 'MCP-сервер', 'Codex Trust', 'Codex Gates', 'Watcher']);
     expect(check.nodes.find(node => node.id === 'server')?.status).toBe('active');
+    expect(check.nodes.find(node => node.id === 'codexTrust')?.status).toBe('waiting');
     expect(check.nodes.find(node => node.id === 'codexGates')?.status).toBe('waiting');
     expect(check.nodes.find(node => node.id === 'codexGates')?.actionLabel).toBeNull();
     expect(check.nodes.find(node => node.id === 'watcher')?.actionLabel).toBe('Установить службу');
     expect(check.overall).toBe('action_required');
+  });
+
+  it('does not mark confirmed Codex project trust as a medium pending gate', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'repo');
+    const source = join(paths.homePath, 'codex-trusted-mcp-config.json');
+    mkdirSync(join(root, '.brain', 'service'), { recursive: true });
+    writeFileSync(source, JSON.stringify({
+      project_id: 'codex-trusted',
+      endpoint: 'http://149.33.14.250/mcp/p/codex-trusted',
+      local_path: root,
+      token_env: 'MCP_BEARER_TOKEN',
+      mcpServers: {
+        'project-brain': {
+          url: 'http://149.33.14.250/mcp/p/codex-trusted',
+          headers: { Authorization: `Bearer ${VALID_TEST_BEARER}` },
+        },
+      },
+    }), 'utf-8');
+    importProjectConfig(paths, source);
+    writeFileSync(join(root, '.brain', 'service', 'quality-gate-runs.json'), JSON.stringify({
+      schemaVersion: 1,
+      projectId: 'codex-trusted',
+      commandRuns: {
+        codexHooks: codexGateRun('Codex hooks ready', 'codex plugin add persistent-verifier@claude-migrated-home'),
+      },
+      verification: {
+        codexTrust: codexGateRun('Codex project trust подтверждён для выбранной папки.', 'read ~/.codex/config.toml projects trust'),
+        codexRuntime: codexGateRun('Codex CLI проверен.', 'codex --version'),
+        hookPersistence: codexGateRun('Codex SessionStart hook loaded persistent-verifier.', 'codex features list'),
+        smoke: codexGateRun('Smoke gate Codex прошёл.', 'npm test'),
+        rollback: codexGateRun('Rollback доступен.', 'codex plugin remove persistent-verifier@claude-migrated-home'),
+      },
+    }), 'utf-8');
+    vi.stubGlobal('fetch', verifiedMcpFetch());
+
+    const check = await buildDesktopConnectionCheck(paths, 'codex-trusted');
+    const trustNode = check.nodes.find(item => item.id === 'codexTrust');
+    const gatesNode = check.nodes.find(item => item.id === 'codexGates');
+
+    expect(trustNode).toMatchObject({
+      label: 'Codex Trust',
+      status: 'active',
+      detail: 'Codex project trust подтверждён для выбранной папки.',
+      action: 'none',
+      actionLabel: null,
+    });
+    expect(gatesNode?.status).toBe('waiting');
+    expect(gatesNode?.detail).toBe('Codex Runtime Context proof ещё не записан. Отправь сообщение или запусти subagent в проекте, чтобы native hooks подтвердили контекст.');
   });
 
   it('keeps a retry action visible when native Codex hook evidence failed', async () => {

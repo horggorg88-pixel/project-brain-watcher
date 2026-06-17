@@ -72,9 +72,44 @@ function buildNodes(input: {
     node('config', 'Файл настройки', input.configFound, input.configFound ? 'Файл настройки принят' : 'Импортируйте файл из личного кабинета', 'import_config', 'Импортировать файл'),
     node('key', 'Ключ доступа', input.secretConfigured, input.secretConfigured ? 'Ключ сохранён локально' : 'Пульт не нашёл локальный ключ', 'download_config', 'Скачать пакет'),
     node('server', 'MCP-сервер', input.serverVerified, serverDetail, 'open_logs', input.serverVerified ? 'Проверить MCP' : 'Показать причину'),
+    codexTrustNode(input.codexGates),
     codexGateNode(input.codexGates),
     node('watcher', 'Watcher', input.service.running && input.service.health === 'healthy', serviceDetail(input.service), serviceAction(input.service), serviceActionLabel(input.service)),
   ];
+}
+
+function codexTrustNode(status: DesktopCodexGateStatus): DesktopCheckNode {
+  const trust = status.evidence.verification.codexTrust;
+  if (trust && hasCurrentPassed(trust, status.checkedAt)) {
+    return {
+      id: 'codexTrust',
+      label: 'Codex Trust',
+      status: 'active',
+      detail: trust.detail,
+      action: 'none',
+      actionLabel: null,
+    };
+  }
+  if (trust?.available === true && trust.passed === false) {
+    return {
+      id: 'codexTrust',
+      label: 'Codex Trust',
+      status: 'inactive',
+      detail: trust.detail,
+      action: 'verify_codex_gates',
+      actionLabel: 'Повторить',
+    };
+  }
+  return {
+    id: 'codexTrust',
+    label: 'Codex Trust',
+    status: 'waiting',
+    detail: trust && isStale(trust, status.checkedAt)
+      ? 'Codex project trust evidence устарел. Повторите проверку Codex gates.'
+      : 'Codex project trust ещё не подтверждён.',
+    action: trust ? 'verify_codex_gates' : 'none',
+    actionLabel: trust ? 'Повторить' : null,
+  };
 }
 
 function codexGateNode(status: DesktopCodexGateStatus): DesktopCheckNode {
@@ -88,7 +123,17 @@ function codexGateNode(status: DesktopCodexGateStatus): DesktopCheckNode {
       actionLabel: null,
     };
   }
-  if (hasCodexGateFailure(status)) {
+  if (!hasCurrentPassed(status.evidence.verification.codexTrust, status.checkedAt)) {
+    return {
+      id: 'codexGates',
+      label: 'Codex Gates',
+      status: 'waiting',
+      detail: 'Runtime hooks ждут подтверждения Codex Trust.',
+      action: 'none',
+      actionLabel: null,
+    };
+  }
+  if (hasCodexRuntimeGateFailure(status)) {
     return {
       id: 'codexGates',
       label: 'Codex Gates',
@@ -156,10 +201,9 @@ function hasCodexBaseVerification(status: DesktopCodexGateStatus): boolean {
     && hasCurrentPassed(evidence.verification.rollback, status.checkedAt);
 }
 
-function hasCodexGateFailure(status: DesktopCodexGateStatus): boolean {
+function hasCodexRuntimeGateFailure(status: DesktopCodexGateStatus): boolean {
   const evidence = status.evidence;
   return [
-    evidence.verification.codexTrust,
     evidence.verification.codexRuntime,
     evidence.commandRuns.codexHooks,
     evidence.verification.desktopBootstrap,
