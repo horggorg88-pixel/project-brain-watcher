@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { _electron as electron, type ElectronApplication } from 'playwright';
 import { createRequire } from 'node:module';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
@@ -14,7 +14,7 @@ const fakeBearer = 'pb_e2e_codex_token_1234567890';
 test('verifies Codex settings from the real desktop control panel', async ({}, testInfo) => {
   const mcpServer = await startMockMcpServer();
   const fixture = createFixture(mcpServer.url);
-  const app = await launchDesktop(fixture.homePath, fixture.userDataPath, fixture.projectRoot, fixture.fakeBinPath);
+  const app = await launchDesktop(fixture.homePath, fixture.userDataPath, fixture.projectRoot, fixture.fakeBinPath, fixture.programDataPath);
   const page = await app.firstWindow();
   const rendererErrors = collectRendererErrors(page);
   const mainErrors = collectMainErrors(app);
@@ -42,6 +42,11 @@ test('verifies Codex settings from the real desktop control panel', async ({}, t
     expect(evidence.verification?.hookPersistence).toBeUndefined();
     expect(evidence.verification?.smoke?.command).toBe('npm test');
     expect(evidence.verification?.rollback?.command).toBe('codex plugin remove persistent-verifier@claude-migrated-home');
+    if (process.platform === 'win32') {
+      const requirementsPath = join(fixture.programDataPath, 'OpenAI', 'Codex', 'requirements.toml');
+      expect(existsSync(requirementsPath)).toBe(true);
+      expect(readFileSync(requirementsPath, 'utf-8')).toContain(fixture.homePath.replace(/\\/g, '\\\\'));
+    }
     expect(JSON.stringify(evidence)).not.toContain(fakeBearer);
     expect(rendererErrors).toEqual([]);
     expect(mainErrors).toEqual([]);
@@ -86,6 +91,7 @@ function stopServer(server: Server): Promise<void> {
 function createFixture(serverUrl: string): {
   readonly fakeBinPath: string;
   readonly homePath: string;
+  readonly programDataPath: string;
   readonly projectRoot: string;
   readonly rootPath: string;
   readonly userDataPath: string;
@@ -93,10 +99,12 @@ function createFixture(serverUrl: string): {
   const rootPath = mkdtempSync(join(tmpdir(), 'watcher-desktop-codex-e2e-'));
   const fakeBinPath = join(rootPath, 'fake-bin');
   const homePath = join(rootPath, 'home');
+  const programDataPath = join(rootPath, 'program-data');
   const userDataPath = join(rootPath, 'user-data');
   const projectRoot = join(rootPath, 'Client Project');
   mkdirSync(fakeBinPath, { recursive: true });
   mkdirSync(homePath, { recursive: true });
+  mkdirSync(programDataPath, { recursive: true });
   mkdirSync(userDataPath, { recursive: true });
   mkdirSync(projectRoot, { recursive: true });
   writeTrustedCodexProject(homePath, projectRoot);
@@ -113,7 +121,7 @@ function createFixture(serverUrl: string): {
     tokenEnv: 'MCP_BEARER_TOKEN',
     createdAt: new Date(0).toISOString(),
   }], null, 2), 'utf-8');
-  return { fakeBinPath, homePath, projectRoot, rootPath, userDataPath };
+  return { fakeBinPath, homePath, programDataPath, projectRoot, rootPath, userDataPath };
 }
 
 function writeFakeCommand(binPath: string, name: string, output: string): void {
@@ -140,6 +148,7 @@ async function launchDesktop(
   userDataPath: string,
   projectRoot: string,
   fakeBinPath: string,
+  programDataPath: string,
 ): Promise<ElectronApplication> {
   const pathKey = Object.keys(process.env).find(key => key.toLowerCase() === 'path') ?? 'PATH';
   return electron.launch({
@@ -150,6 +159,8 @@ async function launchDesktop(
       [pathKey]: `${fakeBinPath}${delimiter}${process.env[pathKey] ?? ''}`,
       HOME: homePath,
       USERPROFILE: homePath,
+      ProgramData: programDataPath,
+      PROGRAMDATA: programDataPath,
       MCP_BEARER_TOKEN: fakeBearer,
       PROJECT_BRAIN_DESKTOP_HOME_DIR: homePath,
       PROJECT_BRAIN_DESKTOP_USER_DATA_DIR: userDataPath,
