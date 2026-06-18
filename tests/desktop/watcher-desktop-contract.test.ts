@@ -453,7 +453,7 @@ describe('watcher desktop contract', () => {
     expect(serviceRunnerSource).toContain('Команда прервана по таймауту');
   });
 
-  it('keeps generated service launches on the current watcher release with explicit takeover', () => {
+  it('keeps generated service launches on the current watcher release without implicit takeover', () => {
     const watcherBundle = readFileSync(join(process.cwd(), 'bin', 'watcher.js'), 'utf-8');
     const watcherPackage = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8')) as {
       version?: string;
@@ -463,7 +463,8 @@ describe('watcher desktop contract', () => {
     expect(watcherBundle).toContain('project-brain-watcher-');
     expect(watcherBundle).toContain(`/releases/download/v`);
     expect(watcherBundle).not.toContain('"v1.4.4"');
-    expect(watcherBundle).toContain('"--watch","--replace"');
+    expect(watcherBundle).toContain('"--watch"');
+    expect(watcherBundle).not.toContain('"--watch","--replace"');
     expect(watcherBundle).toContain('"refresh"');
   });
 
