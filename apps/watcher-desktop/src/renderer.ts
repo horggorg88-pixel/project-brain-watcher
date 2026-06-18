@@ -21,14 +21,12 @@ import {
   applyUiState,
   errorMessage,
   fallbackStatus as fallbackServiceStatus,
-  hydrateProjectForm,
   renderConfigPackage,
   renderConnectionCheck,
   renderConnectionCause,
   renderModes,
   renderOverall,
   renderProjectSelect,
-  renderProjects,
   renderService,
   renderShellAccess,
   sectionFrom,
@@ -48,7 +46,6 @@ declare global {
 }
 
 const authForm = document.querySelector<HTMLFormElement>('[data-auth-form]');
-const projectForm = document.querySelector<HTMLFormElement>('[data-project-form]');
 const authStatusEl = document.querySelector<HTMLElement>('[data-auth-status]');
 const accountEl = document.querySelector<HTMLElement>('[data-profile-card]');
 const appShellEl = document.querySelector<HTMLElement>('[data-app-shell]');
@@ -72,7 +69,6 @@ const serviceStatusEl = document.querySelector<HTMLElement>('[data-service-statu
 const serviceOutputEl = document.querySelector<HTMLElement>('[data-service-output]');
 const serviceButtons = document.querySelectorAll<HTMLButtonElement>('[data-service-action]');
 const promptEl = document.querySelector<HTMLElement>('[data-start-prompt]');
-const projectListEl = document.querySelector<HTMLElement>('[data-projects]');
 const modesEl = document.querySelector<HTMLElement>('[data-modes]');
 const windowTitlebarEl = document.querySelector<HTMLElement>('[data-window-titlebar]');
 const floatingTooltipEl = document.querySelector<HTMLElement>('[data-floating-tooltip]');
@@ -122,15 +118,6 @@ accountEl?.addEventListener('click', event => {
     .then(() => refresh())
     .catch(error => setText(authStatusEl, errorMessage(error)))
     .finally(() => { button.disabled = false; });
-});
-
-projectForm?.addEventListener('submit', event => {
-  event.preventDefault();
-  const project = projectDraftFromForm(projectForm);
-  void window.watcherDesktop.projects.save(project)
-    .then(saved => saveUiState({ ...uiState, lastProjectId: saved.id, activeSection: 'start' }))
-    .then(() => refresh())
-    .catch(error => writeLog(errorMessage(error)));
 });
 
 navButtons.forEach(button => {
@@ -203,10 +190,7 @@ window.addEventListener('resize', hideTooltip);
 window.addEventListener('scroll', hideTooltip, true);
 
 selectRootButton?.addEventListener('click', () => {
-  void window.watcherDesktop.projects.selectRoot()
-    .then(path => path ? saveRootProfile(path) : null)
-    .then(() => refresh())
-    .catch(error => writeLog(errorMessage(error)));
+  void selectProjectRootFromDialog().catch(error => writeLog(errorMessage(error)));
 });
 
 downloadConfigButton?.addEventListener('click', () => {
@@ -288,7 +272,7 @@ async function handleCheckAction(value: string | undefined): Promise<void> {
   if (!action || action === 'none') return;
   switch (action) {
     case 'select_project':
-      await goToSection('projects');
+      await selectProjectRootFromDialog();
       return;
     case 'import_config':
       await importConfigFromDialog();
@@ -355,6 +339,16 @@ async function saveCurrentConfigPackage(): Promise<void> {
   if (result) await refresh();
 }
 
+async function selectProjectRootFromDialog(): Promise<void> {
+  const root = await window.watcherDesktop.projects.selectRoot();
+  if (!root) {
+    writeLog('Выбор папки проекта отменён');
+    return;
+  }
+  await saveRootProfile(root);
+  await refresh();
+}
+
 async function importConfigFromDialog(): Promise<void> {
   const result = await window.watcherDesktop.projects.importConfig();
   if (!result) {
@@ -364,7 +358,7 @@ async function importConfigFromDialog(): Promise<void> {
   await saveUiState({
     ...uiState,
     lastProjectId: result.profile?.id ?? uiState.lastProjectId,
-    activeSection: result.profile ? 'start' : 'projects',
+    activeSection: 'start',
   });
   writeLog(importResultLog(result));
   await refresh();
@@ -391,7 +385,6 @@ async function refreshInternal(): Promise<void> {
   if (!accessState.signedIn) return;
   currentProjects = await safeProjects();
   renderProjectSelect(currentProjects, projectSelect, currentProjectId());
-  hydrateProjectForm(projectForm, selectedProject(), accessState.config);
   const [check, pack, modes] = await Promise.all([
     safeFullCheck(),
     safeConfigPackage(),
@@ -407,7 +400,6 @@ async function refreshInternal(): Promise<void> {
   setServiceActionState(serviceButtons, check.service);
   setServiceConfirmationHint(serviceButtons, pendingServiceAction);
   renderCurrentPackage();
-  renderProjects(currentProjects, projectListEl);
   renderModes(currentModes, modesEl, activeModeId);
   scheduleAutomaticCodexGateVerification(check);
 }
@@ -715,18 +707,6 @@ function currentProjectId(): string {
 function selectedProject(): SavedProjectProfile | undefined {
   const projectId = currentProjectId();
   return currentProjects.find(project => project.id === projectId) ?? currentProjects[0];
-}
-
-function projectDraftFromForm(form: HTMLFormElement): ProjectDraft {
-  const data = new FormData(form);
-  return {
-    id: String(data.get('id') ?? ''),
-    name: String(data.get('name') ?? ''),
-    root: String(data.get('root') ?? ''),
-    indexId: String(data.get('indexId') ?? ''),
-    serverUrl: String(data.get('serverUrl') ?? ''),
-    tokenEnv: String(data.get('tokenEnv') ?? ''),
-  };
 }
 
 function draftFromRoot(root: string): ProjectDraft {

@@ -5,7 +5,6 @@ import type {
   DesktopModeSummary,
   DesktopSection,
   DesktopUiState,
-  McpConfigDiscovery,
   SavedProjectProfile,
   WatcherServiceStatus,
 } from './contracts.js';
@@ -143,19 +142,6 @@ export function renderConfigPackage(pack: DesktopConfigPackage | null, targets: 
   setText(targets.promptEl, pack ? promptText(pack, serverVerified) : 'Сначала выберите проект.');
 }
 
-export function renderProjects(projects: readonly SavedProjectProfile[], element: HTMLElement | null): void {
-  if (!element) return;
-  element.innerHTML = projects.length
-    ? projects.map(project => (
-      `<article class="project-row">
-        <strong>${escapeHtml(project.name)}</strong>
-        <span>${escapeHtml(project.id)}</span>
-        <p>${escapeHtml(project.root)}</p>
-      </article>`
-    )).join('')
-    : '<p class="empty-state">Выберите папку проекта, чтобы создать профиль.</p>';
-}
-
 export function renderModes(modes: readonly DesktopModeSummary[], element: HTMLElement | null, activeModeId: string | null = null): void {
   if (!element) return;
   if (modes.length === 0) {
@@ -224,7 +210,7 @@ function checkActionTooltip(action: string): string {
     import_config: 'Импортировать файл настройки MCP в пульт',
     install_service: 'Установить Windows-службу watcher для проекта',
     open_logs: 'Открыть нижнюю панель логов watcher',
-    select_project: 'Открыть профиль проекта и выбрать рабочую папку',
+    select_project: 'Выбрать рабочую папку проекта',
     start_service: 'Запустить watcher для выбранного проекта',
     verify: 'Повторить проверку MCP-сервера, ключа и watcher',
     verify_codex_gates: 'Установить persistent-verifier и проверить native Codex SessionStart hook',
@@ -253,26 +239,6 @@ function renderModeCard(mode: DesktopModeSummary): string {
   </article>`;
 }
 
-export function hydrateProjectForm(
-  form: HTMLFormElement | null,
-  project: SavedProjectProfile | undefined,
-  config: McpConfigDiscovery,
-): void {
-  if (!form) return;
-  const values = {
-    id: project?.id ?? config.projectId ?? 'mcp-monorepo',
-    name: project?.name ?? 'MCP Monorepo',
-    root: project?.root ?? config.localPath ?? 'C:\\Users\\New\\Desktop\\MCP',
-    indexId: project?.indexId ?? 'idx-mcp-monorepo',
-    serverUrl: project?.serverUrl ?? config.serverUrl ?? '',
-    tokenEnv: project?.tokenEnv ?? config.tokenEnv ?? 'MCP_BEARER_TOKEN',
-  };
-  for (const [name, value] of Object.entries(values)) {
-    const input = form.elements.namedItem(name);
-    if (input instanceof HTMLInputElement && input.value.length === 0) input.value = value;
-  }
-}
-
 export function fallbackStatus(message: string): WatcherServiceStatus {
   return {
     installed: false,
@@ -299,7 +265,7 @@ export function errorMessage(error: unknown): string {
 }
 
 export function sectionFrom(value: string | undefined): DesktopSection | null {
-  const sections: readonly DesktopSection[] = ['start', 'prompt', 'watcher', 'projects', 'modes'];
+  const sections: readonly DesktopSection[] = ['start', 'prompt', 'watcher', 'modes'];
   return typeof value === 'string' && sections.includes(value as DesktopSection) ? value as DesktopSection : null;
 }
 

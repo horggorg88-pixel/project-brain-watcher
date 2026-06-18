@@ -56,8 +56,9 @@ test('clicks through the desktop control panel until the selected project is ful
     await expect(page.locator('[data-service-output]')).toContainText('Логи службы скопированы');
     await page.screenshot({ path: testInfo.outputPath('desktop-ready-watcher.png'), fullPage: true });
 
-    await page.getByRole('button', { name: 'Проекты' }).click();
-    await expect(page.locator('[data-project-form] input[name="id"]')).toHaveValue(readyProjectId);
+    await expect(page.getByRole('button', { name: 'Проекты' })).toHaveCount(0);
+    await expect(page.locator('[data-section="projects"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Выбрать папку' })).toBeVisible();
     await page.locator('[data-toggle-theme]').click();
     await expect(page.locator('body')).toHaveAttribute('data-theme', 'dark');
     await page.locator('[data-toggle-theme]').click();

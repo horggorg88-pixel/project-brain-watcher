@@ -47,8 +47,6 @@
           <p>Контур MCP</p>
           <button type="button" data-nav-section="prompt">Промт</button>
           <button type="button" data-nav-section="modes">Режимы</button>
-          <p>Проект</p>
-          <button type="button" data-nav-section="projects">Проекты</button>
         </nav>
 
         <section class="account-card" data-profile-card hidden></section>
@@ -131,25 +129,6 @@
             </div>
           </div>
           <pre class="code-block service-status-output" data-service-status>Проверяем службу...</pre>
-        </section>
-
-        <section class="content-section" data-section="projects" hidden>
-          <div class="section-head">
-            <div>
-              <p class="eyebrow">проект</p>
-              <h2>Профиль</h2>
-            </div>
-            <button type="submit" form="project-form">Сохранить профиль</button>
-          </div>
-          <form class="form-grid" id="project-form" data-project-form>
-            <label>ID проекта<input name="id" required /></label>
-            <label>Название<input name="name" required /></label>
-            <label>Путь<input name="root" required /></label>
-            <label>ID индекса<input name="indexId" required /></label>
-            <label>MCP сервер<input name="serverUrl" /></label>
-            <label>Переменная токена<input name="tokenEnv" required /></label>
-          </form>
-          <div class="project-list" data-projects>Загрузка...</div>
         </section>
 
         <section class="content-section" data-section="modes" hidden>

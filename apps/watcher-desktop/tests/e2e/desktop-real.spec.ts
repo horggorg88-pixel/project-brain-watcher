@@ -35,10 +35,13 @@ test('opens the real desktop control panel and proves the dry service rail', asy
     await expect(page.locator('[data-overall-status]')).not.toHaveText('Проверяем...');
     await expect(page.getByRole('button', { name: 'Конфиг' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Диагностика' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Проекты' })).toHaveCount(0);
     await expect(page.locator('[data-nav-section="settings"]')).toHaveCount(0);
+    await expect(page.locator('[data-nav-section="projects"]')).toHaveCount(0);
     await expect(page.locator('[data-section="mcp"]')).toHaveCount(0);
     await expect(page.locator('[data-section="diagnostics"]')).toHaveCount(0);
     await expect(page.locator('[data-section="settings"]')).toHaveCount(0);
+    await expect(page.locator('[data-section="projects"]')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Скачать файл настройки' })).toBeVisible();
 
     await page.locator('[data-project-select]').selectOption('client-project');
