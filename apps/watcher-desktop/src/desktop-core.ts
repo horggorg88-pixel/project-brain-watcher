@@ -20,6 +20,7 @@ export { runServiceAction } from './desktop-service-runner.js';
 export {
   enrollManagedDevice,
   enrollManagedDeviceFromHandoff,
+  ensureManagedDeviceEnrolled,
   readManagedDeviceStatus,
 } from './desktop-support-device.js';
 

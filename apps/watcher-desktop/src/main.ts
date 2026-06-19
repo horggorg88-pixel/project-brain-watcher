@@ -10,7 +10,7 @@ import { importProjectConfig } from './desktop-config-import.js';
 import { listDesktopModeSummaries } from './desktop-mode-summary.js';
 import { reportDesktopOnboardingProgress } from './desktop-onboarding-events.js';
 import { readDesktopUiState, saveDesktopUiState } from './desktop-ui-state.js';
-import { enrollManagedDeviceFromHandoff, previewDiagnostics, previewMcpDiff, listDesktopProjectProfiles, readManagedDeviceStatus, readServiceStatus, runServiceAction, saveProfile, type DesktopCorePaths } from './desktop-core.js';
+import { ensureManagedDeviceEnrolled, previewDiagnostics, previewMcpDiff, listDesktopProjectProfiles, readManagedDeviceStatus, readServiceStatus, runServiceAction, saveProfile, type DesktopCorePaths } from './desktop-core.js';
 import { startDesktopSupportAgent } from './desktop-support-agent.js';
 
 const DEBUG_PORT = '9223';
@@ -180,7 +180,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle('modes:list', (_event, projectId?: string) => listDesktopModeSummaries(corePaths(), projectId));
   ipcMain.handle('diagnostics:preview-export', (_event, projectId?: string) => previewDiagnostics(corePaths(), projectId));
   ipcMain.handle('support:status', () => readManagedDeviceStatus(corePaths()));
-  ipcMain.handle('support:enroll', (_event, projectId?: string) => enrollManagedDeviceFromHandoff(corePaths(), projectId));
+  ipcMain.handle('support:enroll', (_event, projectId?: string) => ensureManagedDeviceEnrolled(corePaths(), projectId));
   ipcMain.handle('support:collect-diagnostics', (_event, projectId?: string) => previewDiagnostics(corePaths(), projectId));
   ipcMain.handle('clipboard:write-text', (_event, value: string) => {
     clipboard.writeText(value);

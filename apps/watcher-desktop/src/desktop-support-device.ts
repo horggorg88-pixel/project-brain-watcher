@@ -3,11 +3,17 @@ import { hostname, platform, release, userInfo } from 'node:os';
 import { join } from 'node:path';
 import type { DesktopCorePaths } from './desktop-profile-store.js';
 import type { DesktopAccountAuthorization } from './desktop-account-auth.js';
-import type { ManagedDeviceEnrollment, ManagedDeviceStatus } from './contracts.js';
+import type { ManagedDeviceEnrollment, ManagedDeviceStatus, SavedProjectProfile } from './contracts.js';
 import { readDesktopAccessHandoff, readDesktopAccessHandoffToken } from './desktop-access-handoff.js';
+import { discoverMcpConfig } from './desktop-config-discovery.js';
+import { normalizeMcpServerUrl } from './desktop-mcp-endpoint.js';
+import { applyMcpConfigToProfile, defaultProfile, readProfiles } from './desktop-profile-store.js';
+import { readDesktopServiceToken } from './desktop-service-secret.js';
 
 const SUPPORT_STATE_FILE = 'desktop-support-device.json';
 const SUPPORT_VERSION = '1.0.0';
+const DEFAULT_MCP_SERVER_URL = 'http://149.33.14.250';
+const DEFAULT_ACCOUNT_SERVER_URL = 'http://149.33.14.250:3020';
 
 interface SupportDeviceState {
   readonly deviceId: string;
@@ -108,20 +114,54 @@ export async function enrollManagedDevice(
   return { enrolled: true, status: toManagedDeviceStatus(state), message: 'Support-устройство зарегистрировано.' };
 }
 
+export async function ensureManagedDeviceEnrolled(
+  paths: DesktopCorePaths,
+  projectId?: string,
+): Promise<ManagedDeviceEnrollment> {
+  const existing = readManagedDeviceStatus(paths);
+  if (existing.enrolled) {
+    return {
+      enrolled: true,
+      status: existing,
+      message: 'Support-устройство уже зарегистрировано.',
+    };
+  }
+  const handoffAccount = accountFromHandoff(paths);
+  if (handoffAccount) {
+    const enrollment = await enrollManagedDevice(paths, handoffAccount, projectId);
+    if (enrollment.enrolled) return enrollment;
+  }
+  const storedAccount = accountFromStoredProject(paths, projectId);
+  if (!storedAccount) {
+    return {
+      enrolled: false,
+      status: readManagedDeviceStatus(paths),
+      message: 'Нет сохранённого bearer для автоматической support-регистрации.',
+    };
+  }
+  return enrollManagedDevice(paths, storedAccount.account, storedAccount.projectId);
+}
+
 export async function enrollManagedDeviceFromHandoff(
   paths: DesktopCorePaths,
   projectId?: string,
 ): Promise<ManagedDeviceEnrollment> {
-  const handoff = readDesktopAccessHandoff(paths);
-  const bearerToken = readDesktopAccessHandoffToken(paths);
-  if (!handoff || !bearerToken || !handoff.consoleUrl) {
+  const account = accountFromHandoff(paths);
+  if (!account) {
     return {
       enrolled: false,
       status: readManagedDeviceStatus(paths),
       message: 'Личный handoff-token для support enrollment не найден.',
     };
   }
-  return enrollManagedDevice(paths, {
+  return enrollManagedDevice(paths, account, projectId);
+}
+
+function accountFromHandoff(paths: DesktopCorePaths): DesktopAccountAuthorization | null {
+  const handoff = readDesktopAccessHandoff(paths);
+  const bearerToken = readDesktopAccessHandoffToken(paths);
+  if (!handoff || !bearerToken || !handoff.consoleUrl) return null;
+  return {
     ok: true,
     serverUrl: handoff.serverUrl,
     consoleUrl: handoff.consoleUrl,
@@ -130,7 +170,53 @@ export async function enrollManagedDeviceFromHandoff(
     bearerToken,
     tokenEnv: handoff.tokenEnv,
     message: 'Личный handoff-token найден.',
-  }, projectId);
+  };
+}
+
+function accountFromStoredProject(
+  paths: DesktopCorePaths,
+  projectId?: string,
+): { readonly account: DesktopAccountAuthorization; readonly projectId?: string } | null {
+  const config = discoverMcpConfig(paths);
+  const profiles = readProfiles(paths);
+  const profile = applyMcpConfigToProfile(
+    resolveStoredProfile(paths, profiles, projectId ?? config.projectId ?? null),
+    config,
+  );
+  if (!profile) return null;
+  const bearerToken = readDesktopServiceToken(profile);
+  if (!bearerToken) return null;
+  const serverUrl = normalizeMcpServerUrl(profile.serverUrl || config.serverUrl || DEFAULT_MCP_SERVER_URL) || DEFAULT_MCP_SERVER_URL;
+  const consoleUrl = normalizeMcpServerUrl(profile.consoleUrl || config.consoleUrl || defaultConsoleUrlFor(serverUrl)) || DEFAULT_ACCOUNT_SERVER_URL;
+  return {
+    projectId: profile.id,
+    account: {
+      ok: true,
+      serverUrl,
+      consoleUrl,
+      supportBaseUrl: consoleUrl,
+      meshBaseUrl: null,
+      bearerToken,
+      tokenEnv: profile.tokenEnv || config.tokenEnv || 'MCP_BEARER_TOKEN',
+      message: 'Support enrollment восстановлен из сохранённого профиля проекта.',
+    },
+  };
+}
+
+function resolveStoredProfile(
+  paths: DesktopCorePaths,
+  profiles: readonly SavedProjectProfile[],
+  projectId: string | null,
+): SavedProjectProfile | null {
+  if (projectId) {
+    const matched = profiles.find(profile => profile.id === projectId);
+    if (matched) return matched;
+  }
+  return profiles[0] ?? defaultProfile(paths);
+}
+
+function defaultConsoleUrlFor(serverUrl: string): string {
+  return normalizeMcpServerUrl(serverUrl) === DEFAULT_MCP_SERVER_URL ? DEFAULT_ACCOUNT_SERVER_URL : '';
 }
 
 function buildEnrollmentPayload(

@@ -2,8 +2,9 @@ import { buildDesktopConnectionCheck } from './desktop-connection-check.js';
 import { verifyDesktopCodexGates } from './desktop-codex-gates.js';
 import { previewDiagnostics } from './desktop-core.js';
 import type { DesktopCorePaths } from './desktop-profile-store.js';
-import { readSupportDeviceCredentials } from './desktop-support-device.js';
+import { ensureManagedDeviceEnrolled, readSupportDeviceCredentials } from './desktop-support-device.js';
 import { runServiceAction } from './desktop-service-runner.js';
+import { readDesktopUiState } from './desktop-ui-state.js';
 
 type SupportJobAction =
   | 'collect_diagnostics'
@@ -41,7 +42,7 @@ export function startDesktopSupportAgent(pathsProvider: () => DesktopCorePaths):
       return;
     }
     running = true;
-    runSupportAgentOnce(pathsProvider())
+    runSupportAgentOnceForCurrentProject(pathsProvider())
       .catch(error => console.warn('Support agent tick failed:', error))
       .finally(() => {
         running = false;
@@ -59,7 +60,11 @@ export async function runSupportAgentOnce(
   paths: DesktopCorePaths,
   fallbackProjectId?: string,
 ): Promise<SupportAgentRunResult> {
-  const credentials = readSupportDeviceCredentials(paths);
+  let credentials = readSupportDeviceCredentials(paths);
+  if (!credentials) {
+    const enrollment = await ensureManagedDeviceEnrolled(paths, fallbackProjectId);
+    credentials = enrollment.enrolled ? readSupportDeviceCredentials(paths) : null;
+  }
   if (!credentials) {
     return { enrolled: false, status: 'not_enrolled', jobId: null, message: 'Support-устройство не зарегистрировано.' };
   }
@@ -169,6 +174,10 @@ function projectIdFromPayload(payload: Record<string, unknown>, fallback: string
 function supportPollIntervalMs(): number {
   const parsed = Number(process.env.PROJECT_BRAIN_SUPPORT_AGENT_INTERVAL_MS ?? '');
   return Number.isFinite(parsed) && parsed >= 5000 ? parsed : 30000;
+}
+
+function runSupportAgentOnceForCurrentProject(paths: DesktopCorePaths): Promise<SupportAgentRunResult> {
+  return runSupportAgentOnce(paths, readDesktopUiState(paths).lastProjectId ?? undefined);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

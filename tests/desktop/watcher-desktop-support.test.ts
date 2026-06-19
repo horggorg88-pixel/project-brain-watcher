@@ -1,15 +1,20 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   enrollManagedDevice,
+  ensureManagedDeviceEnrolled,
   readManagedDeviceStatus,
 } from '../../apps/watcher-desktop/src/desktop-support-device.js';
 import { runSupportAgentOnce } from '../../apps/watcher-desktop/src/desktop-support-agent.js';
 import type { DesktopAccountAuthorization } from '../../apps/watcher-desktop/src/desktop-account-auth.js';
+import { saveProfile } from '../../apps/watcher-desktop/src/desktop-profile-store.js';
+import { stageDesktopServiceSecret } from '../../apps/watcher-desktop/src/desktop-service-secret.js';
 
 const tempDirs: string[] = [];
+const ACCOUNT_BEARER = 'pb_account_bearer_12345678901234567890';
+const DEVICE_TOKEN = 'pbs_device_token_12345678901234567890';
 
 afterEach(() => {
   for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -78,6 +83,55 @@ describe('watcher desktop support device', () => {
       'POST http://console.example.test/api/support/jobs/job_test/complete',
     ]);
   });
+
+  it('auto-enrolls from the saved project service secret before heartbeat', async () => {
+    const paths = tempPaths();
+    const projectRoot = join(paths.homePath, 'mcp-project');
+    mkdirSync(projectRoot, { recursive: true });
+    const profile = saveProfile(paths, {
+      id: 'mcp-project',
+      name: 'MCP Project',
+      root: projectRoot,
+      indexId: 'idx-mcp-project',
+      serverUrl: 'http://149.33.14.250',
+      consoleUrl: 'http://console.example.test',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    stageDesktopServiceSecret(profile, ACCOUNT_BEARER);
+    const requests: string[] = [];
+    const authorizations: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      requests.push(`${init?.method ?? 'GET'} ${urlOf(input)}`);
+      authorizations.push(authorizationOf(init));
+      if (urlOf(input).endsWith('/api/support/devices/enroll')) {
+        return jsonResponse({ ok: true, device: { deviceId: 'dev_saved', meshUrl: null }, deviceToken: DEVICE_TOKEN });
+      }
+      if (urlOf(input).endsWith('/api/support/devices/heartbeat')) {
+        return jsonResponse({ ok: true, device: { deviceId: 'dev_saved' } });
+      }
+      if (urlOf(input).endsWith('/api/support/jobs/claim')) {
+        return jsonResponse({ ok: true, job: null });
+      }
+      return jsonResponse({ ok: false, error: 'unexpected request' }, 404);
+    }));
+
+    const enrollment = await ensureManagedDeviceEnrolled(paths, 'mcp-project');
+    const result = await runSupportAgentOnce(paths, 'mcp-project');
+
+    expect(enrollment.enrolled).toBe(true);
+    expect(result.enrolled).toBe(true);
+    expect(result.status).toBe('idle');
+    expect(requests).toEqual([
+      'POST http://console.example.test/api/support/devices/enroll',
+      'POST http://console.example.test/api/support/devices/heartbeat',
+      'POST http://console.example.test/api/support/jobs/claim',
+    ]);
+    expect(authorizations).toEqual([
+      `Bearer ${ACCOUNT_BEARER}`,
+      `Bearer ${DEVICE_TOKEN}`,
+      `Bearer ${DEVICE_TOKEN}`,
+    ]);
+  });
 });
 
 function tempPaths() {
@@ -96,7 +150,7 @@ function account(): DesktopAccountAuthorization {
     consoleUrl: 'http://console.example.test',
     supportBaseUrl: 'http://console.example.test',
     meshBaseUrl: 'https://mesh.example.test',
-    bearerToken: 'pb_account_bearer',
+    bearerToken: ACCOUNT_BEARER,
     tokenEnv: 'MCP_BEARER_TOKEN',
     message: 'ok',
   };
@@ -113,4 +167,16 @@ function urlOf(input: Parameters<typeof fetch>[0]): string {
   if (typeof input === 'string') return input;
   if (input instanceof URL) return input.toString();
   return input.url;
+}
+
+function authorizationOf(init?: RequestInit): string {
+  const headers = init?.headers;
+  if (!headers) return '';
+  if (headers instanceof Headers) return headers.get('authorization') ?? headers.get('Authorization') ?? '';
+  if (Array.isArray(headers)) {
+    const entry = headers.find(([key]) => key.toLowerCase() === 'authorization');
+    return typeof entry?.[1] === 'string' ? entry[1] : '';
+  }
+  const record = headers as Record<string, string>;
+  return record.authorization ?? record.Authorization ?? '';
 }
