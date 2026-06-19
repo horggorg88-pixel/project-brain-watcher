@@ -6,6 +6,9 @@ import { ensureManagedDeviceEnrolled, readSupportDeviceCredentials } from './des
 import { runServiceAction } from './desktop-service-runner.js';
 import { readDesktopUiState } from './desktop-ui-state.js';
 
+const DEFAULT_SUPPORT_JOB_TIMEOUT_MS = 5 * 60_000;
+const SUPPORT_JOB_TIMEOUT_ENV = 'PROJECT_BRAIN_SUPPORT_JOB_TIMEOUT_MS';
+
 type SupportJobAction =
   | 'collect_diagnostics'
   | 'repair_watcher_service'
@@ -81,7 +84,11 @@ export async function runSupportAgentOnce(
   }
   const projectId = projectIdFromPayload(job.payload, fallbackProjectId);
   try {
-    const result = await executeSupportJob(paths, job, projectId, credentials.meshUrl);
+    const result = await withSupportJobTimeout(
+      executeSupportJob(paths, job, projectId, credentials.meshUrl),
+      supportJobTimeoutMs(job.action),
+      job.action,
+    );
     await postSupport(
       credentials.supportBaseUrl,
       `/api/support/jobs/${encodeURIComponent(job.jobId)}/complete`,
@@ -121,6 +128,40 @@ async function executeSupportJob(
   if (job.action === 'refresh_mcp_config') return { connection: await buildDesktopConnectionCheck(paths, projectId) };
   if (job.action === 'mesh_status') return { meshUrl, ready: Boolean(meshUrl) };
   throw new Error(`Неизвестное support-действие: ${job.action}`);
+}
+
+function withSupportJobTimeout<T>(
+  action: Promise<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Support job ${label} timed out after ${timeoutMs} ms.`));
+    }, timeoutMs);
+    action.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+function supportJobTimeoutMs(action: SupportJobAction): number {
+  const configured = Number(process.env[SUPPORT_JOB_TIMEOUT_ENV] ?? '');
+  if (Number.isFinite(configured) && configured >= 10) return Math.trunc(configured);
+  if (action === 'mesh_status') return 10_000;
+  if (action === 'collect_diagnostics') return 30_000;
+  if (action === 'refresh_mcp_config') return 90_000;
+  if (action === 'verify_codex_gates') return 180_000;
+  if (action === 'update_watcher') return 11 * 60_000;
+  if (action === 'repair_watcher_service' || action === 'restart_watcher') return 4 * 60_000;
+  return DEFAULT_SUPPORT_JOB_TIMEOUT_MS;
 }
 
 async function postSupport(
