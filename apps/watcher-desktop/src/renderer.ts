@@ -45,6 +45,10 @@ declare global {
   }
 }
 
+interface DesktopAiDiagnostic {
+  readonly code: string; readonly severity: 'info' | 'warn' | 'error'; readonly message: string; readonly cause: string; readonly impact: string; readonly nextAction: string;
+}
+
 const authForm = document.querySelector<HTMLFormElement>('[data-auth-form]');
 const authStatusEl = document.querySelector<HTMLElement>('[data-auth-status]');
 const accountEl = document.querySelector<HTMLElement>('[data-profile-card]');
@@ -79,6 +83,7 @@ let currentProjects: readonly SavedProjectProfile[] = [];
 let currentModes: readonly DesktopModeSummary[] = [];
 let activeModeId: string | null = null;
 let currentPackage: DesktopConfigPackage | null = null;
+let currentServiceStatus: WatcherServiceStatus | null = null;
 let pendingServiceAction: PendingServiceActionConfirmation | null = null;
 let automaticCodexGateRunning = false;
 let refreshInFlight: Promise<void> | null = null;
@@ -204,8 +209,8 @@ copyPromptButton?.addEventListener('click', () => {
 });
 
 copyServiceLogsButton?.addEventListener('click', () => {
-  void copyText(serviceLogsText())
-    .then(() => writeLog('Логи службы скопированы'))
+  void copyText(serviceAiLogsText())
+    .then(() => writeLog('AI snapshot логов службы скопирован'))
     .catch(error => writeLog(errorMessage(error)));
 });
 
@@ -396,6 +401,7 @@ async function refreshInternal(): Promise<void> {
   renderOverall(check, overallStatusEl);
   renderConnectionCause(check, connectionCauseEl);
   renderConnectionCheck(check, checklistEl);
+  currentServiceStatus = check.service;
   renderService(check.service, serviceStatusEl, serviceSummaryEl);
   setServiceActionState(serviceButtons, check.service);
   setServiceConfirmationHint(serviceButtons, pendingServiceAction);
@@ -767,10 +773,84 @@ function writeLog(value: string): void {
   if (!uiState.consoleOpen) void saveUiState({ ...uiState, consoleOpen: true }).then(() => renderUiState());
 }
 
-function serviceLogsText(): string {
+function serviceAiLogsText(): string {
   const statusText = serviceStatusEl?.textContent?.trim() ?? '';
   const commandText = serviceOutputEl?.textContent?.trim() ?? '';
-  return [statusText, commandText].filter(Boolean).join('\n\n');
+  const rawText = [statusText, commandText].filter(Boolean).join('\n\n');
+  const safeText = redactAiLogText(rawText);
+  const diagnostics = classifyDesktopAiDiagnostics(safeText, currentServiceStatus);
+  return JSON.stringify({
+    schemaVersion: 'watcher-ai-context/v1',
+    generatedAt: new Date().toISOString(),
+    project: currentServiceStatus?.projectId ?? currentProjectId(),
+    root: currentServiceStatus?.root ?? selectedProject()?.root ?? null,
+    summary: diagnostics[0]?.message ?? serviceSummaryForAi(currentServiceStatus),
+    diagnostics,
+    evidence_refs: serviceEvidenceRefs(currentServiceStatus),
+    next_actions: diagnostics.map(item => item.nextAction),
+    machine_snapshot: currentServiceStatus ? {
+      installed: currentServiceStatus.installed,
+      running: currentServiceStatus.running,
+      health: currentServiceStatus.health,
+      pid: currentServiceStatus.pid,
+      lastSyncAt: currentServiceStatus.lastSyncAt,
+      lastError: currentServiceStatus.lastError,
+    } : null,
+    rawTail: safeText,
+    redacted: safeText !== rawText,
+  }, null, 2);
+}
+
+function classifyDesktopAiDiagnostics(text: string, status: WatcherServiceStatus | null): readonly DesktopAiDiagnostic[] {
+  const diagnostics: DesktopAiDiagnostic[] = [];
+  if (status?.installed && !status.running) diagnostics.push({
+    code: 'WATCHER_SERVICE_STOPPED',
+    severity: 'error' as const,
+    message: status.lastError ?? 'Watcher service stopped',
+    cause: 'Windows service is installed but not running.',
+    impact: 'MCP index will not refresh until watcher starts.',
+    nextAction: 'Запусти watcher service и повтори проверку.',
+  });
+  if (/Watcher lease rejected:\s*Unauthorized|lease rejected:\s*Unauthorized/i.test(text)) diagnostics.push({
+    code: 'WATCHER_UNAUTHORIZED',
+    severity: 'error' as const,
+    message: 'Watcher lease rejected: Unauthorized',
+    cause: 'Bearer token is absent, expired, or bound to another project/server.',
+    impact: 'Server is reachable, but watcher cannot acquire lease.',
+    nextAction: 'Обнови ключ в пульте и проверь project/server в .brain/config.json.',
+  });
+  if (/better-sqlite3|node-gyp|No prebuilt binaries found|Visual Studio installation/i.test(text)) diagnostics.push({
+    code: 'WATCHER_NATIVE_RUNTIME_BUILD_FAILED',
+    severity: 'error' as const,
+    message: 'Native runtime dependency failed to install.',
+    cause: 'Node runtime has no prebuilt better-sqlite3 binary and node-gyp cannot compile it.',
+    impact: 'Service exits before watcher runtime starts.',
+    nextAction: 'Обнови watcher runtime или используй Node LTS / Visual Studio Build Tools C++.',
+  });
+  return diagnostics;
+}
+
+function serviceSummaryForAi(status: WatcherServiceStatus | null): string {
+  if (!status) return 'Service status is not loaded.';
+  if (status.running && status.health === 'healthy') return 'Watcher service is healthy.';
+  return status.lastError ?? `Watcher service health: ${status.health}`;
+}
+
+function serviceEvidenceRefs(status: WatcherServiceStatus | null): readonly { readonly kind: string; readonly label: string; readonly path: string | null }[] {
+  const logs = status?.logs;
+  if (!logs) return [];
+  return [
+    { kind: 'log', label: 'stdout', path: logs.outPath },
+    { kind: 'log', label: 'stderr', path: logs.errPath },
+    { kind: 'log', label: 'wrapper', path: logs.wrapperPath },
+  ];
+}
+
+function redactAiLogText(value: string): string {
+  return value
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/g, 'Bearer [REDACTED]')
+    .replace(/\bpb_[A-Za-z0-9_-]{10,}\b/g, 'pb_[REDACTED]')
+    .replace(/\b((?:TOKEN|SECRET|PASSWORD|KEY)\s*[:=]\s*)[^\s"',;]+/gi, '$1[REDACTED]');
 }
 
 function serviceActionLog(result: WatcherServiceActionResult): string {

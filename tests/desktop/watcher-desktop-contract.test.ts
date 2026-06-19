@@ -367,10 +367,11 @@ describe('watcher desktop contract', () => {
     expect(serviceUiSource).toContain('Установить Windows-службу watcher для выбранного проекта');
     expect(html).toContain('data-tooltip="Скопировать статус службы и последние логи watcher"');
     expect(rendererSource).not.toContain('openServiceLogsButtons');
-    expect(rendererSource).toContain('serviceLogsText');
+    expect(rendererSource).toContain('serviceAiLogsText');
+    expect(rendererSource).toContain('watcher-ai-context/v1');
     expect(rendererSource).toContain('renderConsoleToggle');
     expect(rendererSource).toContain('chevronDownIcon');
-    expect(rendererSource).toContain('Логи службы скопированы');
+    expect(rendererSource).toContain('AI snapshot логов службы скопирован');
     expect(rendererSource).toContain("bottomConsoleEl?.toggleAttribute('data-collapsed'");
     expect(rendererSource).not.toContain("bottomConsoleEl?.toggleAttribute('hidden'");
     expect(layoutCss).toContain('.bottom-console[data-collapsed]');

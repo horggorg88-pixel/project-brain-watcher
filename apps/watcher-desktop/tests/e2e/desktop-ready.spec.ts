@@ -53,7 +53,7 @@ test('clicks through the desktop control panel until the selected project is ful
     await expect(page.locator('[data-service-action="restart"]')).toBeVisible();
     await expect(page.locator('[data-service-action="install"]')).toBeHidden();
     await page.locator('[data-copy-service-logs]').click();
-    await expect(page.locator('[data-service-output]')).toContainText('Логи службы скопированы');
+    await expect(page.locator('[data-service-output]')).toContainText('AI snapshot логов службы скопирован');
     await page.screenshot({ path: testInfo.outputPath('desktop-ready-watcher.png'), fullPage: true });
 
     await expect(page.getByRole('button', { name: 'Проекты' })).toHaveCount(0);
