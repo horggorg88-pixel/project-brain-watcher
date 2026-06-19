@@ -75,7 +75,7 @@ function buildNodes(input: {
     node('server', 'MCP-сервер', input.serverVerified, serverDetail, 'open_logs', input.serverVerified ? 'Проверить MCP' : 'Показать причину'),
     codexTrustNode(input.codexGates),
     codexGateNode(input.codexGates),
-    node('watcher', 'Watcher', input.service.running && input.service.health === 'healthy', serviceDetail(input.service), serviceAction(input.service), serviceActionLabel(input.service)),
+    node('watcher', 'Watcher', serviceReady(input.service), serviceDetail(input.service), serviceAction(input.service), serviceActionLabel(input.service)),
   ];
 }
 
@@ -257,11 +257,15 @@ function statusMessage(overall: DesktopConnectionCheck['overall'], nodes: readon
 }
 
 function serviceDetail(service: WatcherServiceStatus): string {
-  if (service.running && service.health === 'healthy') return 'Watcher работает';
   if (!service.installed) return 'Watcher не установлен';
+  if (service.running && service.health === 'healthy') return 'Watcher работает';
   if (!service.running) return 'Watcher остановлен';
   if (service.lastError) return `Watcher сообщает: ${service.lastError}`;
   return 'Watcher требует внимания';
+}
+
+function serviceReady(service: WatcherServiceStatus): boolean {
+  return service.installed && service.running && service.health === 'healthy';
 }
 
 function serviceAction(service: WatcherServiceStatus): DesktopCheckNode['action'] {

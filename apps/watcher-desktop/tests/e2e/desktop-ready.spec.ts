@@ -30,13 +30,13 @@ test('clicks through the desktop control panel until the selected project is ful
     await page.locator(`[data-project-option="${readyProjectId}"]`).click();
     await page.getByRole('button', { name: 'Проверить подключение' }).click();
 
-    await expect(page.locator('[data-overall-status]')).toHaveText('Подключение готово');
-    await expect(page.locator('[data-connection-cause]')).toHaveText('Причина: контур MCP готов');
-    await expect(page.locator('[data-checklist] [data-status="active"]')).toHaveCount(7);
-    await expect(page.locator('[data-check-action]')).toHaveCount(0);
+    await expect(page.locator('[data-overall-status]')).toHaveText('Нужен шаг: Watcher');
+    await expect(page.locator('[data-connection-cause]')).toHaveText('Причина: Watcher: Watcher не установлен');
+    await expect(page.locator('[data-checklist] [data-status="active"]')).toHaveCount(6);
+    await expect(page.locator('[data-check-action]')).toHaveCount(1);
     await expect(page.locator('[data-node="codexTrust"]')).toContainText('Codex project trust подтверждён.');
     await expect(page.locator('[data-node="codexGates"]')).toContainText('Codex Runtime Context proof подтверждён native hooks.');
-    await expect(page.locator('[data-node="watcher"]')).toContainText('Watcher работает');
+    await expect(page.locator('[data-node="watcher"]')).toContainText('Watcher не установлен');
     await page.screenshot({ path: testInfo.outputPath('desktop-ready-overview.png'), fullPage: true });
     await page.getByRole('button', { name: 'Промт' }).click();
     await page.locator('[data-copy-prompt]').click();
@@ -48,10 +48,10 @@ test('clicks through the desktop control panel until the selected project is ful
     await expect(page.locator('[data-modes]')).toContainText('Когда применять');
 
     await page.getByRole('button', { name: 'Watcher' }).click();
-    await expect(page.locator('[data-service-summary]')).toHaveText('Watcher работает');
-    await expect(page.locator('[data-service-action="stop"]')).toBeVisible();
-    await expect(page.locator('[data-service-action="restart"]')).toBeVisible();
-    await expect(page.locator('[data-service-action="install"]')).toBeHidden();
+    await expect(page.locator('[data-service-summary]')).toHaveText('Watcher не установлен');
+    await expect(page.locator('[data-service-action="install"]')).toBeVisible();
+    await expect(page.locator('[data-service-action="stop"]')).toBeHidden();
+    await expect(page.locator('[data-service-action="restart"]')).toBeHidden();
     await page.locator('[data-copy-service-logs]').click();
     await expect(page.locator('[data-service-output]')).toContainText('AI snapshot логов службы скопирован');
     await page.screenshot({ path: testInfo.outputPath('desktop-ready-watcher.png'), fullPage: true });

@@ -41,12 +41,16 @@ export function readServiceStatus(paths: DesktopCorePaths, projectId?: string): 
   const runtimePath = join(profile.root, '.brain', 'watcher-runtime.json');
   const logs = readServiceLogTail(profile);
   const serviceState = readWindowsServiceState(profile);
-  const installed = existsSync(serviceExePath(profile)) || serviceState.installed;
+  const serviceFilesPrepared = existsSync(serviceExePath(profile));
+  const installed = serviceState.installed;
   if (serviceState.installed && serviceState.metadataError) {
     return stoppedStatus(true, joinStatusMessages(serviceState.lastError, serviceState.metadataError), profile, logs);
   }
   if (serviceState.installed && !serviceState.running) {
     return stoppedStatus(true, serviceState.lastError ?? 'Служба Watcher остановлена', profile, logs);
+  }
+  if (!serviceState.installed && serviceFilesPrepared && !existsSync(runtimePath)) {
+    return stoppedStatus(false, 'Windows service не зарегистрирована; файлы службы подготовлены, но install не завершился', profile, logs);
   }
   if (!existsSync(runtimePath)) return stoppedStatus(installed, 'Служба Watcher не запущена', profile, logs);
   try {

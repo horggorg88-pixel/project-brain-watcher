@@ -265,6 +265,28 @@ describe('watcher desktop core', () => {
     expect(status.lastError).toBe('Служба Watcher не запущена');
   });
 
+  it('does not treat prepared WinSW files as an installed Windows service', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'repo');
+    const serviceDir = join(root, '.brain', 'service');
+    mkdirSync(serviceDir, { recursive: true });
+    writeFileSync(join(serviceDir, 'ProjectBrainWatcher-demo.exe'), '');
+    saveProfile(paths, {
+      id: 'demo',
+      name: 'Demo',
+      root,
+      indexId: 'idx-demo',
+      serverUrl: 'https://brain.example',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    const status = readServiceStatus(paths);
+
+    expect(status.installed).toBe(false);
+    expect(status.health).toBe('not_configured');
+    expect(status.lastError).toBe('Windows service не зарегистрирована; файлы службы подготовлены, но install не завершился');
+  });
+
   it('runs health checks without mutating the service', async () => {
     const paths = tempPaths();
     const result = await runServiceAction(paths, { action: 'health', projectId: 'demo', confirmed: false });
@@ -998,6 +1020,42 @@ describe('watcher desktop core', () => {
     expect(check.nodes.find(node => node.id === 'codexGates')?.actionLabel).toBeNull();
     expect(check.nodes.find(node => node.id === 'watcher')?.actionLabel).toBe('Установить службу');
     expect(check.overall).toBe('action_required');
+  });
+
+  it('does not mark watcher service ready when only the runtime lock and service files exist', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'repo');
+    const source = join(paths.homePath, 'runtime-only-mcp-config.json');
+    const serviceDir = join(root, '.brain', 'service');
+    mkdirSync(serviceDir, { recursive: true });
+    writeFileSync(join(serviceDir, 'ProjectBrainWatcher-runtime-only.exe'), '');
+    writeFileSync(join(root, '.brain', 'watcher-runtime.json'), JSON.stringify({
+      owner: { project_id: 'runtime-only', root, pid: process.pid },
+      updated_at: Date.now(),
+    }), 'utf-8');
+    writeFileSync(source, JSON.stringify({
+      project_id: 'runtime-only',
+      endpoint: 'http://149.33.14.250/mcp/p/runtime-only',
+      local_path: root,
+      token_env: 'MCP_BEARER_TOKEN',
+      mcpServers: {
+        'project-brain': {
+          url: 'http://149.33.14.250/mcp/p/runtime-only',
+          headers: { Authorization: `Bearer ${VALID_TEST_BEARER}` },
+        },
+      },
+    }), 'utf-8');
+    importProjectConfig(paths, source);
+    vi.stubGlobal('fetch', verifiedMcpFetch());
+
+    const check = await buildDesktopConnectionCheck(paths, 'runtime-only');
+    const watcher = check.nodes.find(node => node.id === 'watcher');
+
+    expect(check.service.running).toBe(true);
+    expect(check.service.installed).toBe(false);
+    expect(watcher?.status).toBe('inactive');
+    expect(watcher?.detail).toBe('Watcher не установлен');
+    expect(watcher?.actionLabel).toBe('Установить службу');
   });
 
   it('does not mark confirmed Codex project trust as a medium pending gate', async () => {
