@@ -10,6 +10,8 @@ export interface DesktopAccountAuthorization {
   readonly ok: boolean;
   readonly serverUrl: string | null;
   readonly consoleUrl: string | null;
+  readonly supportBaseUrl: string | null;
+  readonly meshBaseUrl: string | null;
   readonly bearerToken: string | null;
   readonly tokenEnv: string;
   readonly message: string;
@@ -81,8 +83,11 @@ async function parseAuthResponse(response: Response): Promise<DesktopAccountAuth
     return denied(null, message);
   }
   const serverConfig = isRecord(parsed.serverConfig) ? parsed.serverConfig : null;
+  const supportConfig = isRecord(parsed.supportConfig) ? parsed.supportConfig : null;
   const serverUrl = readText(serverConfig?.serverUrl) ?? DEFAULT_MCP_SERVER_URL;
   const consoleUrl = readText(serverConfig?.consoleUrl) ?? responseOrigin(response) ?? DEFAULT_ACCOUNT_SERVER_URL;
+  const supportBaseUrl = readText(supportConfig?.supportBaseUrl) ?? consoleUrl;
+  const meshBaseUrl = readText(supportConfig?.meshBaseUrl);
   const bearerToken = readText(serverConfig?.bearerToken);
   const tokenEnv = readText(serverConfig?.tokenEnv) ?? 'MCP_BEARER_TOKEN';
   if (!isConcreteBearerToken(bearerToken)) return denied(serverUrl, 'Сервер авторизации не выдал реальный bearer.');
@@ -90,6 +95,8 @@ async function parseAuthResponse(response: Response): Promise<DesktopAccountAuth
     ok: true,
     serverUrl: normalizeMcpServerUrl(serverUrl) || DEFAULT_MCP_SERVER_URL,
     consoleUrl: normalizeMcpServerUrl(consoleUrl) || DEFAULT_ACCOUNT_SERVER_URL,
+    supportBaseUrl: normalizeMcpServerUrl(supportBaseUrl) || normalizeMcpServerUrl(consoleUrl) || DEFAULT_ACCOUNT_SERVER_URL,
+    meshBaseUrl: meshBaseUrl ? normalizeMcpServerUrl(meshBaseUrl) : null,
     bearerToken: bearerToken.trim(),
     tokenEnv,
     message: 'Серверная авторизация подтверждена, bearer получен.',
@@ -101,6 +108,8 @@ function denied(serverUrl: string | null, message: string): DesktopAccountAuthor
     ok: false,
     serverUrl: serverUrl ? normalizeMcpServerUrl(serverUrl) : null,
     consoleUrl: null,
+    supportBaseUrl: null,
+    meshBaseUrl: null,
     bearerToken: null,
     tokenEnv: 'MCP_BEARER_TOKEN',
     message,

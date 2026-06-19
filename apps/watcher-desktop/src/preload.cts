@@ -9,6 +9,8 @@ import type {
   DesktopModeSummary,
   DesktopUiState,
   DiagnosticsPreview,
+  ManagedDeviceEnrollment,
+  ManagedDeviceStatus,
   McpDiffPreview,
   ProjectDraft,
   ProjectImportResult,
@@ -77,6 +79,15 @@ const api: WatcherDesktopApi = {
   diagnostics: {
     previewExport: (projectId?: string) => (
       ipcRenderer.invoke('diagnostics:preview-export', projectId) as Promise<DiagnosticsPreview>
+    ),
+  },
+  support: {
+    status: () => ipcRenderer.invoke('support:status') as Promise<ManagedDeviceStatus>,
+    enroll: (projectId?: string) => (
+      ipcRenderer.invoke('support:enroll', projectId) as Promise<ManagedDeviceEnrollment>
+    ),
+    collectDiagnostics: (projectId?: string) => (
+      ipcRenderer.invoke('support:collect-diagnostics', projectId) as Promise<DiagnosticsPreview>
     ),
   },
   clipboard: {

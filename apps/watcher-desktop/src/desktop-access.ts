@@ -7,6 +7,7 @@ import { saveDesktopAccessHandoff } from './desktop-access-handoff.js';
 import { readDesktopEnvServiceToken, readDesktopServiceSecretState, readDesktopServiceToken, stageDesktopServiceSecret } from './desktop-service-secret.js';
 import { verifyProjectServerAccess } from './desktop-server-access.js';
 import { clearDesktopAccessSession, readDesktopAccessSession, saveDesktopAccessSession } from './desktop-access-session.js';
+import { enrollManagedDevice } from './desktop-support-device.js';
 export function readAccessState(paths: DesktopCorePaths): DesktopAccessState {
   const config = discoverMcpConfig(paths);
   const secretState = readDesktopServiceSecretState(resolveConfiguredProfile(paths, config));
@@ -90,6 +91,9 @@ export async function loginAccess(paths: DesktopCorePaths, request: AccessLoginR
   if (config.found && token !== null && activeProfile && accountAccess?.ok) {
     serverAccess = await verifyProjectServerAccess(activeProfile, token);
     verifiedToken = token;
+  }
+  if (accountAccess?.ok) {
+    await enrollManagedDevice(paths, accountAccess, activeProfile?.id ?? config.projectId ?? undefined).catch(() => undefined);
   }
   if (activeProfile && serverAccess.verified && verifiedToken && !enteredBarrierKey) {
     secretState = stageDesktopServiceSecret(activeProfile, verifiedToken);

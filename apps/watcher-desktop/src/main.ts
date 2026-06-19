@@ -10,7 +10,8 @@ import { importProjectConfig } from './desktop-config-import.js';
 import { listDesktopModeSummaries } from './desktop-mode-summary.js';
 import { reportDesktopOnboardingProgress } from './desktop-onboarding-events.js';
 import { readDesktopUiState, saveDesktopUiState } from './desktop-ui-state.js';
-import { previewDiagnostics, previewMcpDiff, listDesktopProjectProfiles, readServiceStatus, runServiceAction, saveProfile, type DesktopCorePaths } from './desktop-core.js';
+import { enrollManagedDeviceFromHandoff, previewDiagnostics, previewMcpDiff, listDesktopProjectProfiles, readManagedDeviceStatus, readServiceStatus, runServiceAction, saveProfile, type DesktopCorePaths } from './desktop-core.js';
+import { startDesktopSupportAgent } from './desktop-support-agent.js';
 
 const DEBUG_PORT = '9223';
 const desktopDebugEnabled = process.env.PROJECT_BRAIN_DESKTOP_DEBUG === '1';
@@ -30,19 +31,25 @@ if (!singleInstance) app.quit();
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
+let stopSupportAgent: (() => void) | null = null;
 
 app.whenReady().then(() => {
   registerIpcHandlers();
   Menu.setApplicationMenu(null);
   mainWindow = createMainWindow();
   tray = createTray(mainWindow);
+  stopSupportAgent = startDesktopSupportAgent(corePaths);
 });
 
 app.on('second-instance', () => showMainWindow());
 
 app.on('activate', () => showMainWindow());
 
-app.on('before-quit', () => { isQuitting = true; });
+app.on('before-quit', () => {
+  isQuitting = true;
+  stopSupportAgent?.();
+  stopSupportAgent = null;
+});
 
 app.on('window-all-closed', () => {
   if (tray) mainWindow?.hide();
@@ -172,6 +179,9 @@ function registerIpcHandlers(): void {
   ));
   ipcMain.handle('modes:list', (_event, projectId?: string) => listDesktopModeSummaries(corePaths(), projectId));
   ipcMain.handle('diagnostics:preview-export', (_event, projectId?: string) => previewDiagnostics(corePaths(), projectId));
+  ipcMain.handle('support:status', () => readManagedDeviceStatus(corePaths()));
+  ipcMain.handle('support:enroll', (_event, projectId?: string) => enrollManagedDeviceFromHandoff(corePaths(), projectId));
+  ipcMain.handle('support:collect-diagnostics', (_event, projectId?: string) => previewDiagnostics(corePaths(), projectId));
   ipcMain.handle('clipboard:write-text', (_event, value: string) => {
     clipboard.writeText(value);
   });

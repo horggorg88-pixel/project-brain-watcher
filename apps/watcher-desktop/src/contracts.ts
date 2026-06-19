@@ -18,6 +18,15 @@ export type DesktopCheckAction =
   | 'verify_codex_gates'
   | 'verify';
 export type DesktopModeStatus = 'ready' | 'action_required' | 'error';
+export type ManagedDeviceHealth = 'not_enrolled' | 'online' | 'offline' | 'degraded';
+export type SupportAgentAction =
+  | 'collect_diagnostics'
+  | 'repair_watcher_service'
+  | 'restart_watcher'
+  | 'update_watcher'
+  | 'verify_codex_gates'
+  | 'refresh_mcp_config'
+  | 'mesh_status';
 export type AccessStatus =
   | 'signed_out'
   | 'config_missing'
@@ -122,6 +131,22 @@ export interface DesktopAccessState {
   readonly message: string;
   readonly config: McpConfigDiscovery;
   readonly gates: readonly WatcherPolicyGate[];
+}
+
+export interface ManagedDeviceStatus {
+  readonly enrolled: boolean;
+  readonly health: ManagedDeviceHealth;
+  readonly deviceId: string | null;
+  readonly supportBaseUrl: string | null;
+  readonly meshUrl: string | null;
+  readonly message: string;
+  readonly updatedAt: string | null;
+}
+
+export interface ManagedDeviceEnrollment {
+  readonly enrolled: boolean;
+  readonly status: ManagedDeviceStatus;
+  readonly message: string;
 }
 
 export interface WatcherPolicyGate {
@@ -308,6 +333,11 @@ export interface WatcherDesktopApi {
   };
   readonly diagnostics: {
     previewExport(projectId?: string): Promise<DiagnosticsPreview>;
+  };
+  readonly support: {
+    status(): Promise<ManagedDeviceStatus>;
+    enroll(projectId?: string): Promise<ManagedDeviceEnrollment>;
+    collectDiagnostics(projectId?: string): Promise<DiagnosticsPreview>;
   };
   readonly clipboard: {
     writeText(value: string): Promise<void>;

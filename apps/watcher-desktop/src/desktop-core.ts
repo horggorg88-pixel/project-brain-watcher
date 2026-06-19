@@ -17,6 +17,11 @@ import { readServiceStatus, resolveServiceProfile } from './desktop-service-stat
 export { readProfiles, saveProfile, type DesktopCorePaths } from './desktop-profile-store.js';
 export { readServiceStatus } from './desktop-service-status.js';
 export { runServiceAction } from './desktop-service-runner.js';
+export {
+  enrollManagedDevice,
+  enrollManagedDeviceFromHandoff,
+  readManagedDeviceStatus,
+} from './desktop-support-device.js';
 
 export function listDesktopProjectProfiles(paths: DesktopCorePaths): readonly SavedProjectProfile[] {
   const profiles = readProfiles(paths);
