@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -33,6 +33,7 @@ const VALID_TEST_BEARER = 'valid_test_bearer_12345678901234567890';
 const VALID_ENV_BEARER = 'valid_env_bearer_12345678901234567890';
 const PLACEHOLDER_BEARER = 'pb_secret_value';
 const STALE_LOCAL_BEARER = 'stale_local_bearer_123456789012345678';
+const SERVICE_LOG_CHUNK_BYTES = 24_000;
 
 afterEach(() => {
   for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -521,10 +522,42 @@ describe('watcher desktop core', () => {
     expect(status.logs?.out).not.toContain('first-line');
     expect(outStream?.tail.truncated).toBe(true);
     expect(firstChunk?.bytes).toBeLessThanOrEqual(24_000);
+    expect(firstChunk?.textEncoding).toBe('utf8-best-effort');
+    expect(firstChunk?.textIntegrity).toBe('exact');
     expect(firstChunk?.complete).toBe(false);
     expect(firstChunk?.nextCursor).toBeTruthy();
     expect(secondChunk?.offset).toBe(firstChunk?.bytes);
     expect(readServiceLogChunk(profile, 'not-a-valid-cursor')).toBeNull();
+  });
+
+  it('keeps watcher service log chunks on UTF-8 byte boundaries', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'HyinahiTEst');
+    const serviceDir = join(root, '.brain', 'service');
+    mkdirSync(serviceDir, { recursive: true });
+    const profile = saveProfile(paths, {
+      id: 'hyinahitest',
+      name: 'HyinahiTEst',
+      root,
+      indexId: 'idx-hyinahitest',
+      serverUrl: 'https://brain.example',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const base = join(serviceDir, serviceName(profile.id));
+    writeFileSync(`${base}.out.log`, `${'A'.repeat(23_999)}🙂\nlast-line\n`, 'utf-8');
+
+    const status = readServiceStatus(paths, 'hyinahitest');
+    const outStream = status.logs?.transport.streams.find(stream => stream.id === 'out');
+    const firstChunk = readServiceLogChunk(profile, outStream?.firstCursor ?? '');
+    const secondChunk = readServiceLogChunk(profile, firstChunk?.nextCursor ?? '');
+
+    expect(firstChunk?.text).not.toContain('\uFFFD');
+    expect(firstChunk?.textIntegrity).toBe('exact');
+    expect(firstChunk?.bytes).toBe(23_999);
+    expect(secondChunk?.offset).toBe(23_999);
+    expect(secondChunk?.text).toContain('[TRUNCATED_CROSS_CHUNK_SECRET_LINE]');
+    expect(secondChunk?.text).toContain('last-line');
+    expect(secondChunk?.text).not.toContain('\uFFFD');
   });
 
   it('rejects stale watcher log cursors after log rotation', () => {
@@ -553,6 +586,60 @@ describe('watcher desktop core', () => {
     expect(readServiceLogChunk(profile, oldCursor)).toBeNull();
   });
 
+  it('rejects stale watcher log cursors when a same-head log is rewritten', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'HyinahiTEst');
+    const serviceDir = join(root, '.brain', 'service');
+    mkdirSync(serviceDir, { recursive: true });
+    const profile = saveProfile(paths, {
+      id: 'hyinahitest',
+      name: 'HyinahiTEst',
+      root,
+      indexId: 'idx-hyinahitest',
+      serverUrl: 'https://brain.example',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const base = join(serviceDir, serviceName(profile.id));
+    const outPath = `${base}.out.log`;
+    const sharedHead = 'H'.repeat(4096);
+    writeFileSync(outPath, `${sharedHead}\nold-body\n${'A'.repeat(50_000)}\n`, 'utf-8');
+    const status = readServiceStatus(paths, 'hyinahitest');
+    const oldCursor = status.logs?.transport.streams.find(stream => stream.id === 'out')?.firstCursor ?? '';
+
+    writeFileSync(outPath, `${sharedHead}\nnew-body\n${'B'.repeat(60_000)}\n`, 'utf-8');
+    const future = new Date(Date.now() + 10_000);
+    utimesSync(outPath, future, future);
+
+    expect(readServiceLogChunk(profile, oldCursor)).toBeNull();
+  });
+
+  it('keeps watcher log cursors valid when the log only appends', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'HyinahiTEst');
+    const serviceDir = join(root, '.brain', 'service');
+    mkdirSync(serviceDir, { recursive: true });
+    const profile = saveProfile(paths, {
+      id: 'hyinahitest',
+      name: 'HyinahiTEst',
+      root,
+      indexId: 'idx-hyinahitest',
+      serverUrl: 'https://brain.example',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const base = join(serviceDir, serviceName(profile.id));
+    const outPath = `${base}.out.log`;
+    writeFileSync(outPath, `${'A'.repeat(30_000)}\nfirst snapshot\n`, 'utf-8');
+    const status = readServiceStatus(paths, 'hyinahitest');
+    const firstCursor = status.logs?.transport.streams.find(stream => stream.id === 'out')?.firstCursor ?? '';
+
+    writeFileSync(outPath, `${readFileSync(outPath, 'utf-8')}appended line\n`, 'utf-8');
+
+    const chunk = readServiceLogChunk(profile, firstCursor);
+    expect(chunk).not.toBeNull();
+    expect(chunk?.text).toContain('A');
+    expect(chunk?.nextCursor).toBeTruthy();
+  });
+
   it('redacts watcher service log tails and chunks', () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'HyinahiTEst');
@@ -569,7 +656,13 @@ describe('watcher desktop core', () => {
     const base = join(serviceDir, serviceName(profile.id));
     writeFileSync(
       `${base}.out.log`,
-      'Authorization: Bearer pb_should_not_leak TOKEN=secret-value\nnormal line\n',
+      [
+        'Authorization: Bearer pb_should_not_leak TOKEN=secret-value',
+        'OPENAI_API_KEY="sk-should-not-leak"',
+        'ANTHROPIC_API_KEY=sk-ant-should-not-leak',
+        'Bearer sk-another-should-not-leak',
+        'normal line',
+      ].join('\n'),
       'utf-8',
     );
 
@@ -579,12 +672,74 @@ describe('watcher desktop core', () => {
 
     expect(status.logs?.out).toContain('Authorization: Bearer [REDACTED]');
     expect(status.logs?.out).toContain('TOKEN=[REDACTED]');
+    expect(status.logs?.out).toContain('OPENAI_API_KEY="[REDACTED]');
+    expect(status.logs?.out).toContain('ANTHROPIC_API_KEY=[REDACTED]');
     expect(status.logs?.out).not.toContain('pb_should_not_leak');
     expect(status.logs?.out).not.toContain('secret-value');
+    expect(status.logs?.out).not.toContain('should-not-leak');
     expect(chunk?.text).toContain('Authorization: Bearer [REDACTED]');
     expect(chunk?.text).toContain('TOKEN=[REDACTED]');
+    expect(chunk?.text).toContain('OPENAI_API_KEY="[REDACTED]');
+    expect(chunk?.text).toContain('ANTHROPIC_API_KEY=[REDACTED]');
     expect(chunk?.text).not.toContain('pb_should_not_leak');
     expect(chunk?.text).not.toContain('secret-value');
+    expect(chunk?.text).not.toContain('should-not-leak');
+  });
+
+  it('does not leak a bearer token split across watcher log chunk boundaries', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'HyinahiTEst');
+    const serviceDir = join(root, '.brain', 'service');
+    mkdirSync(serviceDir, { recursive: true });
+    const profile = saveProfile(paths, {
+      id: 'hyinahitest',
+      name: 'HyinahiTEst',
+      root,
+      indexId: 'idx-hyinahitest',
+      serverUrl: 'https://brain.example',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const base = join(serviceDir, serviceName(profile.id));
+    const prefix = `${'A'.repeat(23_980)}Authorization: Bearer sk-`;
+    writeFileSync(`${base}.out.log`, `${prefix}${'Z'.repeat(40_000)}\nnormal line\n`, 'utf-8');
+
+    const status = readServiceStatus(paths, 'hyinahitest');
+    const outStream = status.logs?.transport.streams.find(stream => stream.id === 'out');
+    const firstChunk = readServiceLogChunk(profile, outStream?.firstCursor ?? '');
+    const secondChunk = readServiceLogChunk(profile, firstChunk?.nextCursor ?? '');
+
+    expect(firstChunk?.text).not.toContain('sk-');
+    expect(secondChunk?.text).toContain('[TRUNCATED_CROSS_CHUNK_SECRET_LINE]');
+    expect(secondChunk?.text).not.toContain('ZZZZZZZZZZZZZZZZ');
+  });
+
+  it('does not leak a short bearer token tail split across watcher log chunk boundaries', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'HyinahiTEst');
+    const serviceDir = join(root, '.brain', 'service');
+    mkdirSync(serviceDir, { recursive: true });
+    const profile = saveProfile(paths, {
+      id: 'hyinahitest',
+      name: 'HyinahiTEst',
+      root,
+      indexId: 'idx-hyinahitest',
+      serverUrl: 'https://brain.example',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const base = join(serviceDir, serviceName(profile.id));
+    const secretPrefix = 'Authorization: Bearer sk-should-not-';
+    const filler = 'A'.repeat(SERVICE_LOG_CHUNK_BYTES - secretPrefix.length);
+    writeFileSync(`${base}.out.log`, `${filler}${secretPrefix}leak\nnormal line\n`, 'utf-8');
+
+    const status = readServiceStatus(paths, 'hyinahitest');
+    const outStream = status.logs?.transport.streams.find(stream => stream.id === 'out');
+    const firstChunk = readServiceLogChunk(profile, outStream?.firstCursor ?? '');
+    const secondChunk = readServiceLogChunk(profile, firstChunk?.nextCursor ?? '');
+
+    expect(firstChunk?.text).not.toContain('sk-should-not');
+    expect(secondChunk?.text).toContain('[TRUNCATED_CROSS_CHUNK_SECRET_LINE]');
+    expect(secondChunk?.text).toContain('normal line');
+    expect(secondChunk?.text).not.toContain('leak');
   });
 
   it('does not treat pending Windows service transitions as settled', () => {

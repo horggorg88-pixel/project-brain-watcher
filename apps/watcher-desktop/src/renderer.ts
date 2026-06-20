@@ -14,6 +14,7 @@ import type {
   SavedProjectProfile,
   WatcherServiceAction,
   WatcherServiceActionResult,
+  WatcherServiceLogStream,
   WatcherServiceLogTail,
   WatcherServiceStatus,
 } from './contracts.js';
@@ -92,6 +93,7 @@ let codexGateVerificationProjectId: string | null = null;
 let refreshInFlight: Promise<void> | null = null;
 const automaticCodexGateAttempts = new Set<string>();
 const serverHeartbeatRefreshMs = 60 * 1000;
+const SERVICE_AI_LOG_CHUNK_LIMIT = 6;
 
 void refresh();
 window.setInterval(() => {
@@ -212,7 +214,8 @@ copyPromptButton?.addEventListener('click', () => {
 });
 
 copyServiceLogsButton?.addEventListener('click', () => {
-  void copyText(serviceAiLogsText())
+  void serviceAiLogsText()
+    .then(text => copyText(text))
     .then(() => writeLog('AI snapshot логов службы скопирован'))
     .catch(error => writeLog(errorMessage(error)));
 });
@@ -789,10 +792,11 @@ function writeLog(value: string): void {
   if (!uiState.consoleOpen) void saveUiState({ ...uiState, consoleOpen: true }).then(() => renderUiState());
 }
 
-function serviceAiLogsText(): string {
+async function serviceAiLogsText(): Promise<string> {
   const statusText = serviceStatusEl?.textContent?.trim() ?? '';
   const commandText = serviceOutputEl?.textContent?.trim() ?? '';
-  const rawText = [statusText, commandText].filter(Boolean).join('\n\n');
+  const expandedLogsText = await serviceAiExpandedLogsText(currentServiceStatus);
+  const rawText = [statusText, commandText, expandedLogsText].filter(Boolean).join('\n\n');
   const safeText = redactAiLogText(rawText);
   const diagnostics = classifyDesktopAiDiagnostics(safeText, currentServiceStatus);
   return JSON.stringify({
@@ -804,6 +808,7 @@ function serviceAiLogsText(): string {
     diagnostics,
     evidence_refs: serviceEvidenceRefs(currentServiceStatus),
     next_actions: diagnostics.map(item => item.nextAction),
+    expanded_log_chunks: expandedLogsText ? redactAiLogText(expandedLogsText) : null,
     machine_snapshot: currentServiceStatus ? {
       installed: currentServiceStatus.installed,
       running: currentServiceStatus.running,
@@ -816,6 +821,29 @@ function serviceAiLogsText(): string {
     rawTail: safeText,
     redacted: safeText !== rawText,
   }, null, 2);
+}
+
+async function serviceAiExpandedLogsText(status: WatcherServiceStatus | null): Promise<string> {
+  const projectId = status?.projectId ?? currentProjectId();
+  const streams = status?.logs?.transport.streams ?? [];
+  const sections = await Promise.all(streams.map(stream => serviceAiStreamText(projectId, stream)));
+  return sections.filter(Boolean).join('\n\n');
+}
+
+async function serviceAiStreamText(projectId: string, stream: WatcherServiceLogStream): Promise<string | null> {
+  if (!stream.firstCursor) return null;
+  const chunks: string[] = [];
+  let cursor: string | null = stream.firstCursor;
+  for (let index = 0; cursor && index < SERVICE_AI_LOG_CHUNK_LIMIT; index += 1) {
+    const chunk = await window.watcherDesktop.service.logChunk(projectId, cursor);
+    if (!chunk) break;
+    chunks.push(chunk.text);
+    cursor = chunk.nextCursor;
+    if (chunk.complete) break;
+  }
+  if (!chunks.length) return null;
+  const suffix = cursor ? '\n[TRUNCATED_BY_AI_COPY_LIMIT]' : '';
+  return `Лог ${stream.label} (${stream.id}):\n${chunks.join('')}${suffix}`;
 }
 
 function classifyDesktopAiDiagnostics(text: string, status: WatcherServiceStatus | null): readonly DesktopAiDiagnostic[] {
@@ -865,9 +893,13 @@ function serviceEvidenceRefs(status: WatcherServiceStatus | null): readonly { re
 
 function redactAiLogText(value: string): string {
   return value
-    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/g, 'Bearer [REDACTED]')
+    .replace(/\bBearer\s+(?:sk-[A-Za-z0-9._-]+|[A-Za-z0-9._~+/=-]{16,})/gi, 'Bearer [REDACTED]')
     .replace(/\bpb_[A-Za-z0-9_-]{10,}\b/g, 'pb_[REDACTED]')
-    .replace(/\b((?:TOKEN|SECRET|PASSWORD|KEY)\s*[:=]\s*)[^\s"',;]+/gi, '$1[REDACTED]');
+    .replace(/\bsk-[A-Za-z0-9._-]{8,}/g, 'sk-[REDACTED]')
+    .replace(
+      /\b((?:MCP_BEARER_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY|TOKEN|SECRET|PASSWORD|KEY)\s*[:=]\s*)(["']?)[^\s"',;]+/gi,
+      '$1$2[REDACTED]',
+    );
 }
 
 function serviceActionLog(result: WatcherServiceActionResult): string {

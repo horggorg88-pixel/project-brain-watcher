@@ -96,6 +96,8 @@ export interface WatcherServiceLogChunk {
   readonly offset: number;
   readonly bytes: number;
   readonly text: string;
+  readonly textEncoding: 'utf8-best-effort';
+  readonly textIntegrity: 'exact' | 'lossy';
   readonly nextCursor: string | null;
   readonly complete: boolean;
 }

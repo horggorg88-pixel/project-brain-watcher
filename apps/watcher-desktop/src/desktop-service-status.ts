@@ -42,6 +42,7 @@ interface ServiceLogCursor {
   readonly sizeBytes: number;
   readonly modifiedAtMs: number;
   readonly headHash: string;
+  readonly snapshotHash?: string;
 }
 
 export interface WindowsServiceState {
@@ -162,15 +163,23 @@ export function readServiceLogChunk(
     const stat = statSync(path);
     if (cursor.offset > stat.size || stat.size < cursor.sizeBytes) return null;
     if (cursor.headHash !== serviceLogHeadHash(path, stat)) return null;
-    const end = Math.min(stat.size, cursor.offset + SERVICE_LOG_CHUNK_BYTES);
+    if (cursor.snapshotHash && cursor.snapshotHash !== serviceLogSnapshotHash(path, cursor)) return null;
+    if (!isSafeUtf8Offset(path, cursor.offset, stat.size)) return null;
+    const end = safeUtf8ChunkEnd(path, cursor.offset, stat.size);
+    if (end <= cursor.offset && cursor.offset < stat.size) return null;
     const body = readBytes(path, cursor.offset, end - cursor.offset);
+    const text = redactServiceLogText(
+      trimPartialLeadingLogLine(stripAnsi(body.toString('utf8')), cursor.offset),
+    );
     return {
       version: 'watcher-log-transport/v1',
       streamId: cursor.streamId,
       cursorId,
       offset: cursor.offset,
       bytes: body.byteLength,
-      text: redactServiceLogText(stripAnsi(body.toString('utf8'))),
+      text,
+      textEncoding: 'utf8-best-effort',
+      textIntegrity: text.includes('\uFFFD') ? 'lossy' : 'exact',
       nextCursor: end < stat.size ? encodeServiceLogCursor(cursor.streamId, end, path, stat) : null,
       complete: end >= stat.size,
     };
@@ -298,7 +307,7 @@ function readTail(path: string): string {
     const size = statSync(path).size;
     const offset = Math.max(0, size - SERVICE_LOG_TAIL_BYTES);
     const tail = readBytes(path, offset, size - offset).toString('utf8');
-    return lastLines(redactServiceLogText(stripAnsi(tail)), SERVICE_LOG_TAIL_LINES);
+    return lastLines(redactServiceLogText(stripAnsi(trimPartialLeadingLogLine(tail, offset))), SERVICE_LOG_TAIL_LINES);
   } catch (error) {
     return `Лог недоступен: ${errorMessage(error)}`;
   }
@@ -317,22 +326,35 @@ function logStream(id: ServiceLogStreamId, label: string, path: string): Watcher
       firstCursor: null,
     };
   }
-  const stat = statSync(path);
-  const tailBytes = Math.min(stat.size, SERVICE_LOG_TAIL_BYTES);
-  return {
-    id,
-    label,
-    path,
-    exists: true,
-    sizeBytes: stat.size,
-    modifiedAt: stat.mtime.toISOString(),
-    tail: {
-      offset: Math.max(0, stat.size - tailBytes),
-      bytes: tailBytes,
-      truncated: stat.size > SERVICE_LOG_TAIL_BYTES,
-    },
-    firstCursor: stat.size > 0 ? encodeServiceLogCursor(id, 0, path, stat) : null,
-  };
+  try {
+    const stat = statSync(path);
+    const tailBytes = Math.min(stat.size, SERVICE_LOG_TAIL_BYTES);
+    return {
+      id,
+      label,
+      path,
+      exists: true,
+      sizeBytes: stat.size,
+      modifiedAt: stat.mtime.toISOString(),
+      tail: {
+        offset: Math.max(0, stat.size - tailBytes),
+        bytes: tailBytes,
+        truncated: stat.size > SERVICE_LOG_TAIL_BYTES,
+      },
+      firstCursor: stat.size > 0 ? encodeServiceLogCursor(id, 0, path, stat) : null,
+    };
+  } catch {
+    return {
+      id,
+      label,
+      path,
+      exists: false,
+      sizeBytes: 0,
+      modifiedAt: null,
+      tail: { offset: 0, bytes: 0, truncated: false },
+      firstCursor: null,
+    };
+  }
 }
 
 function serviceLogPath(profile: SavedProjectProfile, streamId: ServiceLogStreamId): string | null {
@@ -351,6 +373,7 @@ function encodeServiceLogCursor(streamId: ServiceLogStreamId, offset: number, pa
     sizeBytes: stat.size,
     modifiedAtMs: Math.trunc(stat.mtimeMs),
     headHash: serviceLogHeadHash(path, stat),
+    snapshotHash: serviceLogSnapshotHash(path, { offset, sizeBytes: stat.size }),
   };
   return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
 }
@@ -373,7 +396,9 @@ function isServiceLogCursor(value: unknown): value is ServiceLogCursor {
     && isNonNegativeSafeInteger(value.sizeBytes)
     && isNonNegativeSafeInteger(value.modifiedAtMs)
     && typeof value.headHash === 'string'
-    && /^[a-f0-9]{64}$/.test(value.headHash);
+    && /^[a-f0-9]{64}$/.test(value.headHash)
+    && (value.snapshotHash === undefined
+      || (typeof value.snapshotHash === 'string' && /^[a-f0-9]{64}$/.test(value.snapshotHash)));
 }
 
 function isServiceLogStreamId(value: unknown): value is ServiceLogStreamId {
@@ -407,14 +432,50 @@ function stripAnsi(value: string): string {
 function redactServiceLogText(value: string): string {
   return value
     .replace(/Authorization:\s*Bearer\s+[^\s"'}]+/gi, 'Authorization: Bearer [REDACTED]')
-    .replace(/Bearer\s+pb_[A-Za-z0-9._-]+/g, 'Bearer pb_[REDACTED]')
-    .replace(/\b(MCP_BEARER_TOKEN|TOKEN|API_KEY|PASSWORD|SECRET)\s*[=:]\s*[^\s,"'}]+/gi, '$1=[REDACTED]')
+    .replace(/\bBearer\s+(?:sk-[A-Za-z0-9._-]+|pb_[A-Za-z0-9._-]+|[A-Za-z0-9._~+/=-]{16,})/gi, 'Bearer [REDACTED]')
+    .replace(
+      /\b((?:MCP_BEARER_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY|TOKEN|API_KEY|PASSWORD|SECRET)\s*[=:]\s*)(["']?)[^\s,"'};]+/gi,
+      '$1$2[REDACTED]',
+    )
+    .replace(/\bsk-[A-Za-z0-9._-]{8,}/g, 'sk-[REDACTED]')
     .replace(/pb_[A-Za-z0-9._-]{8,}/g, 'pb_[REDACTED]');
 }
 
 function serviceLogHeadHash(path: string, stat: Stats): string {
   const bytes = Math.min(stat.size, SERVICE_LOG_IDENTITY_BYTES);
   return createHash('sha256').update(readBytes(path, 0, bytes)).digest('hex');
+}
+
+function serviceLogSnapshotHash(
+  path: string,
+  cursor: Pick<ServiceLogCursor, 'offset' | 'sizeBytes'>,
+): string {
+  const bytes = Math.max(0, Math.min(SERVICE_LOG_CHUNK_BYTES, cursor.sizeBytes - cursor.offset));
+  return createHash('sha256').update(readBytes(path, cursor.offset, bytes)).digest('hex');
+}
+
+function safeUtf8ChunkEnd(path: string, offset: number, size: number): number {
+  let end = Math.min(size, offset + SERVICE_LOG_CHUNK_BYTES);
+  while (end > offset && end < size && isUtf8ContinuationByte(readBytes(path, end, 1)[0] ?? 0)) {
+    end -= 1;
+  }
+  return end;
+}
+
+function isSafeUtf8Offset(path: string, offset: number, size: number): boolean {
+  if (offset <= 0 || offset >= size) return true;
+  return !isUtf8ContinuationByte(readBytes(path, offset, 1)[0] ?? 0);
+}
+
+function isUtf8ContinuationByte(byte: number): boolean {
+  return (byte & 0b1100_0000) === 0b1000_0000;
+}
+
+function trimPartialLeadingLogLine(value: string, byteOffset: number): string {
+  if (byteOffset <= 0 || value.startsWith('\n')) return value;
+  const newlineIndex = value.indexOf('\n');
+  if (newlineIndex === -1) return '[TRUNCATED_CROSS_CHUNK_SECRET_LINE]';
+  return `[TRUNCATED_CROSS_CHUNK_SECRET_LINE]\n${value.slice(newlineIndex + 1)}`;
 }
 
 function lastLines(value: string, limit: number): string {
