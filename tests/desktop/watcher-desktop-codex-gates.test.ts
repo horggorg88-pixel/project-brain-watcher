@@ -253,6 +253,43 @@ describe('watcher desktop codex gates', () => {
     });
   });
 
+  it('surfaces the failing smoke command reason instead of a generic pending message', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    mkdirSync(root, { recursive: true });
+    writeTrustedCodexProject(paths.homePath, root);
+    stagePersistentVerifierHookFiles(paths.homePath);
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    const result = await verifyDesktopCodexGates(paths, 'demo-project', {
+      runner: async request => {
+        const command = [request.command, ...request.args].join(' ');
+        if (command === 'npm test') {
+          return {
+            exitCode: 1,
+            output: 'FAIL tests/runtime-start/app-version.test.ts TOKEN=pb_secret_value expected v1.4.66 received v1.4.65',
+          };
+        }
+        return { exitCode: 0, output: 'ok' };
+      },
+      now: () => new Date('2026-06-15T10:00:00.000Z'),
+    });
+
+    expect(result.ready).toBe(false);
+    expect(result.message).toContain('Smoke gate Codex упал');
+    expect(result.message).toContain('tests/runtime-start/app-version.test.ts');
+    expect(result.message).toContain('TOKEN=[redacted]');
+    expect(result.message).not.toContain('pb_secret_value');
+  });
+
   it('reads native hook persistence evidence written by Codex hooks', () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');

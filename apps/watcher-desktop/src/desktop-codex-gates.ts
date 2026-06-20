@@ -1162,7 +1162,8 @@ function blockerMessage(evidence: DesktopCodexGateEvidence, checkedAt: string): 
   }
   if (!hasCurrentPassed(evidence.verification.codexRuntime, checkedAt)) return 'Codex CLI ещё не проверен.';
   if (!hasCurrentPassed(evidence.commandRuns.codexHooks, checkedAt)) return 'Persistent-verifier plugin ещё не установлен или не прошёл проверку.';
-  if (!hasCurrentPassed(evidence.verification.smoke, checkedAt)) return 'Smoke gate Codex ещё не прошёл.';
+  const smokeMessage = smokeBlockerMessage(evidence.verification.smoke, checkedAt);
+  if (smokeMessage) return smokeMessage;
   if (!hasCurrentPassed(evidence.verification.rollback, checkedAt)) return 'Rollback-команда Codex gates не подтверждена.';
   if (evidence.verification.hookPersistence?.available === true && evidence.verification.hookPersistence.passed === false) {
     return evidence.verification.hookPersistence.detail;
@@ -1183,6 +1184,14 @@ function blockerMessage(evidence: DesktopCodexGateEvidence, checkedAt: string): 
     return 'Codex hooks установлены. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.';
   }
   return 'Codex gates ожидают SessionStart evidence.';
+}
+
+function smokeBlockerMessage(value: DesktopCodexGateRunEvidence | undefined, checkedAt: string): string | null {
+  if (hasCurrentPassed(value, checkedAt)) return null;
+  if (value?.available === true && value.passed === false) return `Smoke gate Codex упал: ${value.detail}`;
+  if (hasPassed(value) && isStale(value, checkedAt)) return 'Smoke gate Codex устарел. Запусти Codex Gates заново, чтобы обновить npm test evidence.';
+  if (value?.available === true) return value.detail;
+  return 'Smoke gate Codex ещё не запускался. Нажми Codex Gates, чтобы выполнить npm test.';
 }
 
 function hasBaseVerification(evidence: DesktopCodexGateEvidence, checkedAt: string): boolean {
