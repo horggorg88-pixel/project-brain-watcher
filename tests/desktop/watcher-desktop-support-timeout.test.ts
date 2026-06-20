@@ -45,6 +45,9 @@ describe('watcher desktop support job timeout', () => {
           },
         });
       }
+      if (urlOf(input).endsWith('/api/support/jobs/job_timeout/progress')) {
+        return jsonResponse({ ok: true, job: { jobId: 'job_timeout', status: 'running' } });
+      }
       if (urlOf(input).endsWith('/api/support/jobs/job_timeout/complete')) {
         completions.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
         return jsonResponse({ ok: true, job: { jobId: 'job_timeout', status: 'failed' } });

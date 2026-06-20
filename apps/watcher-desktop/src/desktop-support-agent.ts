@@ -2,7 +2,7 @@ import { buildDesktopConnectionCheck } from './desktop-connection-check.js';
 import { verifyDesktopCodexGates } from './desktop-codex-gates.js';
 import { previewDiagnostics } from './desktop-core.js';
 import type { DesktopCorePaths } from './desktop-profile-store.js';
-import { ensureManagedDeviceEnrolled, readSupportDeviceCredentials } from './desktop-support-device.js';
+import { ensureManagedDeviceEnrolled, readSupportDeviceCredentials, type SupportDeviceCredentials } from './desktop-support-device.js';
 import { runServiceAction } from './desktop-service-runner.js';
 import { readDesktopUiState } from './desktop-ui-state.js';
 
@@ -84,11 +84,20 @@ export async function runSupportAgentOnce(
   }
   const projectId = projectIdFromPayload(job.payload, fallbackProjectId);
   try {
+    await postSupportProgress(credentials, job, 'claimed', 10, 'Пульт получил команду.');
+    await postSupportProgress(
+      credentials,
+      job,
+      job.action,
+      20,
+      supportActionProgressMessage(job.action),
+    );
     const result = await withSupportJobTimeout(
       executeSupportJob(paths, job, projectId, credentials.meshUrl),
       supportJobTimeoutMs(job.action),
       job.action,
     );
+    await postSupportProgress(credentials, job, 'finalize', 95, 'Отправляем результат команды.');
     await postSupport(
       credentials.supportBaseUrl,
       `/api/support/jobs/${encodeURIComponent(job.jobId)}/complete`,
@@ -98,6 +107,7 @@ export async function runSupportAgentOnce(
     return { enrolled: true, status: 'completed', jobId: job.jobId, message: `${job.action} выполнен.` };
   } catch (error) {
     const result = { error: error instanceof Error ? error.message : 'Support job failed.' };
+    await postSupportProgress(credentials, job, 'failed', 100, result.error);
     await postSupport(
       credentials.supportBaseUrl,
       `/api/support/jobs/${encodeURIComponent(job.jobId)}/complete`,
@@ -106,6 +116,23 @@ export async function runSupportAgentOnce(
     );
     return { enrolled: true, status: 'failed', jobId: job.jobId, message: result.error };
   }
+}
+
+async function postSupportProgress(
+  credentials: SupportDeviceCredentials,
+  job: SupportJob,
+  stage: string,
+  progressPercent: number,
+  message: string,
+): Promise<void> {
+  await postSupport(
+    credentials.supportBaseUrl,
+    `/api/support/jobs/${encodeURIComponent(job.jobId)}/progress`,
+    credentials.deviceToken,
+    { stage, progressPercent, message },
+  ).catch(error => {
+    console.warn('Support job progress failed:', error instanceof Error ? error.message : String(error));
+  });
 }
 
 async function executeSupportJob(
@@ -162,6 +189,16 @@ function supportJobTimeoutMs(action: SupportJobAction): number {
   if (action === 'update_watcher') return 11 * 60_000;
   if (action === 'repair_watcher_service' || action === 'restart_watcher') return 4 * 60_000;
   return DEFAULT_SUPPORT_JOB_TIMEOUT_MS;
+}
+
+function supportActionProgressMessage(action: SupportJobAction): string {
+  if (action === 'collect_diagnostics') return 'Собираем диагностику проекта и службы.';
+  if (action === 'repair_watcher_service') return 'Проверяем и чиним watcher-службу.';
+  if (action === 'restart_watcher') return 'Перезапускаем watcher-службу.';
+  if (action === 'update_watcher') return 'Проверяем и устанавливаем обновление watcher.';
+  if (action === 'verify_codex_gates') return 'Проверяем Codex gates и evidence.';
+  if (action === 'refresh_mcp_config') return 'Проверяем MCP-конфиг и подключение.';
+  return 'Проверяем состояние удалённого доступа.';
 }
 
 async function postSupport(

@@ -65,6 +65,9 @@ describe('watcher desktop support device', () => {
           },
         });
       }
+      if (urlOf(input).endsWith('/api/support/jobs/job_test/progress')) {
+        return jsonResponse({ ok: true, job: { jobId: 'job_test', status: 'running' } });
+      }
       if (urlOf(input).endsWith('/api/support/jobs/job_test/complete')) {
         return jsonResponse({ ok: true, job: { jobId: 'job_test', status: 'succeeded' } });
       }
@@ -80,8 +83,50 @@ describe('watcher desktop support device', () => {
       'POST http://console.example.test/api/support/devices/enroll',
       'POST http://console.example.test/api/support/devices/heartbeat',
       'POST http://console.example.test/api/support/jobs/claim',
+      'POST http://console.example.test/api/support/jobs/job_test/progress',
+      'POST http://console.example.test/api/support/jobs/job_test/progress',
+      'POST http://console.example.test/api/support/jobs/job_test/progress',
       'POST http://console.example.test/api/support/jobs/job_test/complete',
     ]);
+  });
+
+  it('posts progress events while executing claimed support jobs', async () => {
+    const paths = tempPaths();
+    const progressBodies: Record<string, unknown>[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      if (urlOf(input).endsWith('/api/support/devices/enroll')) {
+        return jsonResponse({ ok: true, device: { deviceId: 'dev_progress', meshUrl: null }, deviceToken: 'pbs_device_token' });
+      }
+      if (urlOf(input).endsWith('/api/support/devices/heartbeat')) {
+        return jsonResponse({ ok: true, device: { deviceId: 'dev_progress' } });
+      }
+      if (urlOf(input).endsWith('/api/support/jobs/claim')) {
+        return jsonResponse({
+          ok: true,
+          job: {
+            jobId: 'job_progress',
+            action: 'collect_diagnostics',
+            payload: { projectId: 'mcp-project' },
+          },
+        });
+      }
+      if (urlOf(input).endsWith('/api/support/jobs/job_progress/progress')) {
+        progressBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+        return jsonResponse({ ok: true, job: { jobId: 'job_progress', status: 'running' } });
+      }
+      if (urlOf(input).endsWith('/api/support/jobs/job_progress/complete')) {
+        return jsonResponse({ ok: true, job: { jobId: 'job_progress', status: 'succeeded' } });
+      }
+      return jsonResponse({ ok: false, error: 'unexpected request' }, 404);
+    }));
+
+    await enrollManagedDevice(paths, account(), 'mcp-project');
+    const result = await runSupportAgentOnce(paths, 'mcp-project');
+
+    expect(result.status).toBe('completed');
+    expect(progressBodies.map(body => body.stage)).toContain('collect_diagnostics');
+    expect(progressBodies.some(body => body.progressPercent === 20)).toBe(true);
+    expect(JSON.stringify(progressBodies)).not.toContain(DEVICE_TOKEN);
   });
 
   it('auto-enrolls from the saved project service secret before heartbeat', async () => {
