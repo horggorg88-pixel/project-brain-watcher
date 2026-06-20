@@ -82,6 +82,28 @@ export function renderConnectionCheck(check: DesktopConnectionCheck, element: HT
   )).join('');
 }
 
+export function withCodexGateProgress(
+  check: DesktopConnectionCheck,
+  activeProjectId: string | null,
+): DesktopConnectionCheck {
+  if (!activeProjectId || (check.projectId ?? '') !== activeProjectId) return check;
+  const nodes = check.nodes.map(node => node.id === 'codexGates'
+    ? {
+        ...node,
+        status: 'waiting' as const,
+        detail: 'Проверяем Codex CLI, hooks, smoke и rollback. Обычно это занимает до пары минут.',
+        action: 'none' as const,
+        actionLabel: null,
+      }
+    : node);
+  return {
+    ...check,
+    overall: check.overall === 'ready' ? 'action_required' : check.overall,
+    message: 'Проверяем Codex Gates.',
+    nodes,
+  };
+}
+
 function toggleClass(status: string): string {
   if (status === 'active') return 'on';
   if (status === 'waiting') return 'wait';

@@ -25,7 +25,8 @@ import { isServiceActionSettled, prepareServiceSecretForLaunch, resolveVerifiedS
 import { parseWindowsServiceConfigOutput, parseWindowsServiceOutput } from '../../apps/watcher-desktop/src/desktop-service-status.js';
 import { readDesktopUiState, saveDesktopUiState } from '../../apps/watcher-desktop/src/desktop-ui-state.js';
 import { defaultProfile, serviceName } from '../../apps/watcher-desktop/src/desktop-profile-store.js';
-import type { DesktopCodexGateRunEvidence, WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
+import { withCodexGateProgress } from '../../apps/watcher-desktop/src/renderer-view.js';
+import type { DesktopCodexGateRunEvidence, DesktopConnectionCheck, WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
 
 const tempDirs: string[] = [];
 const VALID_TEST_BEARER = 'valid_test_bearer_12345678901234567890';
@@ -1153,6 +1154,55 @@ describe('watcher desktop core', () => {
     expect(node?.action).toBe('verify_codex_gates');
     expect(node?.actionLabel).toBe('Повторить');
     expect(node?.detail).toBe('Native hook failed');
+  });
+
+  it('shows Codex gate progress instead of a stale smoke failure while verification is running', () => {
+    const check = {
+      overall: 'action_required',
+      message: 'Остался шаг подключения. Причина: Codex Gates: Smoke gate Codex упал',
+      projectId: 'client-project',
+      checkedAt: new Date().toISOString(),
+      nodes: [
+        { id: 'project', label: 'Проект', status: 'active', detail: 'repo', action: 'none', actionLabel: null },
+        {
+          id: 'codexGates',
+          label: 'Codex Gates',
+          status: 'inactive',
+          detail: 'Smoke gate Codex упал: Команда завершилась с ошибкой',
+          action: 'verify_codex_gates',
+          actionLabel: 'Повторить',
+        },
+      ],
+      codexGates: {
+        ready: false,
+        message: 'Smoke gate Codex упал: Команда завершилась с ошибкой',
+        checkedAt: new Date().toISOString(),
+        evidence: {
+          commandRuns: {},
+          verification: {
+            smoke: {
+              ...codexGateRun('Команда завершилась с ошибкой', 'npm test'),
+              passed: false,
+              exitCode: 1,
+            },
+          },
+        },
+      },
+      service: statusFixture({ projectId: 'client-project' }),
+      diagnostics: { ready: false, summary: 'нет данных', findings: [] },
+    } satisfies DesktopConnectionCheck;
+
+    const visible = withCodexGateProgress(check, 'client-project');
+    const node = visible.nodes.find(item => item.id === 'codexGates');
+
+    expect(node).toMatchObject({
+      status: 'waiting',
+      detail: 'Проверяем Codex CLI, hooks, smoke и rollback. Обычно это занимает до пары минут.',
+      action: 'none',
+      actionLabel: null,
+    });
+    expect(node?.detail).not.toContain('упал');
+    expect(visible.codexGates.message).toContain('упал');
   });
 
   it('builds onboarding events from completed desktop connection steps', () => {

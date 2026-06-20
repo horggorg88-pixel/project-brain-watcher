@@ -31,6 +31,7 @@ import {
   renderShellAccess,
   sectionFrom,
   setText,
+  withCodexGateProgress,
 } from './renderer-view.js';
 import { actionLabel, decisionLabel, isServiceAction, setServiceActionState, setServiceBusy } from './renderer-service-ui.js';
 import {
@@ -86,6 +87,7 @@ let currentPackage: DesktopConfigPackage | null = null;
 let currentServiceStatus: WatcherServiceStatus | null = null;
 let pendingServiceAction: PendingServiceActionConfirmation | null = null;
 let automaticCodexGateRunning = false;
+let codexGateVerificationProjectId: string | null = null;
 let refreshInFlight: Promise<void> | null = null;
 const automaticCodexGateAttempts = new Set<string>();
 const serverHeartbeatRefreshMs = 60 * 1000;
@@ -297,10 +299,17 @@ async function handleCheckAction(value: string | undefined): Promise<void> {
       writeLog('Проверка завершена. Результат обновлён в обзорном чеклисте.');
       return;
     case 'verify_codex_gates': {
+      const projectId = currentProjectId();
+      codexGateVerificationProjectId = projectId;
       writeLog('Проверяем Codex CLI, persistent-verifier, Runtime Context hooks, smoke и rollback...');
-      const result = await window.watcherDesktop.codexGates.verify(currentProjectId());
-      writeLog(result.message);
       await refresh();
+      try {
+        const result = await window.watcherDesktop.codexGates.verify(projectId);
+        writeLog(result.message);
+      } finally {
+        codexGateVerificationProjectId = null;
+        await refresh();
+      }
       return;
     }
     case 'open_logs':
@@ -398,9 +407,10 @@ async function refreshInternal(): Promise<void> {
   currentPackage = pack;
   currentModes = modes;
   activeModeId = resolveActiveModeId(currentModes, activeModeId);
-  renderOverall(check, overallStatusEl);
-  renderConnectionCause(check, connectionCauseEl);
-  renderConnectionCheck(check, checklistEl);
+  const visibleCheck = withCodexGateProgress(check, codexGateVerificationProjectId);
+  renderOverall(visibleCheck, overallStatusEl);
+  renderConnectionCause(visibleCheck, connectionCauseEl);
+  renderConnectionCheck(visibleCheck, checklistEl);
   currentServiceStatus = check.service;
   renderService(check.service, serviceStatusEl, serviceSummaryEl);
   setServiceActionState(serviceButtons, check.service);
@@ -411,6 +421,7 @@ async function refreshInternal(): Promise<void> {
 }
 
 function scheduleAutomaticCodexGateVerification(check: DesktopConnectionCheck): void {
+  if (codexGateVerificationProjectId) return;
   if (!needsAutomaticCodexGateVerification(check)) return;
   const projectId = check.projectId ?? currentProjectId();
   const attemptKey = `${projectId}:${check.codexGates.message}`;
@@ -474,7 +485,9 @@ function isStale(value: DesktopCodexGateRunEvidence | undefined, checkedAt: stri
 }
 
 async function runAutomaticCodexGateVerification(projectId: string): Promise<void> {
+  codexGateVerificationProjectId = projectId;
   writeLog('Автоматически настраиваем Codex: CLI, persistent-verifier, Runtime Context hooks, smoke и rollback...');
+  await refresh();
   try {
     const result = await window.watcherDesktop.codexGates.verify(projectId);
     writeLog(result.message);
@@ -486,6 +499,8 @@ async function runAutomaticCodexGateVerification(projectId: string): Promise<voi
     }
   } finally {
     automaticCodexGateRunning = false;
+    codexGateVerificationProjectId = null;
+    await refresh();
   }
 }
 
