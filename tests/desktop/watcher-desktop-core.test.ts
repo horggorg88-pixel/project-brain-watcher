@@ -1515,6 +1515,33 @@ describe('watcher desktop core', () => {
     expect(projects[0]?.serverUrl).toBe('http://149.33.14.250');
   });
 
+  it('prefers the real mcp-monorepo folder before the legacy Desktop MCP fallback', () => {
+    const paths = tempPaths();
+    const legacyRoot = join(paths.homePath, 'Desktop', 'MCP');
+    const monorepoRoot = join(paths.homePath, 'Desktop', 'mcp-monorepo');
+    mkdirSync(legacyRoot, { recursive: true });
+    mkdirSync(monorepoRoot, { recursive: true });
+
+    const profile = defaultProfile(paths);
+
+    expect(profile?.id).toBe('mcp-monorepo');
+    expect(profile?.root).toBe(monorepoRoot);
+  });
+
+  it('uses the explicit runtime project root before desktop fallbacks', () => {
+    const paths = tempPaths();
+    const legacyRoot = join(paths.homePath, 'Desktop', 'MCP');
+    const runtimeRoot = join(paths.homePath, 'Runtime Project');
+    mkdirSync(legacyRoot, { recursive: true });
+    mkdirSync(runtimeRoot, { recursive: true });
+    vi.stubEnv('PROJECT_BRAIN_E2E_PROJECT_ROOT', runtimeRoot);
+
+    const profile = defaultProfile(paths);
+
+    expect(profile?.id).toBe('runtime-project');
+    expect(profile?.root).toBe(runtimeRoot);
+  });
+
   it('treats the default Codex-backed profile as a configured project in diagnostics', () => {
     const paths = tempPaths();
     const codexDir = join(paths.homePath, '.codex');

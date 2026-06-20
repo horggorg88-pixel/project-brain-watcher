@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { McpConfigDiscovery, ProjectDraft, SavedProjectProfile } from './contracts.js';
 import { readDesktopAccessHandoff, stageDesktopAccessHandoffForProfile } from './desktop-access-handoff.js';
 import { stageProjectBrainFiles } from './desktop-brain-bootstrap.js';
@@ -43,18 +43,40 @@ export function saveProfile(paths: DesktopCorePaths, project: ProjectDraft): Sav
 }
 
 export function defaultProfile(paths: DesktopCorePaths): SavedProjectProfile | null {
-  const root = join(paths.homePath, 'Desktop', 'MCP');
+  const root = defaultProjectRoot(paths);
   if (!existsSync(root)) return null;
+  const id = defaultProjectId(root);
   return {
-    id: 'mcp-monorepo',
-    name: 'MCP Monorepo',
+    id,
+    name: readableDefaultProjectName(root, id),
     root,
-    indexId: 'idx-mcp-monorepo',
+    indexId: `idx-${id}`,
     serverUrl: '',
     consoleUrl: '',
     tokenEnv: 'MCP_BEARER_TOKEN',
     createdAt: new Date(0).toISOString(),
   };
+}
+
+function defaultProjectRoot(paths: DesktopCorePaths): string {
+  const runtimeRoot = process.env.PROJECT_BRAIN_E2E_PROJECT_ROOT?.trim();
+  const candidates = [
+    runtimeRoot,
+    join(paths.homePath, 'Desktop', 'mcp-monorepo'),
+    join(paths.homePath, 'Desktop', 'MCP'),
+  ].filter((value): value is string => Boolean(value));
+  return candidates.find(candidate => existsSync(candidate)) ?? candidates[candidates.length - 1];
+}
+
+function defaultProjectId(root: string): string {
+  const slug = basename(root).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return slug === 'mcp' ? 'mcp-monorepo' : slug || 'mcp-monorepo';
+}
+
+function readableDefaultProjectName(root: string, id: string): string {
+  const name = basename(root).trim();
+  if (name.toLowerCase() === 'mcp') return 'MCP Monorepo';
+  return name || id;
 }
 
 export function applyMcpConfigToProfile(
