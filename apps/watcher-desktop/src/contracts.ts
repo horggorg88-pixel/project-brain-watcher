@@ -63,6 +63,41 @@ export interface WatcherServiceLogTail {
   readonly wrapper: string;
   readonly out: string;
   readonly err: string;
+  readonly transport: WatcherServiceLogTransport;
+}
+
+export interface WatcherServiceLogTransport {
+  readonly version: 'watcher-log-transport/v1';
+  readonly chunkSizeBytes: number;
+  readonly streams: readonly WatcherServiceLogStream[];
+}
+
+export interface WatcherServiceLogStream {
+  readonly id: 'out' | 'err' | 'wrapper';
+  readonly label: string;
+  readonly path: string;
+  readonly exists: boolean;
+  readonly sizeBytes: number;
+  readonly modifiedAt: string | null;
+  readonly tail: WatcherServiceLogRange;
+  readonly firstCursor: string | null;
+}
+
+export interface WatcherServiceLogRange {
+  readonly offset: number;
+  readonly bytes: number;
+  readonly truncated: boolean;
+}
+
+export interface WatcherServiceLogChunk {
+  readonly version: 'watcher-log-transport/v1';
+  readonly streamId: 'out' | 'err' | 'wrapper';
+  readonly cursorId: string;
+  readonly offset: number;
+  readonly bytes: number;
+  readonly text: string;
+  readonly nextCursor: string | null;
+  readonly complete: boolean;
 }
 
 export interface ProjectDraft {
@@ -329,6 +364,7 @@ export interface WatcherDesktopApi {
     status(projectId?: string): Promise<WatcherServiceStatus>;
     run(request: WatcherServiceActionRequest): Promise<WatcherServiceActionResult>;
     fullCheck(projectId: string): Promise<DesktopConnectionCheck>;
+    logChunk(projectId: string, cursorId: string): Promise<WatcherServiceLogChunk | null>;
   };
   readonly codexGates: {
     status(projectId: string): Promise<DesktopCodexGateStatus>;

@@ -1,6 +1,15 @@
 import { app, BrowserWindow, Tray, Menu, ipcMain, dialog, clipboard } from 'electron';
 import { existsSync, writeFileSync } from 'node:fs';
-import type { AccessLoginRequest, DesktopConfigSaveResult, DesktopUiState, McpDiffPreview, ProjectDraft, ProjectImportResult, WatcherServiceActionRequest } from './contracts.js';
+import type {
+  AccessLoginRequest,
+  DesktopConfigSaveResult,
+  DesktopUiState,
+  McpDiffPreview,
+  ProjectDraft,
+  ProjectImportResult,
+  WatcherServiceActionRequest,
+  WatcherServiceLogChunk,
+} from './contracts.js';
 import { loginAccess, logoutAccess, readAccessState } from './desktop-access.js';
 import { resolveDesktopAppAssetPaths } from './desktop-app-paths.js';
 import { buildDesktopConfigPackage } from './desktop-config-package.js';
@@ -10,7 +19,19 @@ import { importProjectConfig } from './desktop-config-import.js';
 import { listDesktopModeSummaries } from './desktop-mode-summary.js';
 import { reportDesktopOnboardingProgress } from './desktop-onboarding-events.js';
 import { readDesktopUiState, saveDesktopUiState } from './desktop-ui-state.js';
-import { ensureManagedDeviceEnrolled, previewDiagnostics, previewMcpDiff, listDesktopProjectProfiles, readManagedDeviceStatus, readServiceStatus, runServiceAction, saveProfile, type DesktopCorePaths } from './desktop-core.js';
+import {
+  ensureManagedDeviceEnrolled,
+  previewDiagnostics,
+  previewMcpDiff,
+  listDesktopProjectProfiles,
+  readManagedDeviceStatus,
+  readServiceLogChunk,
+  readServiceStatus,
+  resolveServiceProfile,
+  runServiceAction,
+  saveProfile,
+  type DesktopCorePaths,
+} from './desktop-core.js';
 import { startDesktopSupportAgent } from './desktop-support-agent.js';
 
 const DEBUG_PORT = '9223';
@@ -134,6 +155,10 @@ function registerIpcHandlers(): void {
     const check = await buildDesktopConnectionCheck(paths, projectId);
     void reportDesktopOnboardingProgress(paths, projectId, check);
     return check;
+  });
+  ipcMain.handle('service:log-chunk', (_event, projectId: string, cursorId: string): WatcherServiceLogChunk | null => {
+    const profile = resolveServiceProfile(corePaths(), projectId);
+    return profile ? readServiceLogChunk(profile, cursorId) : null;
   });
   ipcMain.handle('codex-gates:status', (_event, projectId: string) => (
     readDesktopCodexGateEvidence(corePaths(), projectId)

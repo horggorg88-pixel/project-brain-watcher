@@ -812,6 +812,7 @@ function serviceAiLogsText(): string {
       lastSyncAt: currentServiceStatus.lastSyncAt,
       lastError: currentServiceStatus.lastError,
     } : null,
+    log_transport: currentServiceStatus?.logs?.transport ?? null,
     rawTail: safeText,
     redacted: safeText !== rawText,
   }, null, 2);

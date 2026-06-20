@@ -1,7 +1,15 @@
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readFileSync, readSync, statSync } from 'node:fs';
+import type { Stats } from 'node:fs';
 import { join } from 'node:path';
-import type { SavedProjectProfile, WatcherServiceLogTail, WatcherServiceStatus } from './contracts.js';
+import type {
+  SavedProjectProfile,
+  WatcherServiceLogChunk,
+  WatcherServiceLogStream,
+  WatcherServiceLogTail,
+  WatcherServiceStatus,
+} from './contracts.js';
 import {
   defaultProfile,
   readProfiles,
@@ -13,6 +21,10 @@ import {
 const WATCHER_LOCK_TTL_MS = 90_000;
 const SERVICE_LOG_TAIL_BYTES = 16_384;
 const SERVICE_LOG_TAIL_LINES = 80;
+const SERVICE_LOG_CHUNK_BYTES = 24_000;
+const SERVICE_LOG_IDENTITY_BYTES = 4096;
+
+type ServiceLogStreamId = 'out' | 'err' | 'wrapper';
 
 interface RuntimeLockFile {
   readonly owner: {
@@ -21,6 +33,15 @@ interface RuntimeLockFile {
     readonly pid: number;
   };
   readonly updated_at: number;
+}
+
+interface ServiceLogCursor {
+  readonly version: 1;
+  readonly streamId: ServiceLogStreamId;
+  readonly offset: number;
+  readonly sizeBytes: number;
+  readonly modifiedAtMs: number;
+  readonly headHash: string;
 }
 
 export interface WindowsServiceState {
@@ -117,7 +138,45 @@ export function readServiceLogTail(profile: SavedProjectProfile): WatcherService
     wrapper: readTail(wrapperPath),
     out: readTail(outPath),
     err: readTail(errPath),
+    transport: {
+      version: 'watcher-log-transport/v1',
+      chunkSizeBytes: SERVICE_LOG_CHUNK_BYTES,
+      streams: [
+        logStream('out', 'Лог работы watcher', outPath),
+        logStream('err', 'Ошибки watcher', errPath),
+        logStream('wrapper', 'Лог Windows-службы', wrapperPath),
+      ],
+    },
   };
+}
+
+export function readServiceLogChunk(
+  profile: SavedProjectProfile,
+  cursorId: string,
+): WatcherServiceLogChunk | null {
+  const cursor = decodeServiceLogCursor(cursorId);
+  if (!cursor) return null;
+  const path = serviceLogPath(profile, cursor.streamId);
+  if (!path || !existsSync(path)) return null;
+  try {
+    const stat = statSync(path);
+    if (cursor.offset > stat.size || stat.size < cursor.sizeBytes) return null;
+    if (cursor.headHash !== serviceLogHeadHash(path, stat)) return null;
+    const end = Math.min(stat.size, cursor.offset + SERVICE_LOG_CHUNK_BYTES);
+    const body = readBytes(path, cursor.offset, end - cursor.offset);
+    return {
+      version: 'watcher-log-transport/v1',
+      streamId: cursor.streamId,
+      cursorId,
+      offset: cursor.offset,
+      bytes: body.byteLength,
+      text: redactServiceLogText(stripAnsi(body.toString('utf8'))),
+      nextCursor: end < stat.size ? encodeServiceLogCursor(cursor.streamId, end, path, stat) : null,
+      complete: end >= stat.size,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function readWindowsServiceState(profile: SavedProjectProfile): WindowsServiceState {
@@ -237,16 +296,125 @@ function readTail(path: string): string {
   if (!existsSync(path)) return '';
   try {
     const size = statSync(path).size;
-    const content = readFileSync(path, 'utf-8');
-    const tail = size > SERVICE_LOG_TAIL_BYTES ? content.slice(-SERVICE_LOG_TAIL_BYTES) : content;
-    return lastLines(stripAnsi(tail), SERVICE_LOG_TAIL_LINES);
+    const offset = Math.max(0, size - SERVICE_LOG_TAIL_BYTES);
+    const tail = readBytes(path, offset, size - offset).toString('utf8');
+    return lastLines(redactServiceLogText(stripAnsi(tail)), SERVICE_LOG_TAIL_LINES);
   } catch (error) {
     return `Лог недоступен: ${errorMessage(error)}`;
   }
 }
 
+function logStream(id: ServiceLogStreamId, label: string, path: string): WatcherServiceLogStream {
+  if (!existsSync(path)) {
+    return {
+      id,
+      label,
+      path,
+      exists: false,
+      sizeBytes: 0,
+      modifiedAt: null,
+      tail: { offset: 0, bytes: 0, truncated: false },
+      firstCursor: null,
+    };
+  }
+  const stat = statSync(path);
+  const tailBytes = Math.min(stat.size, SERVICE_LOG_TAIL_BYTES);
+  return {
+    id,
+    label,
+    path,
+    exists: true,
+    sizeBytes: stat.size,
+    modifiedAt: stat.mtime.toISOString(),
+    tail: {
+      offset: Math.max(0, stat.size - tailBytes),
+      bytes: tailBytes,
+      truncated: stat.size > SERVICE_LOG_TAIL_BYTES,
+    },
+    firstCursor: stat.size > 0 ? encodeServiceLogCursor(id, 0, path, stat) : null,
+  };
+}
+
+function serviceLogPath(profile: SavedProjectProfile, streamId: ServiceLogStreamId): string | null {
+  const base = join(profile.root, '.brain', 'service', serviceName(profile.id));
+  if (streamId === 'out') return `${base}.out.log`;
+  if (streamId === 'err') return `${base}.err.log`;
+  if (streamId === 'wrapper') return `${base}.wrapper.log`;
+  return null;
+}
+
+function encodeServiceLogCursor(streamId: ServiceLogStreamId, offset: number, path: string, stat: Stats): string {
+  const cursor: ServiceLogCursor = {
+    version: 1,
+    streamId,
+    offset,
+    sizeBytes: stat.size,
+    modifiedAtMs: Math.trunc(stat.mtimeMs),
+    headHash: serviceLogHeadHash(path, stat),
+  };
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+function decodeServiceLogCursor(cursorId: string): ServiceLogCursor | null {
+  try {
+    const decoded = Buffer.from(cursorId, 'base64url').toString('utf8');
+    const parsed = JSON.parse(decoded) as unknown;
+    return isServiceLogCursor(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function isServiceLogCursor(value: unknown): value is ServiceLogCursor {
+  if (!isRecord(value)) return false;
+  return value.version === 1
+    && isServiceLogStreamId(value.streamId)
+    && isNonNegativeSafeInteger(value.offset)
+    && isNonNegativeSafeInteger(value.sizeBytes)
+    && isNonNegativeSafeInteger(value.modifiedAtMs)
+    && typeof value.headHash === 'string'
+    && /^[a-f0-9]{64}$/.test(value.headHash);
+}
+
+function isServiceLogStreamId(value: unknown): value is ServiceLogStreamId {
+  return value === 'out' || value === 'err' || value === 'wrapper';
+}
+
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function readBytes(path: string, offset: number, byteLength: number): Buffer {
+  if (byteLength <= 0) return Buffer.alloc(0);
+  const fd = openSync(path, 'r');
+  try {
+    const buffer = Buffer.alloc(byteLength);
+    const bytesRead = readSync(fd, buffer, 0, byteLength, offset);
+    return buffer.subarray(0, bytesRead);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 function stripAnsi(value: string): string {
-  return value.replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '').replace(/\r/g, '');
+  return value
+    .replace(/\u001B\][^\u0007]*(?:\u0007|\u001B\\)/g, '')
+    .replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '')
+    .replace(/\u001B[@-Z\\-_]/g, '')
+    .replace(/\r/g, '');
+}
+
+function redactServiceLogText(value: string): string {
+  return value
+    .replace(/Authorization:\s*Bearer\s+[^\s"'}]+/gi, 'Authorization: Bearer [REDACTED]')
+    .replace(/Bearer\s+pb_[A-Za-z0-9._-]+/g, 'Bearer pb_[REDACTED]')
+    .replace(/\b(MCP_BEARER_TOKEN|TOKEN|API_KEY|PASSWORD|SECRET)\s*[=:]\s*[^\s,"'}]+/gi, '$1=[REDACTED]')
+    .replace(/pb_[A-Za-z0-9._-]{8,}/g, 'pb_[REDACTED]');
+}
+
+function serviceLogHeadHash(path: string, stat: Stats): string {
+  const bytes = Math.min(stat.size, SERVICE_LOG_IDENTITY_BYTES);
+  return createHash('sha256').update(readBytes(path, 0, bytes)).digest('hex');
 }
 
 function lastLines(value: string, limit: number): string {

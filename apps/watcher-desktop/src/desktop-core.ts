@@ -15,7 +15,7 @@ import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { readDesktopServiceSecretState } from './desktop-service-secret.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 export { readProfiles, saveProfile, type DesktopCorePaths } from './desktop-profile-store.js';
-export { readServiceStatus } from './desktop-service-status.js';
+export { readServiceLogChunk, readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 export { runServiceAction } from './desktop-service-runner.js';
 export {
   enrollManagedDevice,

@@ -55,6 +55,7 @@ describe('watcher desktop contract', () => {
     expect(preloadSource).toContain("ipcRenderer.invoke('projects:save-config-package'");
     expect(preloadSource).toContain("ipcRenderer.invoke('service:run'");
     expect(preloadSource).toContain("ipcRenderer.invoke('service:full-check'");
+    expect(preloadSource).toContain("ipcRenderer.invoke('service:log-chunk'");
     expect(preloadSource).toContain("ipcRenderer.invoke('ui:load-state'");
     expect(preloadSource).toContain("ipcRenderer.invoke('modes:list'");
     expect(preloadSource).not.toContain('ipcRenderer.on');
@@ -63,6 +64,7 @@ describe('watcher desktop contract', () => {
     expect(mainSource).toContain("ipcMain.handle('window:minimize'");
     expect(mainSource).toContain("ipcMain.handle('window:toggle-maximize'");
     expect(mainSource).toContain("ipcMain.handle('window:close'");
+    expect(mainSource).toContain("ipcMain.handle('service:log-chunk'");
     expect(contractsSource).not.toContain('readonly serverVerified?: boolean');
     expect(contractsSource).toContain('logout(): Promise<DesktopAccessState>');
     expect(contractsSource).toContain('windowControls');
@@ -81,6 +83,7 @@ describe('watcher desktop contract', () => {
     expect(rendererSource).toContain('Папка Brain-конфигов обновлена');
     expect(rendererSource).toContain('.brain/mcp.json с bearer');
     expect(contractsSource).toContain('fullCheck(projectId: string)');
+    expect(contractsSource).toContain('logChunk(projectId: string, cursorId: string)');
     expect(rendererSource).toContain('service.fullCheck');
     expect(rendererSource).toContain('data-check-action');
     expect(rendererSource).toContain('handleCheckAction');

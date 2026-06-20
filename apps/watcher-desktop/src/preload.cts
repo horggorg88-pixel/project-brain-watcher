@@ -18,6 +18,7 @@ import type {
   WatcherDesktopApi,
   WatcherServiceActionRequest,
   WatcherServiceActionResult,
+  WatcherServiceLogChunk,
   WatcherServiceStatus,
 } from './contracts.js';
 
@@ -42,6 +43,9 @@ const api: WatcherDesktopApi = {
     ),
     fullCheck: (projectId: string) => (
       ipcRenderer.invoke('service:full-check', projectId) as Promise<DesktopConnectionCheck>
+    ),
+    logChunk: (projectId: string, cursorId: string) => (
+      ipcRenderer.invoke('service:log-chunk', projectId, cursorId) as Promise<WatcherServiceLogChunk | null>
     ),
   },
   codexGates: {
