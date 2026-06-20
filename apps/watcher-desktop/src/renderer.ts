@@ -39,6 +39,7 @@ import {
   setServiceConfirmationHint,
   type PendingServiceActionConfirmation,
 } from './renderer-service-ui.js';
+import { serviceCommandStatusLine } from './renderer-service-command-status.js';
 
 declare global {
   interface Window {
@@ -870,12 +871,14 @@ function redactAiLogText(value: string): string {
 
 function serviceActionLog(result: WatcherServiceActionResult): string {
   const output = result.output.trim() || 'Команда завершилась без вывода';
+  const commandStatus = result.commandStatus ? serviceCommandStatusLine(result.commandStatus) : null;
   const lines = [
     `${decisionLabel(result.policy.decision)}: код=${result.exitCode ?? 'нет'}`,
     `Проект: ${result.status.projectId ?? currentProjectId()}`,
     `Папка: ${result.status.root ?? selectedProject()?.root ?? 'не определена'}`,
+    commandStatus,
     output,
-  ];
+  ].filter((line): line is string => Boolean(line));
   if (result.status.lastError && !output.includes(result.status.lastError)) {
     lines.push(`Статус службы: ${result.status.lastError}`);
   }

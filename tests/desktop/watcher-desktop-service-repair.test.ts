@@ -15,6 +15,7 @@ import {
   shouldRepairServiceLauncherBeforeAction,
 } from '../../apps/watcher-desktop/src/desktop-service-repair.js';
 import { spawnWatcher } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
+import { serviceCommandStatusLine } from '../../apps/watcher-desktop/src/renderer-service-command-status.js';
 
 const tempDirs: string[] = [];
 
@@ -218,6 +219,90 @@ describe('watcher desktop service repair', () => {
 
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain('Команда прервана по таймауту: desktop update');
+    expect(result.commandStatus.status).toBe('timed_out');
+    expect(result.commandStatus.timedOut).toBe(true);
+    expect(result.commandStatus.killed).toBe(true);
+    expect(result.commandStatus.label).toBe('desktop update');
+  });
+
+  it('reports completed commands as machine-readable command status', async () => {
+    const result = await spawnWatcher(
+      process.execPath,
+      ['-e', 'process.stdout.write("ok"); process.exit(0)'],
+      process.cwd(),
+      {},
+      { timeoutMs: 500, timeoutLabel: 'desktop health' },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toBe('ok');
+    expect(result.commandStatus.status).toBe('completed');
+    expect(result.commandStatus.exitCode).toBe(0);
+    expect(result.commandStatus.killed).toBe(false);
+    expect(result.commandStatus.label).toBe('desktop health');
+  });
+
+  it('reports spawn errors as machine-readable command status', async () => {
+    const result = await spawnWatcher(
+      'missing-watcher-command-for-test.exe',
+      [],
+      process.cwd(),
+      {},
+      { timeoutMs: 25, timeoutLabel: 'missing command' },
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.commandStatus.status).toBe('spawn_error');
+    expect(result.commandStatus.errorMessage).toBeTruthy();
+    expect(result.commandStatus.label).toBe('missing command');
+  });
+
+  it('formats command status lines for watcher service logs', () => {
+    expect(serviceCommandStatusLine({
+      status: 'completed',
+      command: 'node',
+      label: 'desktop health',
+      durationMs: 12,
+      exitCode: 0,
+      signal: null,
+      timedOut: false,
+      timeoutMs: 500,
+      killed: false,
+    })).toBe('Команда: desktop health, 12 мс, exitCode=0');
+    expect(serviceCommandStatusLine({
+      status: 'timed_out',
+      command: 'node',
+      label: 'desktop update',
+      durationMs: 25,
+      exitCode: null,
+      signal: null,
+      timedOut: true,
+      timeoutMs: 25,
+      killed: true,
+    })).toBe('Команда: desktop update, 25 мс, таймаут 25 мс, процесс остановлен');
+    expect(serviceCommandStatusLine({
+      status: 'spawn_error',
+      command: 'missing.exe',
+      label: 'missing command',
+      durationMs: 2,
+      exitCode: 1,
+      signal: null,
+      timedOut: false,
+      timeoutMs: 25,
+      killed: false,
+      errorMessage: 'not found',
+    })).toBe('Команда: missing command, 2 мс, не запустилась: not found');
+    expect(serviceCommandStatusLine({
+      status: 'killed',
+      command: 'node',
+      label: 'desktop restart',
+      durationMs: 8,
+      exitCode: null,
+      signal: 'SIGTERM',
+      timedOut: false,
+      timeoutMs: 500,
+      killed: true,
+    })).toBe('Команда: desktop restart, 8 мс, завершена сигналом SIGTERM');
   });
 });
 

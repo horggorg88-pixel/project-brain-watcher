@@ -167,6 +167,23 @@ export interface WatcherServiceActionResult {
   readonly status: WatcherServiceStatus;
   readonly exitCode: number | null;
   readonly output: string;
+  readonly commandStatus?: WatcherCommandStatus;
+}
+
+export type WatcherCommandStatusKind = 'completed' | 'timed_out' | 'spawn_error' | 'killed';
+
+export interface WatcherCommandStatus {
+  readonly status: WatcherCommandStatusKind;
+  readonly label: string;
+  readonly command: string;
+  readonly exitCode: number | null;
+  readonly signal: string | null;
+  readonly durationMs: number;
+  readonly timeoutMs: number | null;
+  readonly timedOut: boolean;
+  readonly killed: boolean;
+  readonly errorCode?: string;
+  readonly errorMessage?: string;
 }
 
 export interface DesktopUiState {

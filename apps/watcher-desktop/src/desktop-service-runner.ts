@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type {
   SavedProjectProfile,
+  WatcherCommandStatus,
   WatcherPolicyGate,
   WatcherServiceActionRequest,
   WatcherServiceActionResult,
@@ -29,7 +30,7 @@ import {
 } from './desktop-service-repair.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.70/project-brain-watcher-1.4.70.tgz';
+const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.71/project-brain-watcher-1.4.71.tgz';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 const WATCHER_COMMAND_TIMEOUT_MS = 60_000;
@@ -40,6 +41,12 @@ const DESKTOP_UPDATE_TIMEOUT_MS = 10 * 60_000;
 export interface SpawnWatcherOptions {
   readonly timeoutMs?: number;
   readonly timeoutLabel?: string;
+}
+
+export interface SpawnWatcherResult {
+  readonly exitCode: number;
+  readonly output: string;
+  readonly commandStatus: WatcherCommandStatus;
 }
 
 export async function runServiceAction(
@@ -91,6 +98,7 @@ export async function runServiceAction(
       status: readServiceStatus(paths, profile.id),
       exitCode: repair.exitCode,
       output: repair.output,
+      commandStatus: repair.commandStatus,
     };
   }
   if (request.action === 'install' && repair) {
@@ -100,6 +108,7 @@ export async function runServiceAction(
       status: readServiceStatus(paths, profile.id),
       exitCode: repair.exitCode,
       output: repair.output,
+      commandStatus: repair.commandStatus,
     };
   }
   const rawResult = await spawnWatcher(command, buildServiceActionArgs(request.action, profile), profile.root, env, serviceSpawnOptions(request.action));
@@ -115,6 +124,7 @@ export async function runServiceAction(
     status: finalStatus,
     exitCode: settlement.exitCode,
     output: settlement.output,
+    commandStatus: rawResult.commandStatus,
   };
 }
 
@@ -124,7 +134,7 @@ async function repairServiceLauncherIfNeeded(
   action: WatcherServiceActionRequest['action'],
   command: string,
   env: Readonly<Record<string, string>>,
-): Promise<{ readonly exitCode: number; readonly output: string } | null> {
+): Promise<SpawnWatcherResult | null> {
   const repairState = readServiceLauncherRepairState(profile);
   if (!shouldRepairServiceLauncherBeforeAction(action, status, repairState)) return null;
   const install = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env, serviceSpawnOptions('install'));
@@ -135,7 +145,7 @@ async function repairServiceLauncherIfNeeded(
     normalized.output,
   ];
   if (normalized.exitCode !== 0) {
-    return { exitCode: normalized.exitCode, output: output.filter(Boolean).join('\n') };
+    return { exitCode: normalized.exitCode, output: output.filter(Boolean).join('\n'), commandStatus: install.commandStatus };
   }
   if (install.exitCode !== 0) {
     const refreshRaw = await refreshServiceMetadata(profile, command, env);
@@ -146,7 +156,9 @@ async function repairServiceLauncherIfNeeded(
         ? 'service repair: refresh недоступен, продолжаю через start/restart'
         : 'service repair: refresh не выполнен');
     output.push(refresh.output);
-    if (refresh.exitCode !== 0) return { exitCode: refresh.exitCode, output: output.filter(Boolean).join('\n') };
+    if (refresh.exitCode !== 0) {
+      return { exitCode: refresh.exitCode, output: output.filter(Boolean).join('\n'), commandStatus: refreshRaw.commandStatus };
+    }
     if (refreshRaw.exitCode !== 0 && serviceImagePathRepairRequired(status)) {
       const imagePathRaw = await repairServiceImagePath(profile);
       const imagePath = normalizeServiceImagePathRepairResult(imagePathRaw.exitCode, imagePathRaw.output);
@@ -154,16 +166,17 @@ async function repairServiceLauncherIfNeeded(
         ? 'service repair: SCM binPath обновлён'
         : 'service repair: SCM binPath не обновлён');
       output.push(imagePath.output);
-      return { exitCode: imagePath.exitCode, output: output.filter(Boolean).join('\n') };
+      return { exitCode: imagePath.exitCode, output: output.filter(Boolean).join('\n'), commandStatus: imagePathRaw.commandStatus };
     }
     if (refreshRaw.exitCode !== 0) {
       output.push('service repair: SCM binPath уже указывает на текущий проект, admin repair не нужен');
     }
-    return { exitCode: 0, output: output.filter(Boolean).join('\n') };
+    return { exitCode: 0, output: output.filter(Boolean).join('\n'), commandStatus: refreshRaw.commandStatus };
   }
   return {
     exitCode: 0,
     output: output.filter(Boolean).join('\n'),
+    commandStatus: install.commandStatus,
   };
 }
 
@@ -171,7 +184,7 @@ async function refreshServiceMetadata(
   profile: SavedProjectProfile,
   command: string,
   env: Readonly<Record<string, string>>,
-): Promise<{ readonly exitCode: number; readonly output: string }> {
+): Promise<SpawnWatcherResult> {
   return spawnWatcher(command, buildServiceRefreshArgs(profile), profile.root, env, {
     timeoutMs: SERVICE_INSTALL_TIMEOUT_MS,
     timeoutLabel: 'service refresh',
@@ -180,7 +193,7 @@ async function refreshServiceMetadata(
 
 async function repairServiceImagePath(
   profile: SavedProjectProfile,
-): Promise<{ readonly exitCode: number; readonly output: string }> {
+): Promise<SpawnWatcherResult> {
   return spawnWatcher('sc.exe', buildServiceImagePathRepairArgs(profile), profile.root, {}, {
     timeoutMs: SERVICE_METADATA_REPAIR_TIMEOUT_MS,
     timeoutLabel: 'service image path repair',
@@ -329,10 +342,14 @@ async function runUpdateAction(
     timeoutMs: DESKTOP_UPDATE_TIMEOUT_MS,
     timeoutLabel: 'desktop update',
   });
-  if (desktop.exitCode !== 0) return updateResult(paths, profile.id, policy, desktop.exitCode, versionReport, ['Пульт не обновлён', desktop.output]);
+  if (desktop.exitCode !== 0) {
+    return updateResult(paths, profile.id, policy, desktop.exitCode, versionReport, ['Пульт не обновлён', desktop.output], desktop.commandStatus);
+  }
   const installRaw = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env, serviceSpawnOptions('install'));
   const install = normalizeServiceInstallResult(installRaw.exitCode, installRaw.output);
-  if (install.exitCode !== 0) return updateResult(paths, profile.id, policy, install.exitCode, versionReport, ['Пульт обновлён', install.output]);
+  if (install.exitCode !== 0) {
+    return updateResult(paths, profile.id, policy, install.exitCode, versionReport, ['Пульт обновлён', install.output], installRaw.commandStatus);
+  }
   const refreshRaw = installRaw.exitCode === 0 ? null : await refreshServiceMetadata(profile, command, env);
   const refresh = refreshRaw ? normalizeServiceRefreshResult(refreshRaw.exitCode, refreshRaw.output) : null;
   if (refresh && refresh.exitCode !== 0) {
@@ -341,7 +358,7 @@ async function runUpdateAction(
       install.output,
       'Watcher: service repair: refresh не выполнен.',
       refresh.output,
-    ]);
+    ], refreshRaw?.commandStatus);
   }
   const statusAfterRefresh = refreshRaw && refreshRaw.exitCode !== 0 ? readServiceStatus(paths, profile.id) : null;
   const imagePathRaw = statusAfterRefresh && serviceImagePathRepairRequired(statusAfterRefresh) ? await repairServiceImagePath(profile) : null;
@@ -356,7 +373,7 @@ async function runUpdateAction(
       refresh?.output ?? '',
       'Watcher: service repair: SCM binPath не обновлён.',
       imagePath.output,
-    ]);
+    ], imagePathRaw?.commandStatus);
   }
   const restart = await spawnWatcher(command, buildServiceRestartArgs(profile), profile.root, env);
   const status = await waitForServiceActionStatus(paths, 'restart', profile.id);
@@ -385,6 +402,7 @@ async function runUpdateAction(
       'Watcher: команда перезапуска выполнена.',
       compactOutput(restartSettlement.output),
     ].filter(Boolean).join('\n\n'),
+    commandStatus: restart.commandStatus,
   };
 }
 
@@ -395,6 +413,7 @@ function updateResult(
   exitCode: number,
   versionReport: string,
   output: readonly string[],
+  commandStatus?: WatcherCommandStatus,
 ): WatcherServiceActionResult {
   return {
     executed: true,
@@ -402,6 +421,7 @@ function updateResult(
     status: readServiceStatus(paths, projectId),
     exitCode,
     output: [versionReport, ...output.map(compactOutput)].filter(Boolean).join('\n\n'),
+    ...(commandStatus ? { commandStatus } : {}),
   };
 }
 
@@ -538,45 +558,106 @@ export function spawnWatcher(
   cwd: string,
   env: Readonly<Record<string, string>>,
   options: SpawnWatcherOptions = {},
-): Promise<{ readonly exitCode: number; readonly output: string }> {
+): Promise<SpawnWatcherResult> {
   return new Promise(resolve => {
     const chunks: string[] = [];
     const invocation = spawnInvocation(command, args);
     const timeoutMs = options.timeoutMs ?? WATCHER_COMMAND_TIMEOUT_MS;
+    const label = options.timeoutLabel ?? command;
+    const startedAt = Date.now();
     let timedOut = false;
+    let settled = false;
+    let killed = false;
     let child: ReturnType<typeof spawn>;
+    const finish = (result: SpawnWatcherResult): void => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
     try {
       child = spawn(invocation.command, invocation.args, { cwd, env: { ...process.env, ...env }, windowsHide: true });
     } catch (error) {
-      resolve({ exitCode: 1, output: error instanceof Error ? error.message : String(error) });
+      finish(spawnErrorResult(error, invocation.command, label, startedAt, timeoutMs));
       return;
     }
     const timer = setTimeout(() => {
       timedOut = true;
-      child.kill();
+      killed = child.kill();
+      finish({
+        exitCode: 1,
+        output: [
+          chunks.join('').trim(),
+          `Команда прервана по таймауту: ${label} (${timeoutMs} мс)`,
+        ].filter(Boolean).join('\n'),
+        commandStatus: commandStatus('timed_out', invocation.command, label, null, null, startedAt, timeoutMs, true, killed),
+      });
     }, timeoutMs);
     child.stdout?.on('data', chunk => chunks.push(String(chunk)));
     child.stderr?.on('data', chunk => chunks.push(String(chunk)));
-    child.on('close', code => {
+    child.on('close', (code, signal) => {
       clearTimeout(timer);
       const output = chunks.join('').trim();
       if (timedOut) {
-        resolve({
-          exitCode: 1,
-          output: [
-            output,
-            `Команда прервана по таймауту: ${options.timeoutLabel ?? command} (${timeoutMs} мс)`,
-          ].filter(Boolean).join('\n'),
-        });
         return;
       }
-      resolve({ exitCode: code ?? 1, output });
+      const status = signal && code === null ? 'killed' : 'completed';
+      finish({
+        exitCode: code ?? 1,
+        output,
+        commandStatus: commandStatus(status, invocation.command, label, code, signal, startedAt, timeoutMs, false, signal !== null),
+      });
     });
     child.on('error', error => {
       clearTimeout(timer);
-      resolve({ exitCode: 1, output: error.message });
+      finish(spawnErrorResult(error, invocation.command, label, startedAt, timeoutMs));
     });
   });
+}
+
+function commandStatus(
+  status: WatcherCommandStatus['status'],
+  command: string,
+  label: string,
+  exitCode: number | null,
+  signal: NodeJS.Signals | null,
+  startedAt: number,
+  timeoutMs: number,
+  timedOut: boolean,
+  killed: boolean,
+): WatcherCommandStatus {
+  return {
+    status,
+    label,
+    command,
+    exitCode,
+    signal,
+    durationMs: Math.max(0, Date.now() - startedAt),
+    timeoutMs,
+    timedOut,
+    killed,
+  };
+}
+
+function spawnErrorResult(
+  error: unknown,
+  command: string,
+  label: string,
+  startedAt: number,
+  timeoutMs: number,
+): SpawnWatcherResult {
+  const message = error instanceof Error ? error.message : String(error);
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { readonly code?: unknown }).code ?? '')
+    : undefined;
+  return {
+    exitCode: 1,
+    output: message,
+    commandStatus: {
+      ...commandStatus('spawn_error', command, label, 1, null, startedAt, timeoutMs, false, false),
+      errorCode: code || undefined,
+      errorMessage: message,
+    },
+  };
 }
 
 function serviceSpawnOptions(action: WatcherServiceActionRequest['action']): SpawnWatcherOptions {
