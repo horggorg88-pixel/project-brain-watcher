@@ -8,6 +8,8 @@ import { readDesktopUiState } from './desktop-ui-state.js';
 
 const DEFAULT_SUPPORT_JOB_TIMEOUT_MS = 5 * 60_000;
 const SUPPORT_JOB_TIMEOUT_ENV = 'PROJECT_BRAIN_SUPPORT_JOB_TIMEOUT_MS';
+const DEFAULT_SUPPORT_HTTP_TIMEOUT_MS = 15_000;
+const SUPPORT_HTTP_TIMEOUT_ENV = 'PROJECT_BRAIN_SUPPORT_HTTP_TIMEOUT_MS';
 
 type SupportJobAction =
   | 'collect_diagnostics'
@@ -191,6 +193,16 @@ function supportJobTimeoutMs(action: SupportJobAction): number {
   return DEFAULT_SUPPORT_JOB_TIMEOUT_MS;
 }
 
+function supportHttpTimeoutMs(): number {
+  const configured = Number(process.env[SUPPORT_HTTP_TIMEOUT_ENV] ?? '');
+  if (Number.isFinite(configured) && configured >= 10) return Math.trunc(configured);
+  return DEFAULT_SUPPORT_HTTP_TIMEOUT_MS;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
 function supportActionProgressMessage(action: SupportJobAction): string {
   if (action === 'collect_diagnostics') return 'Собираем диагностику проекта и службы.';
   if (action === 'repair_watcher_service') return 'Проверяем и чиним watcher-службу.';
@@ -207,20 +219,31 @@ async function postSupport(
   token: string,
   body: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
-  });
-  const parsed: unknown = await response.json().catch(() => null);
-  const record = isRecord(parsed) ? parsed : {};
-  if (!response.ok || record['ok'] === false) {
-    throw new Error(typeof record['error'] === 'string' ? record['error'] : `Support HTTP ${response.status}.`);
+  const timeoutMs = supportHttpTimeoutMs();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const parsed: unknown = await response.json().catch(() => null);
+    const record = isRecord(parsed) ? parsed : {};
+    if (!response.ok || record['ok'] === false) {
+      throw new Error(typeof record['error'] === 'string' ? record['error'] : `Support HTTP ${response.status}.`);
+    }
+    return record;
+  } catch (error) {
+    if (isAbortError(error)) throw new Error(`Support HTTP ${path} timed out after ${timeoutMs} ms.`);
+    throw error;
+  } finally {
+    clearTimeout(timer);
   }
-  return record;
 }
 
 function toSupportJob(value: unknown): SupportJob | null {
