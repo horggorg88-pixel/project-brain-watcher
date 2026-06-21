@@ -82,10 +82,11 @@ function buildStartPrompt(profile: SavedProjectProfile, endpoint: string): strin
     `MCP endpoint: ${endpoint}`,
     `1. Сначала вызови brain_status(project_id="${profile.id}", local_path="${profile.root}").`,
     '2. Если активный route указывает на другой проект или появился project_route_conflict, вызови reinitialize_project_route(project_id, local_path).',
-    '3. После успешного route вызови runtime_start и получи runtime_session_id, policy_session_id, policy_hash и policy_context_pack.',
-    '4. Любой режим запускай только через policy_workflow / operator_workflow и передавай runtime_session_id + policy_context_pack.',
-    '5. Для чтения проекта используй project_map, get_context, search_code, get_file_summary, find_symbol и dependency_graph.',
-    '6. Не читай файлы напрямую и не продолжай работу, если brain_status, route или runtime/policy gate не прошли.',
+    '3. После успешного route вызови runtime_start и получи runtime_session_id, policy_session_id, policy_hash, policy_context_pack, rail_context_pack, rail_map и required_next.',
+    '4. Перед любым действием сначала прочитай required_next и rail_map.machine_contract.read_order; это транспортная карта, она главнее локальной догадки.',
+    '5. Любой режим запускай только через policy_workflow / operator_workflow и передавай runtime_session_id + policy_context_pack + rail_context_pack.',
+    '6. Для чтения проекта используй project_map, get_context, search_code, get_file_summary, find_symbol и dependency_graph.',
+    '7. Не читай файлы напрямую и не продолжай работу, если brain_status, route, runtime/policy gate или rail_context gate не прошли.',
     '',
     'Лёгкая легенда MCP-режимов:',
     '- brain: привязка к project_id/local_path, route, карта проекта и MCP-only чтение.',
@@ -103,7 +104,7 @@ function buildStartPrompt(profile: SavedProjectProfile, endpoint: string): strin
     '- refactor / рефактор: analyze-only, dry-run, apply with rollback.',
     '- todoist_sync: Brain remember перед Todoist comments/tasks.',
     '',
-    'Если любой gate не прошёл, остановись и объясни, какое подключение нужно исправить. Не используй локальные правила как источник истины вместо MCP-контракта.',
+    'Если любой gate не прошёл, остановись и объясни, какое подключение нужно исправить. Не используй локальные правила как источник истины вместо MCP-контракта и rail_map.',
   ].join('\n');
 }
 

@@ -30,7 +30,7 @@ import {
 } from './desktop-service-repair.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.73/project-brain-watcher-1.4.73.tgz';
+const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.74/project-brain-watcher-1.4.74.tgz';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 const WATCHER_COMMAND_TIMEOUT_MS = 60_000;
@@ -78,14 +78,18 @@ export async function runServiceAction(
     return { executed: false, policy, status: readServiceStatus(paths, request.projectId), exitCode: null, output: 'Проект не найден' };
   }
   if (request.action !== 'stop') {
-    const verifiedToken = await resolveVerifiedServiceActionToken(profile, token);
-    token = verifiedToken.token;
-    const serverAccess = verifiedToken.serverAccess;
-    if (!serverAccess.verified) {
-      const denied: WatcherPolicyGate = { decision: 'deny', risk: 'high', reasons: [serverAccess.message] };
-      return { executed: false, policy: denied, status: readServiceStatus(paths, profile.id), exitCode: null, output: serverAccess.message };
+    if (request.action === 'update') {
+      prepareServiceSecretForLaunch(profile, token);
+    } else {
+      const verifiedToken = await resolveVerifiedServiceActionToken(profile, token);
+      token = verifiedToken.token;
+      const serverAccess = verifiedToken.serverAccess;
+      if (!serverAccess.verified) {
+        const denied: WatcherPolicyGate = { decision: 'deny', risk: 'high', reasons: [serverAccess.message] };
+        return { executed: false, policy: denied, status: readServiceStatus(paths, profile.id), exitCode: null, output: serverAccess.message };
+      }
+      prepareServiceSecretForLaunch(profile, token);
     }
-    prepareServiceSecretForLaunch(profile, token);
   }
   const env = token ? { [profile.tokenEnv]: token } : {};
   const command = defaultNpxExecutable();
@@ -392,6 +396,7 @@ async function runUpdateAction(
     exitCode: restartSettlement.exitCode,
     output: [
       versionReport,
+      'MCP preflight: обновление не блокируется проверкой сервера. Использую локальный bearer, итоговый доступ проверится после перезапуска watcher.',
       'Пульт: новая версия скачана, установщик запущен.',
       compactOutput(desktop.output),
       installSummary,
@@ -694,6 +699,8 @@ function spawnInvocation(command: string, args: readonly string[]): { readonly c
 }
 
 function defaultNpxExecutable(): string {
+  const override = process.env.PROJECT_BRAIN_WATCHER_NPX?.trim();
+  if (override) return override;
   if (process.platform !== 'win32') return 'npx';
   const localNpx = join(dirname(process.execPath), 'npx.cmd');
   return existsSync(localNpx) ? localNpx : 'npx.cmd';

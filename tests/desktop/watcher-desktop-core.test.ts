@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loginAccess, logoutAccess, readAccessState } from '../../apps/watcher-desktop/src/desktop-access.js';
 import { resolveDesktopAppAssetPaths } from '../../apps/watcher-desktop/src/desktop-app-paths.js';
@@ -1116,6 +1116,9 @@ describe('watcher desktop core', () => {
     expect(pack.prompt).toContain('brain_status(project_id="mcp-monorepo"');
     expect(pack.prompt).toContain('reinitialize_project_route');
     expect(pack.prompt).toContain('policy_context_pack');
+    expect(pack.prompt).toContain('rail_context_pack');
+    expect(pack.prompt).toContain('rail_map.machine_contract.read_order');
+    expect(pack.prompt).toContain('required_next');
     expect(pack.prompt).toContain('Лёгкая легенда MCP-режимов');
     expect(pack.prompt).toContain('wave / wavy / вейви');
     expect(pack.prompt).toContain('idol / идол');
@@ -1698,6 +1701,10 @@ describe('watcher desktop core', () => {
   it('opens a local desktop session only after valid credentials and config discovery', async () => {
     const paths = tempPaths();
     vi.stubEnv('MCP_BEARER_TOKEN', '');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: false, error: 'denied' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })));
     const codexDir = join(paths.homePath, '.codex');
     mkdirSync(codexDir, { recursive: true });
     writeFileSync(join(codexDir, 'config.toml'), [
@@ -2156,6 +2163,45 @@ describe('watcher desktop core', () => {
     expect(result.output).toContain('Сервер MCP не подтвердил доступ');
   });
 
+  it('continues desktop update when MCP preflight aborts on a broken old service', async () => {
+    const paths = tempPaths();
+    const source = join(paths.homePath, 'mcp-update-test-mcp-config.json');
+    mkdirSync(paths.homePath, { recursive: true });
+    writeFileSync(source, JSON.stringify({
+      project_id: 'mcp-update-test',
+      endpoint: 'http://149.33.14.250/mcp/p/mcp-update-test',
+      local_path: join(paths.homePath, 'repo'),
+      token_env: 'MCP_BEARER_TOKEN',
+      mcpServers: {
+        'project-brain': {
+          url: 'http://149.33.14.250/mcp/p/mcp-update-test',
+          headers: { Authorization: `Bearer ${VALID_TEST_BEARER}` },
+        },
+      },
+    }), 'utf-8');
+    mkdirSync(join(paths.homePath, 'repo'), { recursive: true });
+    const imported = importProjectConfig(paths, source);
+    expect(imported.profile).not.toBeNull();
+    if (!imported.profile) throw new Error('project profile missing');
+    vi.stubEnv('PROJECT_BRAIN_WATCHER_NPX', installFakeNpx(paths.homePath));
+    vi.stubEnv('PROJECT_BRAIN_TEST_RUNTIME_PID', String(process.pid));
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      const error = new Error('This operation was aborted.');
+      error.name = 'AbortError';
+      throw error;
+    }));
+
+    const result = await runServiceAction(paths, { action: 'update', projectId: imported.profile.id, confirmed: true });
+
+    expect(result.executed).toBe(true);
+    expect(result.policy.decision).toBe('allow');
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain('MCP preflight: обновление не блокируется проверкой сервера');
+    expect(result.output).toContain('Пульт: новая версия скачана');
+    expect(result.output).toContain('Watcher: команда перезапуска выполнена');
+    expect(result.output).not.toContain('Сервер MCP не подтвердил доступ');
+  });
+
   it('checks release availability without requiring a project bearer or mutating the service', async () => {
     const paths = tempPaths();
     const requests: string[] = [];
@@ -2192,6 +2238,40 @@ function verifiedMcpFetch(): ReturnType<typeof vi.fn> {
     }
     return new Response('unexpected request', { status: 400 });
   });
+}
+
+function installFakeNpx(root: string): string {
+  const binDir = join(root, 'fake-bin');
+  mkdirSync(binDir, { recursive: true });
+  const fakeNpxPath = join(binDir, 'fake-npx.cjs');
+  writeFileSync(fakeNpxPath, [
+    'const fs = require("node:fs");',
+    'const path = require("node:path");',
+    'const args = process.argv.slice(2);',
+    'const valueAfter = (flag) => {',
+    '  const index = args.indexOf(flag);',
+    '  return index === -1 ? "" : String(args[index + 1] || "");',
+    '};',
+    'const root = valueAfter("--path");',
+    'const project = valueAfter("--project") || "mcp-monorepo";',
+    'if (root) {',
+    '  fs.mkdirSync(path.join(root, ".brain", "service"), { recursive: true });',
+    '  fs.writeFileSync(path.join(root, ".brain", "service", `ProjectBrainWatcher-${project}.exe`), "");',
+    '}',
+    'if (args.includes("restart") && root) {',
+    '  fs.mkdirSync(path.join(root, ".brain"), { recursive: true });',
+    '  fs.writeFileSync(path.join(root, ".brain", "watcher-runtime.json"), JSON.stringify({',
+    '    owner: { project_id: project, root, pid: Number(process.env.PROJECT_BRAIN_TEST_RUNTIME_PID || process.pid) },',
+    '    updated_at: Date.now(),',
+    '  }));',
+    '}',
+    'process.stdout.write(`fake npx ${args.join(" ")}\\n`);',
+  ].join('\n'), 'utf-8');
+  writeFileSync(join(binDir, 'npx.cmd'), '@echo off\r\nnode "%~dp0fake-npx.cjs" %*\r\n', 'utf-8');
+  writeFileSync(join(binDir, 'npx'), '#!/bin/sh\nnode "$(dirname "$0")/fake-npx.cjs" "$@"\n', 'utf-8');
+  chmodSync(join(binDir, 'npx'), 0o755);
+  vi.stubEnv('PATH', `${binDir}${delimiter}${process.env.PATH ?? ''}`);
+  return process.platform === 'win32' ? join(binDir, 'npx.cmd') : join(binDir, 'npx');
 }
 
 function statusFixture(overrides: Partial<WatcherServiceStatus>): WatcherServiceStatus {

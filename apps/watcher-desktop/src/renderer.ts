@@ -52,6 +52,15 @@ interface DesktopAiDiagnostic {
   readonly code: string; readonly severity: 'info' | 'warn' | 'error'; readonly message: string; readonly cause: string; readonly impact: string; readonly nextAction: string;
 }
 
+interface DesktopAiRailNode {
+  readonly id: string; readonly label: string; readonly status: 'ready' | 'waiting' | 'blocked'; readonly evidence: string;
+}
+
+interface DesktopAiRailMap {
+  readonly version: 'watcher-rail-map/v1'; readonly required_next: string; readonly rails: readonly DesktopAiRailNode[];
+  readonly machine_contract: { readonly read_order: readonly string[]; readonly completion_rule: string; readonly redaction: 'required'; readonly chunking: 'cursor-or-tail' };
+}
+
 const authForm = document.querySelector<HTMLFormElement>('[data-auth-form]');
 const authStatusEl = document.querySelector<HTMLElement>('[data-auth-status]');
 const accountEl = document.querySelector<HTMLElement>('[data-profile-card]');
@@ -799,6 +808,9 @@ async function serviceAiLogsText(): Promise<string> {
   const rawText = [statusText, commandText, expandedLogsText].filter(Boolean).join('\n\n');
   const safeText = redactAiLogText(rawText);
   const diagnostics = classifyDesktopAiDiagnostics(safeText, currentServiceStatus);
+  const nextActions = diagnostics.map(item => item.nextAction);
+  const requiredNext = desktopRequiredNext(nextActions, currentServiceStatus);
+  const railMap = desktopRailMap(currentServiceStatus, diagnostics, expandedLogsText, requiredNext);
   return JSON.stringify({
     schemaVersion: 'watcher-ai-context/v1',
     generatedAt: new Date().toISOString(),
@@ -807,7 +819,9 @@ async function serviceAiLogsText(): Promise<string> {
     summary: diagnostics[0]?.message ?? serviceSummaryForAi(currentServiceStatus),
     diagnostics,
     evidence_refs: serviceEvidenceRefs(currentServiceStatus),
-    next_actions: diagnostics.map(item => item.nextAction),
+    next_actions: nextActions,
+    required_next: requiredNext,
+    rail_map: railMap,
     expanded_log_chunks: expandedLogsText ? redactAiLogText(expandedLogsText) : null,
     machine_snapshot: currentServiceStatus ? {
       installed: currentServiceStatus.installed,
@@ -873,6 +887,41 @@ function classifyDesktopAiDiagnostics(text: string, status: WatcherServiceStatus
     nextAction: 'Обнови watcher runtime или используй Node LTS / Visual Studio Build Tools C++.',
   });
   return diagnostics;
+}
+
+function desktopRequiredNext(nextActions: readonly string[], status: WatcherServiceStatus | null): string {
+  if (nextActions[0]) return nextActions[0];
+  if (!status) return 'Обнови статус службы watcher и повтори диагностику.';
+  if (!status.installed) return 'Установи watcher service для выбранного проекта.';
+  if (!status.running) return 'Запусти watcher service и повтори проверку.';
+  if (status.health !== 'healthy') return 'Повтори диагностику watcher и проверь свежий лог.';
+  return 'Блокеров в локальном статусе службы не найдено.';
+}
+
+function desktopRailMap(status: WatcherServiceStatus | null, diagnostics: readonly DesktopAiDiagnostic[], expandedLogsText: string, requiredNext: string): DesktopAiRailMap {
+  return {
+    version: 'watcher-rail-map/v1',
+    required_next: requiredNext,
+    rails: [
+      { id: 'service.metadata', label: 'Windows service metadata', status: status?.installed ? 'ready' : 'blocked', evidence: status?.installed ? 'service installed' : 'service not installed' },
+      { id: 'service.process', label: 'Windows service process', status: status?.running ? 'ready' : 'blocked', evidence: status?.running ? `pid=${status.pid ?? 'unknown'}` : status?.lastError ?? 'service stopped' },
+      { id: 'runtime.health', label: 'Watcher health', status: status?.health === 'healthy' ? 'ready' : status ? 'waiting' : 'blocked', evidence: status?.health ?? 'status missing' },
+      { id: 'logs.evidence', label: 'Expanded log evidence', status: expandedLogsText ? 'ready' : 'waiting', evidence: expandedLogsText ? 'log chunks included' : 'no expanded chunks' },
+      { id: 'diagnostics.classifier', label: 'Diagnostic classifier', status: diagnostics.some(item => item.severity === 'error') ? 'blocked' : 'ready', evidence: diagnostics.length ? diagnostics.map(item => item.code).join(', ') : 'no matched blockers' },
+      { id: 'ai.required-next', label: 'AI next action', status: desktopNextActionRailStatus(diagnostics, requiredNext), evidence: requiredNext },
+    ],
+    machine_contract: {
+      read_order: ['summary', 'required_next', 'diagnostics', 'rail_map', 'evidence_refs', 'expanded_log_chunks'],
+      completion_rule: 'follow required_next until diagnostics are empty and service rails are ready',
+      redaction: 'required',
+      chunking: 'cursor-or-tail',
+    },
+  };
+}
+
+function desktopNextActionRailStatus(diagnostics: readonly DesktopAiDiagnostic[], requiredNext: string): DesktopAiRailNode['status'] {
+  if (diagnostics.some(item => item.severity === 'error')) return 'blocked';
+  return /блокеров.+не найдено/i.test(requiredNext) ? 'ready' : 'waiting';
 }
 
 function serviceSummaryForAi(status: WatcherServiceStatus | null): string {

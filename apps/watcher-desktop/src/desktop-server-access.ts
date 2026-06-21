@@ -41,7 +41,7 @@ export async function verifyProjectServerAccess(
     return {
       verified: false,
       endpoint,
-      message: `Сервер MCP не подтвердил доступ: ${error instanceof Error ? error.message : 'ошибка проверки'}.`,
+      message: `Сервер MCP не подтвердил доступ: ${serverAccessErrorMessage(error)}.`,
     };
   }
 }
@@ -130,6 +130,14 @@ function denied(endpoint: string, status: number): DesktopServerAccessVerificati
     endpoint,
     message: `Сервер MCP не подтвердил доступ: HTTP ${status}.`,
   };
+}
+
+function serverAccessErrorMessage(error: unknown): string {
+  if (!isRecord(error)) return 'ошибка проверки';
+  const name = typeof error.name === 'string' ? error.name : '';
+  const message = typeof error.message === 'string' ? error.message : '';
+  if (name === 'AbortError' || /aborted/i.test(message)) return `таймаут проверки ${VERIFY_TIMEOUT_MS} мс`;
+  return message || 'ошибка проверки';
 }
 
 async function fetchJsonRpc(

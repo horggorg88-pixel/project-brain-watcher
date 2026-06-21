@@ -372,6 +372,8 @@ describe('watcher desktop contract', () => {
     expect(rendererSource).not.toContain('openServiceLogsButtons');
     expect(rendererSource).toContain('serviceAiLogsText');
     expect(rendererSource).toContain('watcher-ai-context/v1');
+    expect(rendererSource).toContain('desktopNextActionRailStatus');
+    expect(rendererSource).not.toContain("status: diagnostics.length ? 'blocked' : 'ready'");
     expect(rendererSource).toContain('renderConsoleToggle');
     expect(rendererSource).toContain('chevronDownIcon');
     expect(rendererSource).toContain('AI snapshot логов службы скопирован');

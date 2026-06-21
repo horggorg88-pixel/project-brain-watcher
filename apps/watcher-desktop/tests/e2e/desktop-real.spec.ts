@@ -59,6 +59,8 @@ test('opens the real desktop control panel and proves the dry service rail', asy
     await expect(page.locator('[data-start-prompt]')).toContainText('reinitialize_project_route');
     await expect(page.locator('[data-start-prompt]')).toContainText('policy_workflow / operator_workflow');
     await expect(page.locator('[data-start-prompt]')).toContainText('policy_context_pack');
+    await expect(page.locator('[data-start-prompt]')).toContainText('rail_context_pack');
+    await expect(page.locator('[data-start-prompt]')).toContainText('required_next');
     await expect(page.locator('[data-start-prompt]')).not.toContainText(fakeBearer);
     await page.locator('[data-copy-prompt]').click();
     await expect(page.locator('[data-service-output]')).toContainText('Стартовый prompt скопирован');
