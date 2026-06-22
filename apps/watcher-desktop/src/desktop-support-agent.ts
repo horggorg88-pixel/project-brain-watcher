@@ -1,6 +1,6 @@
-import { buildDesktopConnectionCheck } from './desktop-connection-check.js';
 import { verifyDesktopCodexGates } from './desktop-codex-gates.js';
 import { previewDiagnostics } from './desktop-core.js';
+import { syncDesktopOnboardingProgress } from './desktop-onboarding-sync.js';
 import type { DesktopCorePaths } from './desktop-profile-store.js';
 import { ensureManagedDeviceEnrolled, readSupportDeviceCredentials, type SupportDeviceCredentials } from './desktop-support-device.js';
 import { runServiceAction } from './desktop-service-runner.js';
@@ -153,8 +153,15 @@ async function executeSupportJob(
   if (job.action === 'update_watcher') {
     return { service: await runServiceAction(paths, { action: 'update', projectId, confirmed: true }) };
   }
-  if (job.action === 'verify_codex_gates') return { codexGates: await verifyDesktopCodexGates(paths, projectId) };
-  if (job.action === 'refresh_mcp_config') return { connection: await buildDesktopConnectionCheck(paths, projectId) };
+  if (job.action === 'verify_codex_gates') {
+    const codexGates = await verifyDesktopCodexGates(paths, projectId);
+    const sync = await syncDesktopOnboardingProgress(paths, projectId);
+    return { codexGates, connection: sync.check, onboardingReports: sync.reports };
+  }
+  if (job.action === 'refresh_mcp_config') {
+    const sync = await syncDesktopOnboardingProgress(paths, projectId);
+    return { connection: sync.check, onboardingReports: sync.reports };
+  }
   if (job.action === 'mesh_status') return { meshUrl, ready: Boolean(meshUrl) };
   throw new Error(`Неизвестное support-действие: ${job.action}`);
 }

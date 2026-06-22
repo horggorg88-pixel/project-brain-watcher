@@ -18,6 +18,7 @@ import { readDesktopCodexGateEvidence, verifyDesktopCodexGates } from './desktop
 import { importProjectConfig } from './desktop-config-import.js';
 import { listDesktopModeSummaries } from './desktop-mode-summary.js';
 import { reportDesktopOnboardingProgress } from './desktop-onboarding-events.js';
+import { syncDesktopOnboardingProgress } from './desktop-onboarding-sync.js';
 import { readDesktopUiState, saveDesktopUiState } from './desktop-ui-state.js';
 import {
   ensureManagedDeviceEnrolled,
@@ -163,9 +164,14 @@ function registerIpcHandlers(): void {
   ipcMain.handle('codex-gates:status', (_event, projectId: string) => (
     readDesktopCodexGateEvidence(corePaths(), projectId)
   ));
-  ipcMain.handle('codex-gates:verify', async (_event, projectId: string) => (
-    verifyDesktopCodexGates(corePaths(), projectId)
-  ));
+  ipcMain.handle('codex-gates:verify', async (_event, projectId: string) => {
+    const paths = corePaths();
+    const status = await verifyDesktopCodexGates(paths, projectId);
+    void syncDesktopOnboardingProgress(paths, projectId).catch(error => {
+      console.warn(`Codex gates onboarding sync failed: ${error instanceof Error ? error.message : String(error)}`);
+    });
+    return status;
+  });
   ipcMain.handle('projects:list', () => listDesktopProjectProfiles(corePaths()));
   ipcMain.handle('projects:save', (_event, project: ProjectDraft) => saveProfile(corePaths(), project));
   ipcMain.handle('projects:select-root', async () => {
