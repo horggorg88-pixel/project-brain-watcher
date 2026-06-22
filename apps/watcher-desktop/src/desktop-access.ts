@@ -7,7 +7,7 @@ import { saveDesktopAccessHandoff } from './desktop-access-handoff.js';
 import { readDesktopEnvServiceToken, readDesktopServiceSecretState, readDesktopServiceToken, stageDesktopServiceSecret } from './desktop-service-secret.js';
 import { verifyProjectServerAccess } from './desktop-server-access.js';
 import { clearDesktopAccessSession, readDesktopAccessSession, saveDesktopAccessSession } from './desktop-access-session.js';
-import { enrollManagedDevice } from './desktop-support-device.js';
+import { enrollManagedDevice, ensureManagedDeviceEnrolled } from './desktop-support-device.js';
 export function readAccessState(paths: DesktopCorePaths): DesktopAccessState {
   const config = discoverMcpConfig(paths);
   const secretState = readDesktopServiceSecretState(resolveConfiguredProfile(paths, config));
@@ -92,9 +92,11 @@ export async function loginAccess(paths: DesktopCorePaths, request: AccessLoginR
     serverAccess = await verifyProjectServerAccess(activeProfile, token);
     verifiedToken = token;
   }
-  if (accountAccess?.ok) {
-    await enrollManagedDevice(paths, accountAccess, activeProfile?.id ?? config.projectId ?? undefined).catch(() => undefined);
-  }
+  const supportGate = await supportEnrollmentGate(
+    paths,
+    accountAccess,
+    activeProfile?.id ?? config.projectId ?? undefined,
+  );
   if (activeProfile && serverAccess.verified && verifiedToken && !enteredBarrierKey) {
     secretState = stageDesktopServiceSecret(activeProfile, verifiedToken);
   }
@@ -119,7 +121,7 @@ export async function loginAccess(paths: DesktopCorePaths, request: AccessLoginR
       : accountAccess?.ok
       ? 'Учётные данные приняты. Теперь выберите папку проекта: пульт сам создаст .brain с вашим bearer.'
       : `Учётные данные приняты локально, но файл настройки MCP не найден. ${accountAccess?.message ?? 'Выберите папку проекта в пульте.'}`,
-    extraGates: [authGate],
+    extraGates: [authGate, supportGate],
   });
 }
 
@@ -182,6 +184,28 @@ function validateLogin(email: string, password: string): WatcherPolicyGate {
   return reasons.length === 0
     ? { decision: 'allow', risk: 'low', reasons: ['Форма входа заполнена'] }
     : { decision: 'deny', risk: 'medium', reasons };
+}
+
+async function supportEnrollmentGate(
+  paths: DesktopCorePaths,
+  accountAccess: Awaited<ReturnType<typeof authorizeDesktopAccount>> | null,
+  projectId: string | undefined,
+): Promise<WatcherPolicyGate> {
+  try {
+    const enrollment = accountAccess?.ok
+      ? await enrollManagedDevice(paths, accountAccess, projectId)
+      : await ensureManagedDeviceEnrolled(paths, projectId);
+    return enrollment.enrolled
+      ? { decision: 'allow', risk: 'low', reasons: [enrollment.message] }
+      : { decision: 'prompt', risk: 'medium', reasons: [enrollment.message] };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      decision: 'prompt',
+      risk: 'medium',
+      reasons: [`Support-регистрация пульта не подтверждена: ${message}`],
+    };
+  }
 }
 
 function barrierTokenFromLogin(value: string): string | null {

@@ -125,6 +125,13 @@ describe('watcher desktop core', () => {
           },
         }), { status: 200, headers: { 'content-type': 'application/json' } });
       }
+      if (String(input) === 'http://149.33.14.250:3020/api/support/devices/enroll') {
+        return new Response(JSON.stringify({
+          ok: true,
+          device: { deviceId: 'dev_client', meshUrl: null },
+          deviceToken: 'pbs_device_token',
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
       return verifiedMcpFetch()(input, init);
     }));
 
@@ -144,6 +151,8 @@ describe('watcher desktop core', () => {
 
     expect(state.signedIn).toBe(true);
     expect(requestedUrls).toContain('http://149.33.14.250:3020/api/auth/access');
+    expect(requestedUrls).toContain('http://149.33.14.250:3020/api/support/devices/enroll');
+    expect(state.gates.some(gate => gate.reasons.includes('Support-устройство зарегистрировано.'))).toBe(true);
     expect(saved.serverUrl).toBe('http://149.33.14.250');
     expect(saved.consoleUrl).toBe('http://149.33.14.250:3020');
     expect(readDesktopServiceSecret(saved)).toBe(VALID_TEST_BEARER);
