@@ -899,6 +899,15 @@ async function serviceAiStreamText(projectId: string, stream: WatcherServiceLogS
 
 function classifyDesktopAiDiagnostics(text: string, status: WatcherServiceStatus | null): readonly DesktopAiDiagnostic[] {
   const diagnostics: DesktopAiDiagnostic[] = [];
+  const metadataMismatch = serviceMetadataMismatch(status);
+  if (metadataMismatch) diagnostics.push({
+    code: 'WATCHER_SERVICE_METADATA_ROOT_MISMATCH',
+    severity: 'error' as const,
+    message: metadataMismatch,
+    cause: 'Windows Service metadata points to another project root or contains corrupted path metadata.',
+    impact: 'Watcher exits before the selected project can be indexed.',
+    nextAction: 'Нажми «Починить службу» для выбранного проекта, затем повтори проверку.',
+  });
   if (status?.installed && !status.running) diagnostics.push({
     code: 'WATCHER_SERVICE_STOPPED',
     severity: 'error' as const,
@@ -930,6 +939,7 @@ function desktopRequiredNext(nextActions: readonly string[], status: WatcherServ
   if (nextActions[0]) return nextActions[0];
   if (!status) return 'Обнови статус службы watcher и повтори диагностику.';
   if (!status.installed) return 'Установи watcher service для выбранного проекта.';
+  if (serviceMetadataMismatch(status)) return 'Нажми «Починить службу» для выбранного проекта, затем повтори проверку.';
   if (!status.running) return 'Запусти watcher service и повтори проверку.';
   if (status.health !== 'healthy') return 'Повтори диагностику watcher и проверь свежий лог.';
   return 'Блокеров в локальном статусе службы не найдено.';
@@ -940,7 +950,12 @@ function desktopRailMap(status: WatcherServiceStatus | null, diagnostics: readon
     version: 'watcher-rail-map/v1',
     required_next: requiredNext,
     rails: [
-      { id: 'service.metadata', label: 'Windows service metadata', status: status?.installed ? 'ready' : 'blocked', evidence: status?.installed ? 'service installed' : 'service not installed' },
+      {
+        id: 'service.metadata',
+        label: 'Windows service metadata',
+        status: serviceMetadataMismatch(status) ? 'blocked' : status?.installed ? 'ready' : 'blocked',
+        evidence: serviceMetadataMismatch(status) ?? (status?.installed ? 'service installed' : 'service not installed'),
+      },
       { id: 'service.process', label: 'Windows service process', status: status?.running ? 'ready' : 'blocked', evidence: status?.running ? `pid=${status.pid ?? 'unknown'}` : status?.lastError ?? 'service stopped' },
       { id: 'runtime.health', label: 'Watcher health', status: status?.health === 'healthy' ? 'ready' : status ? 'waiting' : 'blocked', evidence: status?.health ?? 'status missing' },
       { id: 'logs.evidence', label: 'Expanded log evidence', status: expandedLogsText ? 'ready' : 'waiting', evidence: expandedLogsText ? 'log chunks included' : 'no expanded chunks' },
@@ -954,6 +969,12 @@ function desktopRailMap(status: WatcherServiceStatus | null, diagnostics: readon
       chunking: 'cursor-or-tail',
     },
   };
+}
+
+function serviceMetadataMismatch(status: WatcherServiceStatus | null): string | null {
+  const message = status?.lastError ?? '';
+  const match = message.match(/Windows Service metadata указывает на другой root:[^\n]+/i);
+  return match?.[0] ?? null;
 }
 
 function desktopNextActionRailStatus(diagnostics: readonly DesktopAiDiagnostic[], requiredNext: string): DesktopAiRailNode['status'] {
