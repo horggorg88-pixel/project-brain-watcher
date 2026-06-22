@@ -331,6 +331,41 @@ describe('watcher desktop codex gates', () => {
     expect(config).toContain('trust_level = "trusted"');
   });
 
+  it('accepts a Codex config that starts with a UTF-8 BOM before auto-installing project trust', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    mkdirSync(join(paths.homePath, '.codex'), { recursive: true });
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(paths.homePath, '.codex', 'config.toml'), [
+      '\uFEFFmodel = "gpt-5.5"',
+      'model_reasoning_effort = "high"',
+      '',
+    ].join('\n'), 'utf-8');
+    stagePersistentVerifierHookFiles(paths.homePath);
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    const result = await verifyDesktopCodexGates(paths, 'demo-project', {
+      runner: async () => ({ exitCode: 0, output: 'ok' }),
+      now: () => new Date('2026-06-15T10:00:00.000Z'),
+    });
+
+    const config = readFileSync(join(paths.homePath, '.codex', 'config.toml'), 'utf-8');
+    expect(result.evidence.verification.codexTrust).toMatchObject({
+      passed: true,
+      detail: 'Codex project trust автоматически установлен для выбранной папки.',
+    });
+    expect(config).toContain('model = "gpt-5.5"');
+    expect(config).toContain('model_reasoning_effort = "high"');
+    expect(config).toContain('trust_level = "trusted"');
+  });
+
   it('surfaces the failing smoke command reason instead of a generic pending message', async () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');

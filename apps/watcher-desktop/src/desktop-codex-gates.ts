@@ -780,7 +780,7 @@ type CodexConfigReadResult =
 
 function readCodexConfigDocument(path: string): CodexConfigReadResult {
   try {
-    const parsed: unknown = parseToml(readFileSync(path, 'utf-8'));
+    const parsed: unknown = parseToml(readCodexConfigText(path));
     return isRecord(parsed)
       ? { ok: true, value: { ...parsed } }
       : { ok: false, error: 'Codex config.toml должен быть TOML object' };
@@ -806,7 +806,7 @@ function isTrustedCodexProject(homePath: string, projectRoot: string): boolean {
   if (!existsSync(path)) return false;
   let parsed: unknown;
   try {
-    parsed = parseToml(readFileSync(path, 'utf-8'));
+    parsed = parseToml(readCodexConfigText(path));
   } catch {
     return false;
   }
@@ -819,6 +819,10 @@ function isTrustedCodexProject(homePath: string, projectRoot: string): boolean {
     return value['trust_level'] === 'trusted';
   }
   return false;
+}
+
+function readCodexConfigText(path: string): string {
+  return readFileSync(path, 'utf-8').replace(/^\uFEFF/, '');
 }
 
 function normalizePathKey(value: string): string {
