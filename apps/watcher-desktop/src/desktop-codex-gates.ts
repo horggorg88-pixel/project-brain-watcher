@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { parse as parseToml } from 'smol-toml';
+import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import type {
   DesktopCodexGateEvidence,
   DesktopCodexGateRunEvidence,
@@ -304,7 +304,7 @@ export async function verifyDesktopCodexGates(
   }
 
   const nativeEvidence = readEvidenceFiles(profile.root, profile.id);
-  const codexTrust = codexTrustEvidence(paths.homePath, profile.root, checkedAt);
+  const codexTrust = ensureCodexTrustEvidence(paths.homePath, profile.root, checkedAt);
   if (!hasPassed(codexTrust)) {
     const evidence: DesktopCodexGateEvidence = {
       commandRuns: nativeEvidence.commandRuns,
@@ -705,21 +705,100 @@ function tomlString(value: string): string {
   return JSON.stringify(value);
 }
 
-function codexTrustEvidence(homePath: string, projectRoot: string, checkedAt: string): DesktopCodexGateRunEvidence {
+function ensureCodexTrustEvidence(homePath: string, projectRoot: string, checkedAt: string): DesktopCodexGateRunEvidence {
   const command = 'read ~/.codex/config.toml projects trust';
-  const trusted = isTrustedCodexProject(homePath, projectRoot);
+  const trust = ensureTrustedCodexProject(homePath, projectRoot);
   return {
     available: true,
-    passed: trusted,
-    detail: trusted
-      ? 'Codex project trust подтверждён для выбранной папки.'
-      : 'Codex project trust не найден для выбранной папки; пульт не запускает проектные команды автоматически.',
+    passed: trust.trusted,
+    detail: trust.trusted
+      ? trust.changed
+        ? 'Codex project trust автоматически установлен для выбранной папки.'
+        : 'Codex project trust подтверждён для выбранной папки.'
+      : trust.detail,
     checkedAt,
-    staleAfterMs: trusted ? CODEX_SETUP_EVIDENCE_TTL_MS : STALE_AFTER_MS,
+    staleAfterMs: trust.trusted ? CODEX_SETUP_EVIDENCE_TTL_MS : STALE_AFTER_MS,
     source: SOURCE,
     command,
-    exitCode: trusted ? 0 : 1,
+    exitCode: trust.trusted ? 0 : 1,
   };
+}
+
+interface CodexProjectTrustResult {
+  readonly trusted: boolean;
+  readonly changed: boolean;
+  readonly detail: string;
+}
+
+function ensureTrustedCodexProject(homePath: string, projectRoot: string): CodexProjectTrustResult {
+  if (isTrustedCodexProject(homePath, projectRoot)) {
+    return {
+      trusted: true,
+      changed: false,
+      detail: 'Codex project trust подтверждён для выбранной папки.',
+    };
+  }
+
+  const path = join(homePath, '.codex', 'config.toml');
+  const existing = existsSync(path) ? readCodexConfigDocument(path) : { ok: true as const, value: {} };
+  if (!existing.ok) {
+    return {
+      trusted: false,
+      changed: false,
+      detail: `Codex project trust не установлен: ${existing.error}. Пульт не запускает проектные команды автоматически.`,
+    };
+  }
+
+  const next = setTrustedProject(existing.value, projectRoot);
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, stringifyToml(next), 'utf-8');
+  } catch (error) {
+    return {
+      trusted: false,
+      changed: false,
+      detail: `Codex project trust не установлен: ${error instanceof Error ? error.message : String(error)}. Пульт не запускает проектные команды автоматически.`,
+    };
+  }
+
+  return isTrustedCodexProject(homePath, projectRoot)
+    ? {
+        trusted: true,
+        changed: true,
+        detail: 'Codex project trust автоматически установлен для выбранной папки.',
+      }
+    : {
+        trusted: false,
+        changed: false,
+        detail: 'Codex project trust не найден для выбранной папки; пульт не запускает проектные команды автоматически.',
+      };
+}
+
+type CodexConfigReadResult =
+  | { readonly ok: true; readonly value: Record<string, unknown> }
+  | { readonly ok: false; readonly error: string };
+
+function readCodexConfigDocument(path: string): CodexConfigReadResult {
+  try {
+    const parsed: unknown = parseToml(readFileSync(path, 'utf-8'));
+    return isRecord(parsed)
+      ? { ok: true, value: { ...parsed } }
+      : { ok: false, error: 'Codex config.toml должен быть TOML object' };
+  } catch (error) {
+    return {
+      ok: false,
+      error: `Codex config.toml не прочитан: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+function setTrustedProject(config: Record<string, unknown>, projectRoot: string): Record<string, unknown> {
+  const projects = isRecord(config['projects']) ? { ...config['projects'] } : {};
+  const existingKey = Object.keys(projects).find(pathKey => normalizePathKey(pathKey) === normalizePathKey(projectRoot));
+  const key = existingKey ?? projectRoot;
+  const projectConfig = isRecord(projects[key]) ? { ...projects[key] } : {};
+  projects[key] = { ...projectConfig, trust_level: 'trusted' };
+  return { ...config, projects };
 }
 
 function isTrustedCodexProject(homePath: string, projectRoot: string): boolean {

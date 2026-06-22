@@ -221,7 +221,7 @@ describe('watcher desktop codex gates', () => {
     });
   });
 
-  it('does not run project commands automatically when the Codex project is not trusted', async () => {
+  it('installs Codex project trust before running project commands', async () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');
     mkdirSync(root, { recursive: true });
@@ -244,13 +244,91 @@ describe('watcher desktop codex gates', () => {
       now: () => new Date('2026-06-15T10:00:00.000Z'),
     });
 
+    expect(commands).toEqual([
+      'codex --version',
+      'codex plugin add persistent-verifier@claude-migrated-home',
+      'codex plugin list',
+      'codex features list',
+      'npm test',
+    ]);
+    expect(result.ready).toBe(false);
+    expect(result.message).toBe('Codex hooks установлены. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.');
+    expect(result.evidence.verification.codexTrust).toMatchObject({
+      passed: true,
+      detail: 'Codex project trust автоматически установлен для выбранной папки.',
+      command: 'read ~/.codex/config.toml projects trust',
+    });
+    expect(readFileSync(join(paths.homePath, '.codex', 'config.toml'), 'utf-8')).toContain('trust_level = "trusted"');
+  });
+
+  it('does not run project commands when Codex config cannot be parsed safely', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    mkdirSync(join(paths.homePath, '.codex'), { recursive: true });
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(paths.homePath, '.codex', 'config.toml'), '[projects."broken"\n', 'utf-8');
+    stagePersistentVerifierHookFiles(paths.homePath);
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const commands: string[] = [];
+
+    const result = await verifyDesktopCodexGates(paths, 'demo-project', {
+      runner: async request => {
+        commands.push([request.command, ...request.args].join(' '));
+        return { exitCode: 0, output: 'ok' };
+      },
+      now: () => new Date('2026-06-15T10:00:00.000Z'),
+    });
+
     expect(commands).toEqual([]);
     expect(result.ready).toBe(false);
-    expect(result.message).toBe('Codex project trust не найден для выбранной папки; пульт не запускает проектные команды автоматически.');
+    expect(result.message).toContain('Codex project trust не установлен: Codex config.toml не прочитан');
     expect(result.evidence.verification.codexTrust).toMatchObject({
       passed: false,
       command: 'read ~/.codex/config.toml projects trust',
     });
+  });
+
+  it('keeps an existing Codex MCP server config when auto-installing project trust', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    mkdirSync(join(paths.homePath, '.codex'), { recursive: true });
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(paths.homePath, '.codex', 'config.toml'), [
+      '[mcp_servers.project-brain]',
+      'bearer_token_env_var = "MCP_BEARER_TOKEN"',
+      'url = "http://149.33.14.250/mcp/p/demo-project"',
+      '',
+    ].join('\n'), 'utf-8');
+    stagePersistentVerifierHookFiles(paths.homePath);
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    const result = await verifyDesktopCodexGates(paths, 'demo-project', {
+      runner: async () => ({ exitCode: 0, output: 'ok' }),
+      now: () => new Date('2026-06-15T10:00:00.000Z'),
+    });
+
+    const config = readFileSync(join(paths.homePath, '.codex', 'config.toml'), 'utf-8');
+    expect(result.evidence.verification.codexTrust).toMatchObject({
+      passed: true,
+      detail: 'Codex project trust автоматически установлен для выбранной папки.',
+    });
+    expect(config).toContain('[mcp_servers.project-brain]');
+    expect(config).toContain('url = "http://149.33.14.250/mcp/p/demo-project"');
+    expect(config).toContain('trust_level = "trusted"');
   });
 
   it('surfaces the failing smoke command reason instead of a generic pending message', async () => {
