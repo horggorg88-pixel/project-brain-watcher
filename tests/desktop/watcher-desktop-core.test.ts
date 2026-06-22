@@ -25,8 +25,8 @@ import { isServiceActionSettled, prepareServiceSecretForLaunch, resolveVerifiedS
 import { parseWindowsServiceConfigOutput, parseWindowsServiceOutput, readServiceLogChunk } from '../../apps/watcher-desktop/src/desktop-service-status.js';
 import { readDesktopUiState, saveDesktopUiState } from '../../apps/watcher-desktop/src/desktop-ui-state.js';
 import { defaultProfile, serviceName } from '../../apps/watcher-desktop/src/desktop-profile-store.js';
-import { withCodexGateProgress } from '../../apps/watcher-desktop/src/renderer-view.js';
-import type { DesktopCodexGateRunEvidence, DesktopConnectionCheck, WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
+import { formatCodexGateDiagnostics, formatSupportEnrollmentLog, withCodexGateProgress } from '../../apps/watcher-desktop/src/renderer-view.js';
+import type { DesktopCodexGateRunEvidence, DesktopCodexGateStatus, DesktopConnectionCheck, ManagedDeviceStatus, WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
 
 const tempDirs: string[] = [];
 const VALID_TEST_BEARER = 'valid_test_bearer_12345678901234567890';
@@ -158,6 +158,40 @@ describe('watcher desktop core', () => {
     expect(readDesktopServiceSecret(saved)).toBe(VALID_TEST_BEARER);
     expect(pack.configJson).toContain(`Bearer ${VALID_TEST_BEARER}`);
     expect(brainMcp.mcpServers?.['project-brain']?.headers?.Authorization).toBe(`Bearer ${VALID_TEST_BEARER}`);
+  });
+
+  it('surfaces support enrollment endpoint and HTTP status after account login', async () => {
+    const paths = tempPaths();
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === 'http://149.33.14.250:3020/api/auth/access') {
+        return new Response(JSON.stringify({
+          ok: true,
+          profile: { firstName: 'Client', lastName: 'User', email: 'client@example.com', role: 'user' },
+          serverConfig: {
+            serverUrl: 'http://149.33.14.250',
+            consoleUrl: 'http://149.33.14.250:3020',
+            bearerToken: VALID_TEST_BEARER,
+            tokenEnv: 'MCP_BEARER_TOKEN',
+          },
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      if (String(input) === 'http://149.33.14.250:3020/api/support/devices/enroll') {
+        return new Response(JSON.stringify({ ok: false, error: 'Unauthorized support device' }), {
+          status: 401,
+          headers: { 'content-type': 'application/json', 'x-request-id': 'req-support-1' },
+        });
+      }
+      return verifiedMcpFetch()(input);
+    }));
+
+    const state = await loginAccess(paths, { email: 'client@example.com', password: 'password123' });
+    const supportReason = state.gates.flatMap(gate => gate.reasons).find(reason => reason.includes('Support enrollment failed'));
+
+    expect(state.signedIn).toBe(true);
+    expect(supportReason).toContain('POST http://149.33.14.250:3020/api/support/devices/enroll');
+    expect(supportReason).toContain('HTTP 401');
+    expect(supportReason).toContain('requestId=req-support-1');
+    expect(JSON.stringify(state)).not.toContain(VALID_TEST_BEARER);
   });
 
   it('blocks project package bootstrap when no concrete bearer is available', () => {
@@ -1496,6 +1530,61 @@ describe('watcher desktop core', () => {
     });
     expect(node?.detail).not.toContain('упал');
     expect(visible.codexGates.message).toContain('упал');
+  });
+
+  it('formats Codex gate diagnostics with every command evidence row', () => {
+    const status = {
+      ready: false,
+      message: 'Smoke gate Codex упал: команда завершилась с ошибкой',
+      checkedAt: '2026-06-22T10:00:00.000Z',
+      evidence: {
+        commandRuns: {
+          codexHooks: codexGateRun('Codex hooks ready', 'codex plugin add persistent-verifier@claude-migrated-home'),
+        },
+        verification: {
+          codexTrust: codexGateRun('Codex project trust подтверждён.', 'read ~/.codex/config.toml projects trust'),
+          codexRuntime: codexGateRun('Codex CLI проверен.', 'codex --version'),
+          smoke: {
+            ...codexGateRun(`npm test failed with Bearer ${PLACEHOLDER_BEARER}`, 'npm test'),
+            passed: false,
+            exitCode: 1,
+          },
+        },
+      },
+    } satisfies DesktopCodexGateStatus;
+
+    const log = formatCodexGateDiagnostics(status, 'client-project');
+
+    expect(log).toContain('Codex Gates diagnostics');
+    expect(log).toContain('projectId: client-project');
+    expect(log).toContain('Persistent verifier hooks');
+    expect(log).toContain('Project smoke');
+    expect(log).toContain('failed');
+    expect(log).not.toContain(PLACEHOLDER_BEARER);
+    expect(log).toContain('Bearer pb_[REDACTED]');
+  });
+
+  it('formats support enrollment logs without leaking bearer-like values', () => {
+    const status = {
+      enrolled: false,
+      health: 'not_enrolled',
+      deviceId: null,
+      supportBaseUrl: null,
+      meshUrl: null,
+      message: 'Support-устройство ещё не зарегистрировано.',
+      updatedAt: null,
+    } satisfies ManagedDeviceStatus;
+    const log = formatSupportEnrollmentLog(status, {
+      enrolled: false,
+      status,
+      message: `Support enrollment failed for ${PLACEHOLDER_BEARER}`,
+    }, 'client-project');
+
+    expect(log).toContain('Support-device enrollment');
+    expect(log).toContain('projectId: client-project');
+    expect(log).toContain('enrollmentResult: blocked');
+    expect(log).not.toContain(PLACEHOLDER_BEARER);
+    expect(log).toContain('pb_[REDACTED]');
   });
 
   it('builds onboarding events from completed desktop connection steps', () => {

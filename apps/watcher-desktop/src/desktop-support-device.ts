@@ -75,24 +75,40 @@ export async function enrollManagedDevice(
     return {
       enrolled: false,
       status: readManagedDeviceStatus(paths),
-      message: 'Support enrollment невозможен без активного bearer и supportBaseUrl.',
+      message: `Support enrollment невозможен: bearer=${account.bearerToken ? 'есть' : 'нет'}, supportBaseUrl=${account.supportBaseUrl || 'нет данных'}.`,
     };
   }
   const endpoint = `${account.supportBaseUrl}/api/support/devices/enroll`;
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${account.bearerToken}`,
-    },
-    body: JSON.stringify(buildEnrollmentPayload(paths, projectId, account.meshBaseUrl)),
-  });
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${account.bearerToken}`,
+      },
+      body: JSON.stringify(buildEnrollmentPayload(paths, projectId, account.meshBaseUrl)),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      enrolled: false,
+      status: readManagedDeviceStatus(paths),
+      message: `Support enrollment request failed: POST ${endpoint}: ${message}`,
+    };
+  }
   const parsed: unknown = await response.json().catch(() => null);
   if (!response.ok || !isRecord(parsed) || parsed.ok !== true) {
     const message = isRecord(parsed) && typeof parsed.error === 'string'
       ? parsed.error
       : `Support enrollment вернул HTTP ${response.status}.`;
-    return { enrolled: false, status: readManagedDeviceStatus(paths), message };
+    const requestId = response.headers.get('x-request-id');
+    const suffix = requestId ? ` requestId=${requestId}` : '';
+    return {
+      enrolled: false,
+      status: readManagedDeviceStatus(paths),
+      message: `Support enrollment failed: POST ${endpoint}: HTTP ${response.status}. ${message}${suffix}`,
+    };
   }
   const device = isRecord(parsed.device) ? parsed.device : null;
   const deviceToken = typeof parsed.deviceToken === 'string' ? parsed.deviceToken : '';

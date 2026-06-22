@@ -1,7 +1,11 @@
 import type {
   DesktopAccessState,
+  DesktopCodexGateRunEvidence,
+  DesktopCodexGateStatus,
   DesktopConfigPackage,
   DesktopConnectionCheck,
+  ManagedDeviceEnrollment,
+  ManagedDeviceStatus,
   DesktopModeSummary,
   DesktopSection,
   DesktopUiState,
@@ -102,6 +106,103 @@ export function withCodexGateProgress(
     message: 'Проверяем Codex Gates.',
     nodes,
   };
+}
+
+export function formatAccessGateDiagnostics(state: DesktopAccessState): string {
+  const lines = [
+    'Диагностика доступа пульта',
+    `Аккаунт: ${state.email ?? 'не выполнен вход'}`,
+    `Статус: ${accessLabel(state.status)}`,
+    `Сервер подтверждён: ${state.serverVerified ? 'да' : 'нет'}`,
+    `Secret службы: ${state.serviceSecretConfigured ? 'готов' : 'не готов'}`,
+    `MCP config: ${state.config.found ? state.config.source : 'не найден'}`,
+    `configPath: ${state.config.configPath ?? 'нет данных'}`,
+    `projectId: ${state.config.projectId ?? 'нет данных'}`,
+    `localPath: ${state.config.localPath ?? 'нет данных'}`,
+    `serverUrl: ${state.config.serverUrl ?? 'нет данных'}`,
+    `Сообщение: ${state.message}`,
+    'Gates:',
+    ...state.gates.map((gate, index) => (
+      `${index + 1}. ${gate.decision}/${gate.risk}: ${gate.reasons.map(redactLogValue).join('; ')}`
+    )),
+  ];
+  return lines.map(redactLogValue).join('\n');
+}
+
+export function formatSupportEnrollmentLog(
+  status: ManagedDeviceStatus,
+  enrollment: ManagedDeviceEnrollment | null,
+  projectId: string,
+): string {
+  const lines = [
+    'Support-device enrollment',
+    `projectId: ${projectId || 'нет данных'}`,
+    `enrolled: ${status.enrolled ? 'да' : 'нет'}`,
+    `health: ${status.health}`,
+    `deviceId: ${status.deviceId ?? 'нет данных'}`,
+    `supportBaseUrl: ${status.supportBaseUrl ?? 'нет данных'}`,
+    `updatedAt: ${status.updatedAt ?? 'нет данных'}`,
+    `statusMessage: ${status.message}`,
+  ];
+  if (enrollment) {
+    lines.push(`enrollmentResult: ${enrollment.enrolled ? 'ok' : 'blocked'}`);
+    lines.push(`enrollmentMessage: ${enrollment.message}`);
+  } else {
+    lines.push('next: запускаю автоматическую регистрацию support-device');
+  }
+  return lines.map(redactLogValue).join('\n');
+}
+
+export function formatCodexGateDiagnostics(status: DesktopCodexGateStatus, projectId: string): string {
+  const lines = [
+    'Codex Gates diagnostics',
+    `projectId: ${projectId}`,
+    `ready: ${status.ready ? 'да' : 'нет'}`,
+    `checkedAt: ${status.checkedAt}`,
+    `message: ${status.message}`,
+    'Проверки:',
+    ...codexEvidenceRows(status).map(formatCodexEvidenceRow),
+  ];
+  return lines.map(redactLogValue).join('\n');
+}
+
+function codexEvidenceRows(status: DesktopCodexGateStatus): readonly {
+  readonly id: string;
+  readonly label: string;
+  readonly evidence: DesktopCodexGateRunEvidence | undefined;
+}[] {
+  const commandRuns = status.evidence.commandRuns;
+  const verification = status.evidence.verification;
+  return [
+    { id: 'codexTrust', label: 'Codex project trust', evidence: verification.codexTrust },
+    { id: 'codexRuntime', label: 'Codex CLI', evidence: verification.codexRuntime },
+    { id: 'codexHooks', label: 'Persistent verifier hooks', evidence: commandRuns.codexHooks },
+    { id: 'desktopBootstrap', label: 'Desktop bootstrap', evidence: verification.desktopBootstrap },
+    { id: 'managedHooks', label: 'Managed hooks', evidence: verification.managedHooks },
+    { id: 'smoke', label: 'Project smoke', evidence: verification.smoke },
+    { id: 'rollback', label: 'Rollback command', evidence: verification.rollback },
+    { id: 'hookPersistence', label: 'Native SessionStart', evidence: verification.hookPersistence },
+    { id: 'runtimeContext', label: 'Runtime Context', evidence: verification.runtimeContext },
+  ];
+}
+
+function formatCodexEvidenceRow(row: {
+  readonly id: string;
+  readonly label: string;
+  readonly evidence: DesktopCodexGateRunEvidence | undefined;
+}): string {
+  if (!row.evidence) return `- ${row.label} (${row.id}): нет evidence`;
+  const state = row.evidence.passed === true ? 'passed' : row.evidence.passed === false ? 'failed' : 'unknown';
+  const exitCode = row.evidence.exitCode === undefined ? 'нет данных' : String(row.evidence.exitCode);
+  const checkedAt = row.evidence.checkedAt ?? 'нет данных';
+  return [
+    `- ${row.label} (${row.id}): ${state}`,
+    `exit=${exitCode}`,
+    `source=${row.evidence.source}`,
+    `checkedAt=${checkedAt}`,
+    `command=${row.evidence.command}`,
+    `detail=${row.evidence.detail}`,
+  ].join(' | ');
 }
 
 function toggleClass(status: string): string {
@@ -390,4 +491,15 @@ function userFacingError(message: string): string {
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
+}
+
+function redactLogValue(value: string): string {
+  return value
+    .replace(/\bBearer\s+(?:sk-[A-Za-z0-9._-]+|[A-Za-z0-9._~+/=-]{16,})/gi, 'Bearer [REDACTED]')
+    .replace(/\bpb_[A-Za-z0-9_-]{8,}\b/g, 'pb_[REDACTED]')
+    .replace(/\bsk-[A-Za-z0-9._-]{8,}/g, 'sk-[REDACTED]')
+    .replace(
+      /\b((?:MCP_BEARER_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY|TOKEN|SECRET|PASSWORD|KEY)\s*[:=]\s*)(["']?)[^\s"',;]+/gi,
+      '$1$2[REDACTED]',
+    );
 }

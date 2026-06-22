@@ -22,6 +22,9 @@ import {
   applyUiState,
   errorMessage,
   fallbackStatus as fallbackServiceStatus,
+  formatAccessGateDiagnostics,
+  formatCodexGateDiagnostics,
+  formatSupportEnrollmentLog,
   renderConfigPackage,
   renderConnectionCheck,
   renderConnectionCause,
@@ -100,9 +103,12 @@ let pendingServiceAction: PendingServiceActionConfirmation | null = null;
 let automaticCodexGateRunning = false;
 let codexGateVerificationProjectId: string | null = null;
 let refreshInFlight: Promise<void> | null = null;
+let automaticSupportEnrollmentRunning = false;
 const automaticCodexGateAttempts = new Set<string>();
+const automaticSupportEnrollmentAttempts = new Map<string, number>();
 const serverHeartbeatRefreshMs = 60 * 1000;
 const SERVICE_AI_LOG_CHUNK_LIMIT = 6;
+const supportEnrollmentRetryMs = 2 * 60 * 1000;
 
 void refresh();
 window.setInterval(() => {
@@ -119,6 +125,8 @@ authForm?.addEventListener('submit', event => {
   }).then(state => {
     accessState = state;
     if (state.signedIn) authForm.reset();
+    automaticSupportEnrollmentAttempts.clear();
+    writeLog(formatAccessGateDiagnostics(state));
     return refresh();
   }).catch(error => setText(authStatusEl, errorMessage(error)));
 });
@@ -318,7 +326,7 @@ async function handleCheckAction(value: string | undefined): Promise<void> {
       await refresh();
       try {
         const result = await window.watcherDesktop.codexGates.verify(projectId);
-        writeLog(result.message);
+        writeLog(formatCodexGateDiagnostics(result, projectId));
       } finally {
         codexGateVerificationProjectId = null;
         await refresh();
@@ -372,6 +380,7 @@ async function selectProjectRootFromDialog(): Promise<void> {
     writeLog('Выбор папки проекта отменён');
     return;
   }
+  automaticSupportEnrollmentAttempts.clear();
   await saveRootProfile(root);
   await refresh();
 }
@@ -382,6 +391,7 @@ async function importConfigFromDialog(): Promise<void> {
     writeLog('Импорт файла настройки MCP отменён');
     return;
   }
+  automaticSupportEnrollmentAttempts.clear();
   await saveUiState({
     ...uiState,
     lastProjectId: result.profile?.id ?? uiState.lastProjectId,
@@ -412,6 +422,7 @@ async function refreshInternal(): Promise<void> {
   if (!accessState.signedIn) return;
   currentProjects = await safeProjects();
   renderProjectSelect(currentProjects, projectSelect, currentProjectId());
+  await ensureSupportDeviceEnrollment();
   const [check, pack, modes] = await Promise.all([
     safeFullCheck(),
     safeConfigPackage(),
@@ -497,13 +508,39 @@ function isStale(value: DesktopCodexGateRunEvidence | undefined, checkedAt: stri
   return referenceTime - valueTime > value.staleAfterMs;
 }
 
+async function ensureSupportDeviceEnrollment(): Promise<void> {
+  if (!accessState?.signedIn || automaticSupportEnrollmentRunning) return;
+  const projectId = currentProjectId();
+  const key = supportEnrollmentAttemptKey(projectId);
+  const lastAttemptAt = automaticSupportEnrollmentAttempts.get(key) ?? 0;
+  if (Date.now() - lastAttemptAt < supportEnrollmentRetryMs) return;
+  automaticSupportEnrollmentRunning = true;
+  automaticSupportEnrollmentAttempts.set(key, Date.now());
+  try {
+    const status = await window.watcherDesktop.support.status();
+    if (status.enrolled) return;
+    writeLog(formatSupportEnrollmentLog(status, null, projectId));
+    const enrollment = await window.watcherDesktop.support.enroll(projectId);
+    writeLog(formatSupportEnrollmentLog(enrollment.status, enrollment, projectId));
+    if (enrollment.enrolled) automaticSupportEnrollmentAttempts.delete(key);
+  } catch (error) {
+    writeLog(`Support-device auto enrollment не завершён: ${errorMessage(error)}`);
+  } finally {
+    automaticSupportEnrollmentRunning = false;
+  }
+}
+
+function supportEnrollmentAttemptKey(projectId: string): string {
+  return `${accessState?.email ?? 'local'}:${projectId}`;
+}
+
 async function runAutomaticCodexGateVerification(projectId: string): Promise<void> {
   codexGateVerificationProjectId = projectId;
   writeLog('Автоматически настраиваем Codex: CLI, persistent-verifier, Runtime Context hooks, smoke и rollback...');
   await refresh();
   try {
     const result = await window.watcherDesktop.codexGates.verify(projectId);
-    writeLog(result.message);
+    writeLog(formatCodexGateDiagnostics(result, projectId));
     await refresh();
   } catch (error) {
     writeLog(`Автонастройка Codex не завершилась: ${errorMessage(error)}`);
