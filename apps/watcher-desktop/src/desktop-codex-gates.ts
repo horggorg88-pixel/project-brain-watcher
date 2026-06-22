@@ -41,6 +41,8 @@ const SOURCE = 'desktop-codex-gates';
 const PLUGIN_ID = 'persistent-verifier@claude-migrated-home';
 const MANAGED_HOOKS_START = '# project-brain-managed-hooks:start';
 const MANAGED_HOOKS_END = '# project-brain-managed-hooks:end';
+const FAILURE_OUTPUT_HEAD_CHARS = 320;
+const FAILURE_OUTPUT_TAIL_CHARS = 1200;
 const PERSISTENT_VERIFIER_HOOKS = {
   hooks: {
     SessionStart: [
@@ -92,6 +94,8 @@ const PERSISTENT_VERIFIER_HOOKS = {
     ],
   },
 } as const;
+const CODEX_LIFECYCLE_HOOKS = ['SessionStart', 'UserPromptSubmit', 'SubagentStart', 'PostToolUse', 'Stop'] as const;
+const QUALITY_GATE_RAILS = ['typecheck', 'lint', 'test', 'build', 'check', 'verify'] as const;
 const evidenceFiles = [
   join('.brain', 'service', 'quality-gate-runs.json'),
   join('.brain', 'quality-gate-runs.json'),
@@ -743,7 +747,7 @@ function desktopBootstrapEvidence(
   return {
     available: true,
     passed: true,
-    detail: 'Desktop bootstrap persistent-verifier проверен; native Runtime Context evidence ожидается от Codex.',
+    detail: `Desktop bootstrap persistent-verifier проверен; ${codexHookTopologyDetail()} Native Runtime Context evidence ожидается от Codex.`,
     checkedAt,
     staleAfterMs: CODEX_SETUP_EVIDENCE_TTL_MS,
     source: SOURCE,
@@ -779,7 +783,7 @@ function installManagedPersistentVerifierHooks(
     return {
       available: true,
       passed: true,
-      detail: 'Codex managed hooks установлены в системный requirements.toml; native hooks не требуют ручного /hooks trust.',
+      detail: `Codex managed hooks установлены в системный requirements.toml; ${codexHookTopologyDetail()} Native hooks не требуют ручного /hooks trust.`,
       checkedAt,
       staleAfterMs: CODEX_SETUP_EVIDENCE_TTL_MS,
       source: SOURCE,
@@ -1178,7 +1182,7 @@ function codexHooksEvidence(
   return {
     available: true,
     passed: true,
-    detail: `${marketplace}; hooks.json ${action}, user-level Runtime Context bridge готов${managed}.`,
+    detail: `${marketplace}; hooks.json ${action}, user-level Runtime Context bridge готов${managed}. ${codexHookTopologyDetail()}`,
     checkedAt,
     staleAfterMs: CODEX_SETUP_EVIDENCE_TTL_MS,
     source: SOURCE,
@@ -1377,7 +1381,7 @@ function evidenceFromResult(
   return {
     available: true,
     passed,
-    detail: passed ? successDetail : `Команда завершилась с ошибкой: ${sanitize(result.output).slice(0, 240)}`,
+    detail: passed ? successDetail : `Команда завершилась с ошибкой: ${formatFailureOutput(result.output)}`,
     checkedAt,
     staleAfterMs,
     source: SOURCE,
@@ -1455,9 +1459,13 @@ function blockerMessage(evidence: DesktopCodexGateEvidence, checkedAt: string): 
     return 'Codex Runtime Context proof ещё не записан. Отправь сообщение или запусти subagent в проекте, чтобы native hooks подтвердили контекст.';
   }
   if (hasBaseVerification(evidence, checkedAt)) {
-    return 'Codex hooks установлены. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.';
+    return `Codex hooks установлены: ${codexHookTopologyDetail()} Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.`;
   }
   return 'Codex gates ожидают SessionStart evidence.';
+}
+
+function codexHookTopologyDetail(): string {
+  return `Codex UI показывает ${CODEX_LIFECYCLE_HOOKS.length} lifecycle hooks (${CODEX_LIFECYCLE_HOOKS.join(', ')}), а не число внутренних проверок; qualitygate.py запускает ${QUALITY_GATE_RAILS.length} rails (${QUALITY_GATE_RAILS.join(', ')}).`;
 }
 
 function smokeBlockerMessage(value: DesktopCodexGateRunEvidence | undefined, checkedAt: string): string | null {
@@ -1555,6 +1563,18 @@ function readBoolean(value: Record<string, unknown>, key: string): boolean | und
 
 function sanitizeOptional(value: string | undefined): string | undefined {
   return value === undefined ? undefined : sanitize(value);
+}
+
+function formatFailureOutput(value: string): string {
+  const sanitized = sanitize(stripAnsi(value)).trim();
+  if (sanitized.length <= FAILURE_OUTPUT_HEAD_CHARS + FAILURE_OUTPUT_TAIL_CHARS) return sanitized;
+  const head = sanitized.slice(0, FAILURE_OUTPUT_HEAD_CHARS).trimEnd();
+  const tail = sanitized.slice(-FAILURE_OUTPUT_TAIL_CHARS).trimStart();
+  return `${head}\n... output truncated: showing failure tail ...\n${tail}`;
+}
+
+function stripAnsi(value: string): string {
+  return value.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
 }
 
 function sanitize(value: string): string {

@@ -58,7 +58,7 @@ describe('watcher desktop codex gates', () => {
       'npm test',
     ]);
     expect(result.ready).toBe(false);
-    expect(result.message).toBe('Codex hooks установлены. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.');
+    expectCodexHooksPendingMessage(result.message);
     expect(result.evidence.commandRuns.codexHooks).toMatchObject({
       command: 'codex plugin add persistent-verifier@claude-migrated-home',
       exitCode: 0,
@@ -214,7 +214,7 @@ describe('watcher desktop codex gates', () => {
     });
 
     expect(result.ready).toBe(false);
-    expect(result.message).toBe('Codex hooks установлены. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.');
+    expectCodexHooksPendingMessage(result.message);
     expect(result.evidence.commandRuns.codexHooks).toMatchObject({
       passed: true,
       exitCode: 0,
@@ -252,7 +252,7 @@ describe('watcher desktop codex gates', () => {
     });
 
     expect(result.ready).toBe(false);
-    expect(result.message).toBe('Codex hooks установлены. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.');
+    expectCodexHooksPendingMessage(result.message);
     expect(result.evidence.commandRuns.codexHooks).toMatchObject({
       passed: true,
       exitCode: 0,
@@ -295,7 +295,7 @@ describe('watcher desktop codex gates', () => {
       'npm test',
     ]);
     expect(result.ready).toBe(false);
-    expect(result.message).toBe('Codex hooks установлены. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.');
+    expectCodexHooksPendingMessage(result.message);
     expect(result.evidence.verification.codexTrust).toMatchObject({
       passed: true,
       detail: 'Codex project trust автоматически установлен для выбранной папки.',
@@ -444,6 +444,50 @@ describe('watcher desktop codex gates', () => {
     expect(result.message).toContain('tests/runtime-start/app-version.test.ts');
     expect(result.message).toContain('TOKEN=[redacted]');
     expect(result.message).not.toContain('pb_secret_value');
+  });
+
+  it('keeps the failing smoke tail when vitest writes a long green header first', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    mkdirSync(root, { recursive: true });
+    writeTrustedCodexProject(paths.homePath, root);
+    stagePersistentVerifierHookFiles(paths.homePath);
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    const greenHeader = [
+      '> lbsbonus-monolit@1.0.0 test',
+      '> vitest run',
+      '',
+      'RUN v4.1.8 C:/Users/salim/go/src/LBS_Bonus',
+      ...Array.from({ length: 18 }, (_, index) => `✓ tests/rebrand-inventory-validator.test.js (${index + 1})`),
+    ].join('\n');
+    const failureTail = [
+      'FAIL tests/sql-admin-remaining-endpoint-retirement-contract.test.js',
+      'AssertionError: expected retired endpoint to return 410',
+      'Expected: 410',
+      'Received: 200',
+    ].join('\n');
+    const result = await verifyDesktopCodexGates(paths, 'demo-project', {
+      runner: async request => {
+        const command = [request.command, ...request.args].join(' ');
+        if (command === 'npm test') return { exitCode: 1, output: `${greenHeader}\n${failureTail}` };
+        return { exitCode: 0, output: 'ok' };
+      },
+      now: () => new Date('2026-06-15T10:00:00.000Z'),
+    });
+
+    expect(result.ready).toBe(false);
+    expect(result.message).toContain('Smoke gate Codex упал');
+    expect(result.message).toContain('FAIL tests/sql-admin-remaining-endpoint-retirement-contract.test.js');
+    expect(result.message).toContain('Received: 200');
   });
 
   it('reads native hook persistence evidence written by Codex hooks', () => {
@@ -641,12 +685,13 @@ describe('watcher desktop codex gates', () => {
     });
 
     expect(result.ready).toBe(false);
-    expect(result.message).toBe('Codex hooks установлены. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.');
+    expectCodexHooksPendingMessage(result.message);
     expect(result.evidence.verification.desktopBootstrap).toMatchObject({
       passed: true,
-      detail: 'Desktop bootstrap persistent-verifier проверен; native Runtime Context evidence ожидается от Codex.',
       source: 'desktop-codex-gates',
     });
+    expect(result.evidence.verification.desktopBootstrap?.detail).toContain('5 lifecycle hooks');
+    expect(result.evidence.verification.desktopBootstrap?.detail).toContain('6 rails');
     expect(result.evidence.verification.hookPersistence).toBeUndefined();
     expect(result.evidence.verification.runtimeContext).toBeUndefined();
   });
@@ -731,6 +776,13 @@ function passedRun(
     command,
     exitCode: 0,
   };
+}
+
+function expectCodexHooksPendingMessage(message: string): void {
+  expect(message).toContain('Codex hooks установлены');
+  expect(message).toContain('5 lifecycle hooks');
+  expect(message).toContain('6 rails');
+  expect(message).toContain('native SessionStart');
 }
 
 function stagePersistentVerifierHookFiles(homePath: string): void {
