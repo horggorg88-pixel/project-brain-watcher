@@ -278,6 +278,178 @@ def main():
 if __name__ == "__main__":
     main()
 `;
+const POST_TOOL_USE_HOOK_SCRIPT = `#!/usr/bin/env python3
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT_MARKERS = (
+    "package.json",
+    "tsconfig.json",
+    "pyproject.toml",
+    "Cargo.toml",
+    "go.mod",
+)
+
+
+def succeed():
+    sys.exit(0)
+
+
+def read_input():
+    try:
+        return json.load(sys.stdin)
+    except Exception:
+        return {}
+
+
+def input_cwd(input_data):
+    cwd = input_data.get("cwd")
+    if isinstance(cwd, str) and cwd.strip():
+        return Path(cwd)
+    return Path.cwd()
+
+
+def get_file_path(input_data):
+    candidates = [
+        input_data.get("tool_response", {}).get("filePath") if isinstance(input_data.get("tool_response"), dict) else None,
+        input_data.get("tool_result", {}).get("filePath") if isinstance(input_data.get("tool_result"), dict) else None,
+        input_data.get("tool_input", {}).get("file_path") if isinstance(input_data.get("tool_input"), dict) else None,
+    ]
+    for candidate in candidates:
+        if isinstance(candidate, str) and candidate.strip():
+            return Path(candidate)
+    return None
+
+
+def find_root(start):
+    current = start if start.is_dir() else start.parent
+    while True:
+        if any((current / marker).exists() for marker in ROOT_MARKERS):
+            return current
+        if current.parent == current:
+            return None
+        current = current.parent
+
+
+def main():
+    input_data = read_input()
+    if input_data.get("tool_name") not in {"Write", "Edit", "MultiEdit", "apply_patch"}:
+        succeed()
+    root = find_root((get_file_path(input_data) or input_cwd(input_data)).resolve())
+    if not root:
+        succeed()
+    qualitygate = Path(__file__).with_name("qualitygate.py")
+    if not qualitygate.exists():
+        succeed()
+    hook_input = json.dumps({"hookEventName": "Stop", "cwd": str(root)})
+    result = subprocess.run(
+        [sys.executable, str(qualitygate)],
+        input=hook_input,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
+    sys.exit(result.returncode)
+
+
+if __name__ == "__main__":
+    main()
+`;
+const STOP_HOOK_SCRIPT = `#!/usr/bin/env python3
+import hashlib
+import json
+import os
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+ROOT_MARKERS = (
+    "package.json",
+    "tsconfig.json",
+    "pyproject.toml",
+    "Cargo.toml",
+    "go.mod",
+)
+
+
+def emit(payload):
+    print(json.dumps(payload, ensure_ascii=False))
+    sys.exit(0)
+
+
+def succeed():
+    sys.exit(0)
+
+
+def read_input():
+    try:
+        return json.load(sys.stdin)
+    except Exception:
+        return {}
+
+
+def input_cwd(input_data):
+    cwd = input_data.get("cwd")
+    if isinstance(cwd, str) and cwd.strip():
+        return Path(cwd)
+    return Path(os.getcwd())
+
+
+def state_path(root):
+    digest = hashlib.sha1(str(root).lower().encode("utf-8")).hexdigest()
+    return Path(tempfile.gettempdir()) / "persistent-verifier" / f"{digest}.json"
+
+
+def find_root(start):
+    current = start
+    while True:
+        if any((current / marker).exists() for marker in ROOT_MARKERS):
+            return current
+        if current.parent == current:
+            return None
+        current = current.parent
+
+
+def load_state(root):
+    path = state_path(root)
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def main():
+    input_data = read_input()
+    root = find_root(input_cwd(input_data).resolve())
+    if not root:
+        succeed()
+    state = load_state(root)
+    if not state or state.get("status") != "failed":
+        succeed()
+    updated_at = float(state.get("updated_at", 0))
+    if time.time() - updated_at > 4 * 60 * 60:
+        succeed()
+    emit(
+        {
+            "decision": "block",
+            "reason": "Verifier still failing",
+            "systemMessage": state.get("summary", "persistent-verifier: есть незакрытые ошибки."),
+        }
+    )
+
+
+if __name__ == "__main__":
+    main()
+`;
 
 export function readDesktopCodexGateEvidence(
   paths: DesktopCorePaths,
@@ -432,7 +604,7 @@ function repairPersistentVerifierPluginHooks(homePath: string): PersistentVerifi
 }
 
 function installPersistentVerifierUserHooks(homePath: string, profile: SavedProjectProfile): PersistentVerifierUserHookBridge {
-  const scriptRoot = resolvePersistentVerifierScriptRoot(homePath);
+  const scriptRoot = ensurePersistentVerifierScriptRoot(homePath);
   if (!scriptRoot) {
     return {
       installed: false,
@@ -523,6 +695,24 @@ function writeSessionStartBridge(homePath: string, profile: SavedProjectProfile)
       path: sessionStartScript,
       detail: `Codex SessionStart bridge не установлен: ${error instanceof Error ? error.message : String(error)}`,
     };
+  }
+}
+
+function ensurePersistentVerifierScriptRoot(homePath: string): string | null {
+  const existingRoot = resolvePersistentVerifierScriptRoot(homePath);
+  if (existingRoot) return existingRoot;
+
+  const pluginRoot = join(homePath, 'plugins', 'persistent-verifier');
+  const scriptRoot = join(pluginRoot, 'hooks');
+  try {
+    mkdirSync(scriptRoot, { recursive: true });
+    writeFileSync(join(scriptRoot, 'sessionstart.py'), SESSION_START_BRIDGE_SCRIPT, 'utf-8');
+    writeFileSync(join(scriptRoot, 'posttooluse.py'), POST_TOOL_USE_HOOK_SCRIPT, 'utf-8');
+    writeFileSync(join(scriptRoot, 'stop.py'), STOP_HOOK_SCRIPT, 'utf-8');
+    writeFileSync(join(pluginRoot, 'hooks.json'), JSON.stringify(PERSISTENT_VERIFIER_HOOKS, null, 2) + '\n', 'utf-8');
+    return scriptRoot;
+  } catch {
+    return null;
   }
 }
 
@@ -972,9 +1162,6 @@ function codexHooksEvidence(
   checkedAt: string,
 ): DesktopCodexGateRunEvidence {
   const command = `codex plugin add ${PLUGIN_ID}`;
-  if (installResult.exitCode !== 0) {
-    return evidenceFromResult(installResult, command, checkedAt, 'Codex persistent-verifier plugin установлен или уже доступен.');
-  }
   if (hookRepair.failed.length > 0) {
     return failedEvidence(command, checkedAt, `Persistent-verifier hooks.json не удалось обновить: ${hookRepair.failed[0]}`);
   }
@@ -984,10 +1171,14 @@ function codexHooksEvidence(
   }
   const action = hookRepair.repaired.length > 0 ? 'обновлён под CLAUDE_PLUGIN_ROOT' : 'проверен';
   const managed = managedHooks ? ', managed requirements готов' : '';
+  const marketplace =
+    installResult.exitCode === 0
+      ? 'Codex marketplace plugin доступен'
+      : `Codex marketplace plugin недоступен (${sanitize(installResult.output).slice(0, 160)}), использован локальный bridge`;
   return {
     available: true,
     passed: true,
-    detail: `Codex persistent-verifier plugin установлен, hooks.json ${action}, user-level Runtime Context bridge готов${managed}.`,
+    detail: `${marketplace}; hooks.json ${action}, user-level Runtime Context bridge готов${managed}.`,
     checkedAt,
     staleAfterMs: CODEX_SETUP_EVIDENCE_TTL_MS,
     source: SOURCE,

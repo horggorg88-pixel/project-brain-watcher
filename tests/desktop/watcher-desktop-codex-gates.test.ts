@@ -193,7 +193,7 @@ describe('watcher desktop codex gates', () => {
     expect(parsedHooks.hooks.UserPromptSubmit).toHaveLength(2);
   });
 
-  it('blocks Codex hook setup when persistent-verifier hook files are missing', async () => {
+  it('bootstraps local persistent-verifier hooks when marketplace hook files are missing', async () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');
     mkdirSync(root, { recursive: true });
@@ -214,10 +214,53 @@ describe('watcher desktop codex gates', () => {
     });
 
     expect(result.ready).toBe(false);
-    expect(result.message).toBe('Persistent-verifier plugin ещё не установлен или не прошёл проверку.');
+    expect(result.message).toBe('Codex hooks установлены. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.');
     expect(result.evidence.commandRuns.codexHooks).toMatchObject({
-      passed: false,
-      exitCode: 1,
+      passed: true,
+      exitCode: 0,
+    });
+    expect(readFileSync(join(paths.homePath, 'plugins', 'persistent-verifier', 'hooks', 'posttooluse.py'), 'utf-8')).toContain('tool_name');
+    expect(readFileSync(join(paths.homePath, 'plugins', 'persistent-verifier', 'hooks', 'stop.py'), 'utf-8')).toContain('Verifier still failing');
+  });
+
+  it('keeps Codex hooks ready when the marketplace plugin is not found but local bridge is installed', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    mkdirSync(root, { recursive: true });
+    writeTrustedCodexProject(paths.homePath, root);
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    const result = await verifyDesktopCodexGates(paths, 'demo-project', {
+      runner: async request => {
+        if ([request.command, ...request.args].join(' ') === 'codex plugin add persistent-verifier@claude-migrated-home') {
+          return {
+            exitCode: 1,
+            output: 'Error: plugin persistent-verifier was not found in marketplace claude-migrated-home',
+          };
+        }
+        return { exitCode: 0, output: 'ok' };
+      },
+      now: () => new Date('2026-06-15T10:00:00.000Z'),
+    });
+
+    expect(result.ready).toBe(false);
+    expect(result.message).toBe('Codex hooks установлены. Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.');
+    expect(result.evidence.commandRuns.codexHooks).toMatchObject({
+      passed: true,
+      exitCode: 0,
+    });
+    expect(result.evidence.commandRuns.codexHooks?.detail).toContain('marketplace plugin недоступен');
+    expect(result.evidence.verification.desktopBootstrap).toMatchObject({
+      passed: true,
+      command: 'verify persistent-verifier desktop bridge',
     });
   });
 
