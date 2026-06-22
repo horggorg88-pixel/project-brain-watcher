@@ -52,7 +52,7 @@ function resolveAccountServerUrl(config: McpConfigDiscovery, profile: SavedProje
     || config.serverUrl
     || profile?.serverUrl
     || DEFAULT_ACCOUNT_SERVER_URL;
-  return normalizeMcpServerUrl(base) || DEFAULT_ACCOUNT_SERVER_URL;
+  return clientBaseUrl(base, DEFAULT_ACCOUNT_SERVER_URL);
 }
 
 async function fetchJson(endpoint: string, body: Record<string, unknown>): Promise<Response> {
@@ -84,9 +84,10 @@ async function parseAuthResponse(response: Response): Promise<DesktopAccountAuth
   }
   const serverConfig = isRecord(parsed.serverConfig) ? parsed.serverConfig : null;
   const supportConfig = isRecord(parsed.supportConfig) ? parsed.supportConfig : null;
+  const responseUrl = responseOrigin(response) ?? DEFAULT_ACCOUNT_SERVER_URL;
   const serverUrl = readText(serverConfig?.serverUrl) ?? DEFAULT_MCP_SERVER_URL;
-  const consoleUrl = readText(serverConfig?.consoleUrl) ?? responseOrigin(response) ?? DEFAULT_ACCOUNT_SERVER_URL;
-  const supportBaseUrl = readText(supportConfig?.supportBaseUrl) ?? consoleUrl;
+  const consoleUrl = clientBaseUrl(readText(serverConfig?.consoleUrl) ?? responseUrl, responseUrl);
+  const supportBaseUrl = clientBaseUrl(readText(supportConfig?.supportBaseUrl) ?? consoleUrl, consoleUrl);
   const meshBaseUrl = readText(supportConfig?.meshBaseUrl);
   const bearerToken = readText(serverConfig?.bearerToken);
   const tokenEnv = readText(serverConfig?.tokenEnv) ?? 'MCP_BEARER_TOKEN';
@@ -94,8 +95,8 @@ async function parseAuthResponse(response: Response): Promise<DesktopAccountAuth
   return {
     ok: true,
     serverUrl: normalizeMcpServerUrl(serverUrl) || DEFAULT_MCP_SERVER_URL,
-    consoleUrl: normalizeMcpServerUrl(consoleUrl) || DEFAULT_ACCOUNT_SERVER_URL,
-    supportBaseUrl: normalizeMcpServerUrl(supportBaseUrl) || normalizeMcpServerUrl(consoleUrl) || DEFAULT_ACCOUNT_SERVER_URL,
+    consoleUrl,
+    supportBaseUrl,
     meshBaseUrl: meshBaseUrl ? normalizeMcpServerUrl(meshBaseUrl) : null,
     bearerToken: bearerToken.trim(),
     tokenEnv,
@@ -118,6 +119,29 @@ function denied(serverUrl: string | null, message: string): DesktopAccountAuthor
 
 function defaultConsoleUrlFor(serverUrl: string): string {
   return normalizeMcpServerUrl(serverUrl) === DEFAULT_MCP_SERVER_URL ? DEFAULT_ACCOUNT_SERVER_URL : '';
+}
+
+function clientBaseUrl(value: string, fallback: string): string {
+  const normalized = normalizeMcpServerUrl(value);
+  const normalizedFallback = normalizeMcpServerUrl(fallback) || DEFAULT_ACCOUNT_SERVER_URL;
+  if (!normalized || isLocalBindUrl(normalized)) return normalizedFallback;
+  return normalized;
+}
+
+function isLocalBindUrl(value: string): boolean {
+  try {
+    const host = new URL(value).hostname.toLowerCase();
+    return (
+      host === '0.0.0.0'
+      || host === '::'
+      || host === '[::]'
+      || host === 'localhost'
+      || host === '127.0.0.1'
+      || host.startsWith('127.')
+    );
+  } catch {
+    return false;
+  }
 }
 
 function responseOrigin(response: Response): string | null {

@@ -177,11 +177,12 @@ function accountFromHandoff(paths: DesktopCorePaths): DesktopAccountAuthorizatio
   const handoff = readDesktopAccessHandoff(paths);
   const bearerToken = readDesktopAccessHandoffToken(paths);
   if (!handoff || !bearerToken || !handoff.consoleUrl) return null;
+  const consoleUrl = clientBaseUrl(handoff.consoleUrl, DEFAULT_ACCOUNT_SERVER_URL);
   return {
     ok: true,
     serverUrl: handoff.serverUrl,
-    consoleUrl: handoff.consoleUrl,
-    supportBaseUrl: handoff.consoleUrl,
+    consoleUrl,
+    supportBaseUrl: consoleUrl,
     meshBaseUrl: null,
     bearerToken,
     tokenEnv: handoff.tokenEnv,
@@ -203,7 +204,7 @@ function accountFromStoredProject(
   const bearerToken = readDesktopServiceToken(profile);
   if (!bearerToken) return null;
   const serverUrl = normalizeMcpServerUrl(profile.serverUrl || config.serverUrl || DEFAULT_MCP_SERVER_URL) || DEFAULT_MCP_SERVER_URL;
-  const consoleUrl = normalizeMcpServerUrl(profile.consoleUrl || config.consoleUrl || defaultConsoleUrlFor(serverUrl)) || DEFAULT_ACCOUNT_SERVER_URL;
+  const consoleUrl = clientBaseUrl(profile.consoleUrl || config.consoleUrl || defaultConsoleUrlFor(serverUrl), DEFAULT_ACCOUNT_SERVER_URL);
   return {
     projectId: profile.id,
     account: {
@@ -233,6 +234,29 @@ function resolveStoredProfile(
 
 function defaultConsoleUrlFor(serverUrl: string): string {
   return normalizeMcpServerUrl(serverUrl) === DEFAULT_MCP_SERVER_URL ? DEFAULT_ACCOUNT_SERVER_URL : '';
+}
+
+function clientBaseUrl(value: string, fallback: string): string {
+  const normalized = normalizeMcpServerUrl(value);
+  const normalizedFallback = normalizeMcpServerUrl(fallback) || DEFAULT_ACCOUNT_SERVER_URL;
+  if (!normalized || isLocalBindUrl(normalized)) return normalizedFallback;
+  return normalized;
+}
+
+function isLocalBindUrl(value: string): boolean {
+  try {
+    const host = new URL(value).hostname.toLowerCase();
+    return (
+      host === '0.0.0.0'
+      || host === '::'
+      || host === '[::]'
+      || host === 'localhost'
+      || host === '127.0.0.1'
+      || host.startsWith('127.')
+    );
+  } catch {
+    return false;
+  }
 }
 
 function buildEnrollmentPayload(
@@ -267,7 +291,7 @@ function readSupportDeviceState(paths: DesktopCorePaths): SupportDeviceState | n
   if (!existsSync(path)) return null;
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, 'utf-8'));
-    return isSupportDeviceState(parsed) ? parsed : null;
+    return isSupportDeviceState(parsed) && !isLocalBindUrl(parsed.supportBaseUrl) ? parsed : null;
   } catch {
     return null;
   }

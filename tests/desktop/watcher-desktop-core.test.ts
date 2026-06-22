@@ -194,6 +194,46 @@ describe('watcher desktop core', () => {
     expect(JSON.stringify(state)).not.toContain(VALID_TEST_BEARER);
   });
 
+  it('replaces local bind support URLs from auth with the public auth origin', async () => {
+    const paths = tempPaths();
+    const requestedUrls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      requestedUrls.push(String(input));
+      if (String(input) === 'http://149.33.14.250:3020/api/auth/access') {
+        const response = new Response(JSON.stringify({
+          ok: true,
+          profile: { firstName: 'Client', lastName: 'User', email: 'client@example.com', role: 'user' },
+          serverConfig: {
+            serverUrl: 'http://149.33.14.250',
+            consoleUrl: 'http://0.0.0.0:3020',
+            bearerToken: VALID_TEST_BEARER,
+            tokenEnv: 'MCP_BEARER_TOKEN',
+          },
+          supportConfig: {
+            supportBaseUrl: 'http://0.0.0.0:3020',
+          },
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+        Object.defineProperty(response, 'url', { value: 'http://149.33.14.250:3020/api/auth/access' });
+        return response;
+      }
+      if (String(input) === 'http://149.33.14.250:3020/api/support/devices/enroll') {
+        return new Response(JSON.stringify({
+          ok: true,
+          device: { deviceId: 'dev_public_origin', meshUrl: null },
+          deviceToken: 'pbs_device_token',
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return verifiedMcpFetch()(input);
+    }));
+
+    const state = await loginAccess(paths, { email: 'client@example.com', password: 'password123' });
+
+    expect(state.signedIn).toBe(true);
+    expect(requestedUrls).toContain('http://149.33.14.250:3020/api/support/devices/enroll');
+    expect(requestedUrls).not.toContain('http://0.0.0.0:3020/api/support/devices/enroll');
+    expect(readAccessState(paths).config.consoleUrl).toBe('http://149.33.14.250:3020');
+  });
+
   it('blocks project package bootstrap when no concrete bearer is available', () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'Client Project');

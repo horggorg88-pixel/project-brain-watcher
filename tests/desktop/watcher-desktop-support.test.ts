@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -176,6 +176,47 @@ describe('watcher desktop support device', () => {
       `Bearer ${DEVICE_TOKEN}`,
       `Bearer ${DEVICE_TOKEN}`,
     ]);
+  });
+
+  it('re-enrolls when an old support state points to a local bind URL', async () => {
+    const paths = tempPaths();
+    const projectRoot = join(paths.homePath, 'mcp-project');
+    mkdirSync(projectRoot, { recursive: true });
+    mkdirSync(paths.userDataPath, { recursive: true });
+    const profile = saveProfile(paths, {
+      id: 'mcp-project',
+      name: 'MCP Project',
+      root: projectRoot,
+      indexId: 'idx-mcp-project',
+      serverUrl: 'http://149.33.14.250',
+      consoleUrl: 'http://0.0.0.0:3020',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    stageDesktopServiceSecret(profile, ACCOUNT_BEARER);
+    writeFileSync(join(paths.userDataPath, 'desktop-support-device.json'), JSON.stringify({
+      deviceId: 'dev_stale',
+      deviceToken: 'pbs_stale_device_token',
+      supportBaseUrl: 'http://0.0.0.0:3020',
+      meshUrl: null,
+      updatedAt: new Date(0).toISOString(),
+    }), 'utf-8');
+    const requests: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+      requests.push(urlOf(input));
+      if (urlOf(input).endsWith('/api/support/devices/enroll')) {
+        return jsonResponse({ ok: true, device: { deviceId: 'dev_repaired', meshUrl: null }, deviceToken: DEVICE_TOKEN });
+      }
+      return jsonResponse({ ok: false, error: 'unexpected request' }, 404);
+    }));
+
+    const before = readManagedDeviceStatus(paths);
+    const enrollment = await ensureManagedDeviceEnrolled(paths, 'mcp-project');
+    const after = readManagedDeviceStatus(paths);
+
+    expect(before.enrolled).toBe(false);
+    expect(enrollment.enrolled).toBe(true);
+    expect(after.deviceId).toBe('dev_repaired');
+    expect(requests).toEqual(['http://149.33.14.250:3020/api/support/devices/enroll']);
   });
 });
 
