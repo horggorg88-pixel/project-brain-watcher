@@ -41,7 +41,7 @@ function readCodexConfig(path: string): McpConfigDiscovery {
   if (!existsSync(path)) return notFound('codex', path);
   let content = '';
   try {
-    content = readFileSync(path, 'utf-8');
+    content = readCodexConfigText(path);
   } catch (error) {
     return notFound('codex', `${path}: ${errorMessage(error)}`);
   }
@@ -151,6 +151,10 @@ function readTomlProjectBrainServer(content: string): { readonly url: string | n
     url: typeof server.url === 'string' ? server.url : null,
     tokenEnv: typeof server.bearer_token_env_var === 'string' ? server.bearer_token_env_var : null,
   };
+}
+
+function readCodexConfigText(path: string): string {
+  return readFileSync(path, 'utf-8').replace(/^\uFEFF/, '');
 }
 
 function normalizeServerUrl(value: string | null): string | null {

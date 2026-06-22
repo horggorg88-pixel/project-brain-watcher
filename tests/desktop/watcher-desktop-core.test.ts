@@ -962,6 +962,24 @@ describe('watcher desktop core', () => {
     expect(config.tokenEnv).toBe('MCP_BEARER_TOKEN');
   });
 
+  it('discovers Codex MCP config when config.toml starts with a UTF-8 BOM', () => {
+    const paths = tempPaths();
+    const codexDir = join(paths.homePath, '.codex');
+    mkdirSync(codexDir, { recursive: true });
+    writeFileSync(join(codexDir, 'config.toml'), [
+      '\uFEFF[mcp_servers.project-brain]',
+      'bearer_token_env_var = "MCP_BEARER_TOKEN"',
+      'url = "http://149.33.14.250/mcp"',
+    ].join('\n'), 'utf-8');
+
+    const config = discoverMcpConfig(paths);
+
+    expect(config.found).toBe(true);
+    expect(config.source).toBe('codex');
+    expect(config.serverUrl).toBe('http://149.33.14.250');
+    expect(config.tokenEnv).toBe('MCP_BEARER_TOKEN');
+  });
+
   it('imports a web handoff config without persisting raw bearer values', () => {
     const paths = tempPaths();
     const source = join(paths.homePath, 'mcp-monorepo-mcp-config.json');
