@@ -13,6 +13,7 @@ import { buildOnboardingEventReports, reportOnboardingEvents } from '../../apps/
 import {
   readProfiles,
   readServiceStatus,
+  removeProfile,
   runServiceAction,
   saveProfile,
   listDesktopProjectProfiles,
@@ -81,6 +82,57 @@ describe('watcher desktop core', () => {
     expect(saved.id).toBe('demo');
     expect(saved.serverUrl).toBe('https://brain.example');
     expect(JSON.stringify(readProfiles(paths))).not.toContain('Bearer ');
+  });
+
+  it('removes a selected project profile by root without deleting the project folder', () => {
+    const paths = tempPaths();
+    const firstRoot = join(paths.homePath, 'Project A');
+    const secondRoot = join(paths.homePath, 'Project B');
+    mkdirSync(firstRoot, { recursive: true });
+    mkdirSync(secondRoot, { recursive: true });
+
+    saveProfile(paths, {
+      id: 'project-a',
+      name: 'Project A',
+      root: firstRoot,
+      indexId: 'idx-project-a',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    saveProfile(paths, {
+      id: 'project-b',
+      name: 'Project B',
+      root: secondRoot,
+      indexId: 'idx-project-b',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    const remaining = removeProfile(paths, 'project-a', firstRoot);
+
+    expect(existsSync(firstRoot)).toBe(true);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]?.root).toBe(secondRoot);
+    expect(readProfiles(paths).map(profile => profile.root)).toEqual([secondRoot]);
+  });
+
+  it('keeps an explicit empty desktop project list empty instead of restoring a fallback', () => {
+    const paths = tempPaths();
+    const monorepoRoot = join(paths.homePath, 'Desktop', 'mcp-monorepo');
+    mkdirSync(monorepoRoot, { recursive: true });
+    const saved = saveProfile(paths, {
+      id: 'mcp-monorepo',
+      name: 'MCP Monorepo',
+      root: monorepoRoot,
+      indexId: 'idx-mcp-monorepo',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    removeProfile(paths, saved.id, saved.root);
+
+    expect(readProfiles(paths)).toEqual([]);
+    expect(listDesktopProjectProfiles(paths)).toEqual([]);
   });
 
   it('aligns stale desktop profile identity with the local brain config', () => {
@@ -1919,7 +1971,7 @@ describe('watcher desktop core', () => {
   it('stages a barrier key entered on login before server verification', async () => {
     const paths = tempPaths();
     const codexDir = join(paths.homePath, '.codex');
-    const root = join(paths.homePath, 'Desktop', 'MCP');
+    const root = join(paths.homePath, 'Desktop', 'mcp-monorepo');
     mkdirSync(codexDir, { recursive: true });
     mkdirSync(root, { recursive: true });
     writeFileSync(join(codexDir, 'config.toml'), [
@@ -1950,7 +2002,7 @@ describe('watcher desktop core', () => {
   it('prefers a valid environment bearer over a placeholder local service secret during login verification', async () => {
     const paths = tempPaths();
     const codexDir = join(paths.homePath, '.codex');
-    const root = join(paths.homePath, 'Desktop', 'MCP');
+    const root = join(paths.homePath, 'Desktop', 'mcp-monorepo');
     mkdirSync(codexDir, { recursive: true });
     mkdirSync(root, { recursive: true });
     writeFileSync(join(codexDir, 'config.toml'), [
@@ -1981,7 +2033,7 @@ describe('watcher desktop core', () => {
   it('falls back to a valid environment bearer when the local service secret fails verification', async () => {
     const paths = tempPaths();
     const codexDir = join(paths.homePath, '.codex');
-    const root = join(paths.homePath, 'Desktop', 'MCP');
+    const root = join(paths.homePath, 'Desktop', 'mcp-monorepo');
     mkdirSync(codexDir, { recursive: true });
     mkdirSync(root, { recursive: true });
     writeFileSync(join(codexDir, 'config.toml'), [
@@ -2013,7 +2065,7 @@ describe('watcher desktop core', () => {
   it('lists the default Codex-backed project when no profile was imported yet', () => {
     const paths = tempPaths();
     const codexDir = join(paths.homePath, '.codex');
-    const root = join(paths.homePath, 'Desktop', 'MCP');
+    const root = join(paths.homePath, 'Desktop', 'mcp-monorepo');
     mkdirSync(codexDir, { recursive: true });
     mkdirSync(root, { recursive: true });
     writeFileSync(join(codexDir, 'config.toml'), [
@@ -2029,17 +2081,24 @@ describe('watcher desktop core', () => {
     expect(projects[0]?.serverUrl).toBe('http://149.33.14.250');
   });
 
-  it('prefers the real mcp-monorepo folder before the legacy Desktop MCP fallback', () => {
+  it('uses the real mcp-monorepo folder as the desktop fallback', () => {
     const paths = tempPaths();
-    const legacyRoot = join(paths.homePath, 'Desktop', 'MCP');
     const monorepoRoot = join(paths.homePath, 'Desktop', 'mcp-monorepo');
-    mkdirSync(legacyRoot, { recursive: true });
     mkdirSync(monorepoRoot, { recursive: true });
 
     const profile = defaultProfile(paths);
 
     expect(profile?.id).toBe('mcp-monorepo');
     expect(profile?.root).toBe(monorepoRoot);
+  });
+
+  it('does not treat the legacy Desktop MCP folder as mcp-monorepo', () => {
+    const paths = tempPaths();
+    const legacyRoot = join(paths.homePath, 'Desktop', 'MCP');
+    mkdirSync(legacyRoot, { recursive: true });
+
+    expect(defaultProfile(paths)).toBeNull();
+    expect(listDesktopProjectProfiles(paths)).toEqual([]);
   });
 
   it('uses the explicit runtime project root before desktop fallbacks', () => {
@@ -2059,7 +2118,7 @@ describe('watcher desktop core', () => {
   it('treats the default Codex-backed profile as a configured project in diagnostics', () => {
     const paths = tempPaths();
     const codexDir = join(paths.homePath, '.codex');
-    const root = join(paths.homePath, 'Desktop', 'MCP');
+    const root = join(paths.homePath, 'Desktop', 'mcp-monorepo');
     mkdirSync(codexDir, { recursive: true });
     mkdirSync(root, { recursive: true });
     writeFileSync(join(codexDir, 'config.toml'), [
@@ -2128,7 +2187,7 @@ describe('watcher desktop core', () => {
   it('uses the Codex MCP endpoint for the default desktop profile server verification', async () => {
     const paths = tempPaths();
     const codexDir = join(paths.homePath, '.codex');
-    const root = join(paths.homePath, 'Desktop', 'MCP');
+    const root = join(paths.homePath, 'Desktop', 'mcp-monorepo');
     mkdirSync(codexDir, { recursive: true });
     mkdirSync(root, { recursive: true });
     writeFileSync(join(codexDir, 'config.toml'), [
@@ -2155,7 +2214,7 @@ describe('watcher desktop core', () => {
   it('uses the Codex MCP endpoint in the default connection checklist', async () => {
     const paths = tempPaths();
     const codexDir = join(paths.homePath, '.codex');
-    const root = join(paths.homePath, 'Desktop', 'MCP');
+    const root = join(paths.homePath, 'Desktop', 'mcp-monorepo');
     mkdirSync(codexDir, { recursive: true });
     mkdirSync(root, { recursive: true });
     writeFileSync(join(codexDir, 'config.toml'), [
@@ -2181,7 +2240,7 @@ describe('watcher desktop core', () => {
   it('uses the Codex MCP endpoint in the default downloadable config package', () => {
     const paths = tempPaths();
     const codexDir = join(paths.homePath, '.codex');
-    const root = join(paths.homePath, 'Desktop', 'MCP');
+    const root = join(paths.homePath, 'Desktop', 'mcp-monorepo');
     mkdirSync(codexDir, { recursive: true });
     mkdirSync(root, { recursive: true });
     writeFileSync(join(codexDir, 'config.toml'), [
@@ -2199,7 +2258,7 @@ describe('watcher desktop core', () => {
   it('builds the downloadable config package from env bearer when the local service secret is a placeholder', () => {
     const paths = tempPaths();
     const codexDir = join(paths.homePath, '.codex');
-    const root = join(paths.homePath, 'Desktop', 'MCP');
+    const root = join(paths.homePath, 'Desktop', 'mcp-monorepo');
     mkdirSync(codexDir, { recursive: true });
     mkdirSync(root, { recursive: true });
     writeFileSync(join(codexDir, 'config.toml'), [
@@ -2223,7 +2282,7 @@ describe('watcher desktop core', () => {
   it('builds the downloadable config package from the local project secret even when an env bearer exists', () => {
     const paths = tempPaths();
     const codexDir = join(paths.homePath, '.codex');
-    const root = join(paths.homePath, 'Desktop', 'MCP');
+    const root = join(paths.homePath, 'Desktop', 'mcp-monorepo');
     mkdirSync(codexDir, { recursive: true });
     mkdirSync(root, { recursive: true });
     writeFileSync(join(codexDir, 'config.toml'), [
@@ -2506,3 +2565,4 @@ function tempPaths(): DesktopCorePaths {
     userDataPath: join(root, 'user-data'),
   };
 }
+

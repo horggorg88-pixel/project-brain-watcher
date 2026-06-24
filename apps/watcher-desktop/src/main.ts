@@ -29,6 +29,7 @@ import {
   readServiceLogChunk,
   readServiceStatus,
   resolveServiceProfile,
+  removeProfile,
   runServiceAction,
   saveProfile,
   type DesktopCorePaths,
@@ -174,6 +175,9 @@ function registerIpcHandlers(): void {
   });
   ipcMain.handle('projects:list', () => listDesktopProjectProfiles(corePaths()));
   ipcMain.handle('projects:save', (_event, project: ProjectDraft) => saveProfile(corePaths(), project));
+  ipcMain.handle('projects:remove', (_event, projectId: string, root?: string | null) => (
+    removeProfile(corePaths(), projectId, root)
+  ));
   ipcMain.handle('projects:select-root', async () => {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
     return result.canceled ? null : result.filePaths[0] ?? null;

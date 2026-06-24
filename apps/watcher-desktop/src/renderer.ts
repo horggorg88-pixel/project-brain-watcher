@@ -73,6 +73,7 @@ const navButtons = document.querySelectorAll<HTMLButtonElement>('[data-nav-secti
 const sections = document.querySelectorAll<HTMLElement>('[data-section]');
 const projectSelect = document.querySelector<HTMLSelectElement>('[data-project-select]');
 const selectRootButton = document.querySelector<HTMLButtonElement>('[data-select-root]');
+const removeProjectButton = document.querySelector<HTMLButtonElement>('[data-remove-project]');
 const downloadConfigButton = document.querySelector<HTMLButtonElement>('[data-download-config]');
 const copyPromptButton = document.querySelector<HTMLButtonElement>('[data-copy-prompt]');
 const copyServiceLogsButton = document.querySelector<HTMLButtonElement>('[data-copy-service-logs]');
@@ -218,6 +219,10 @@ window.addEventListener('scroll', hideTooltip, true);
 
 selectRootButton?.addEventListener('click', () => {
   void selectProjectRootFromDialog().catch(error => writeLog(errorMessage(error)));
+});
+
+removeProjectButton?.addEventListener('click', () => {
+  void removeSelectedProjectFromConsole().catch(error => writeLog(errorMessage(error)));
 });
 
 downloadConfigButton?.addEventListener('click', () => {
@@ -382,6 +387,23 @@ async function selectProjectRootFromDialog(): Promise<void> {
   }
   automaticSupportEnrollmentAttempts.clear();
   await saveRootProfile(root);
+  await refresh();
+}
+
+async function removeSelectedProjectFromConsole(): Promise<void> {
+  const project = selectedProject();
+  if (!project) {
+    writeLog('Проект для удаления из списка пульта не выбран');
+    return;
+  }
+  const profiles = await window.watcherDesktop.projects.remove(project.id, project.root);
+  const nextProject = profiles.find(profile => profile.id !== project.id) ?? profiles[0] ?? null;
+  automaticSupportEnrollmentAttempts.clear();
+  await saveUiState({ ...uiState, lastProjectId: nextProject?.id ?? null, activeSection: 'start' });
+  writeLog([
+    `Проект убран из списка пульта: ${project.name}`,
+    `Папка на диске не удалялась: ${project.root}`,
+  ].join('\n'));
   await refresh();
 }
 
@@ -772,7 +794,7 @@ function renderCurrentPackage(): void {
 }
 
 function currentProjectId(): string {
-  return projectSelect?.value || uiState.lastProjectId || currentProjects[0]?.id || 'mcp-monorepo';
+  return projectSelect?.value || uiState.lastProjectId || currentProjects[0]?.id || '';
 }
 
 function selectedProject(): SavedProjectProfile | undefined {

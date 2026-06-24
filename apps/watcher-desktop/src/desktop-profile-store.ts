@@ -22,6 +22,10 @@ export function readProfiles(paths: DesktopCorePaths): readonly SavedProjectProf
   }
 }
 
+export function hasStoredProfiles(paths: DesktopCorePaths): boolean {
+  return existsSync(profilesPath(paths));
+}
+
 export function saveProfile(paths: DesktopCorePaths, project: ProjectDraft): SavedProjectProfile {
   const handoff = readDesktopAccessHandoff(paths);
   const serverUrl = project.serverUrl.trim() || handoff?.serverUrl || '';
@@ -40,6 +44,22 @@ export function saveProfile(paths: DesktopCorePaths, project: ProjectDraft): Sav
   stageDesktopAccessHandoffForProfile(paths, saved);
   stageProjectBrainFiles(saved, { bearerToken: readDesktopServiceToken(saved) });
   return saved;
+}
+
+export function removeProfile(
+  paths: DesktopCorePaths,
+  projectId: string,
+  root?: string | null,
+): readonly SavedProjectProfile[] {
+  const id = projectId.trim();
+  const normalizedRoot = root ? normalizePath(root) : null;
+  const profiles = readProfiles(paths).filter(profile => {
+    if (normalizedRoot) return normalizePath(profile.root) !== normalizedRoot;
+    return profile.id !== id;
+  });
+  mkdirSync(paths.userDataPath, { recursive: true });
+  writeFileSync(profilesPath(paths), JSON.stringify(profiles, null, 2), 'utf-8');
+  return profiles;
 }
 
 export function defaultProfile(paths: DesktopCorePaths): SavedProjectProfile | null {
@@ -63,19 +83,17 @@ function defaultProjectRoot(paths: DesktopCorePaths): string {
   const candidates = [
     runtimeRoot,
     join(paths.homePath, 'Desktop', 'mcp-monorepo'),
-    join(paths.homePath, 'Desktop', 'MCP'),
   ].filter((value): value is string => Boolean(value));
   return candidates.find(candidate => existsSync(candidate)) ?? candidates[candidates.length - 1];
 }
 
 function defaultProjectId(root: string): string {
   const slug = basename(root).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  return slug === 'mcp' ? 'mcp-monorepo' : slug || 'mcp-monorepo';
+  return slug || 'mcp-project';
 }
 
 function readableDefaultProjectName(root: string, id: string): string {
   const name = basename(root).trim();
-  if (name.toLowerCase() === 'mcp') return 'MCP Monorepo';
   return name || id;
 }
 

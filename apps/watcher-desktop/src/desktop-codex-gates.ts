@@ -512,13 +512,7 @@ export async function verifyDesktopCodexGates(
   const codexHooks = codexHooksEvidence(codexHookInstall, hookRepair, hookBridge, managedHooks, checkedAt);
   await run(runner, profile.root, 'codex', ['plugin', 'list']);
   await run(runner, profile.root, 'codex', ['features', 'list']);
-  const smoke = evidenceFromResult(
-    await run(runner, profile.root, 'npm', ['test']),
-    'npm test',
-    checkedAt,
-    'Проектный smoke gate выполнен.',
-    CODEX_SETUP_EVIDENCE_TTL_MS,
-  );
+  const smoke = await projectSmokeEvidence(runner, profile.root, checkedAt);
   const rollback = {
     available: true,
     passed: true,
@@ -1368,6 +1362,47 @@ function parseRunEvidence(
     exitCode: readNumber(value, 'exitCode'),
     runId: sanitizeOptional(readString(value, 'runId')),
   };
+}
+
+async function projectSmokeEvidence(
+  runner: DesktopCodexCommandRunner,
+  root: string,
+  checkedAt: string,
+): Promise<DesktopCodexGateRunEvidence> {
+  const command = projectSmokeCommand(root);
+  if (!command) {
+    return {
+      available: true,
+      passed: true,
+      detail: 'Project smoke gate пропущен: в выбранном проекте нет package.json scripts.test.',
+      checkedAt,
+      staleAfterMs: CODEX_SETUP_EVIDENCE_TTL_MS,
+      source: SOURCE,
+      command: 'package.json scripts.test',
+      exitCode: 0,
+    };
+  }
+  return evidenceFromResult(
+    await run(runner, root, command.command, command.args),
+    command.label,
+    checkedAt,
+    'Проектный smoke gate выполнен.',
+    CODEX_SETUP_EVIDENCE_TTL_MS,
+  );
+}
+
+function projectSmokeCommand(root: string): {
+  readonly args: readonly string[];
+  readonly command: string;
+  readonly label: string;
+} | null {
+  const manifest = readJson(join(root, 'package.json'));
+  if (!isRecord(manifest)) return null;
+  const scripts = manifest.scripts;
+  if (!isRecord(scripts)) return null;
+  const testScript = scripts.test;
+  if (typeof testScript !== 'string' || testScript.trim().length === 0) return null;
+  return { command: 'npm', args: ['test'], label: 'npm test' };
 }
 
 function evidenceFromResult(

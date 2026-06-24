@@ -8,13 +8,14 @@ import type {
 import {
   applyMcpConfigToProfile,
   defaultProfile,
+  hasStoredProfiles,
   readProfiles,
   type DesktopCorePaths,
 } from './desktop-profile-store.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { readDesktopServiceSecretState } from './desktop-service-secret.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
-export { readProfiles, saveProfile, type DesktopCorePaths } from './desktop-profile-store.js';
+export { hasStoredProfiles, readProfiles, removeProfile, saveProfile, type DesktopCorePaths } from './desktop-profile-store.js';
 export { readServiceLogChunk, readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 export { runServiceAction } from './desktop-service-runner.js';
 export {
@@ -30,6 +31,7 @@ export function listDesktopProjectProfiles(paths: DesktopCorePaths): readonly Sa
   if (profiles.length > 0) {
     return profiles.map(profile => applyMcpConfigToProfile(profile, config) ?? profile);
   }
+  if (hasStoredProfiles(paths)) return [];
   const fallback = applyMcpConfigToProfile(defaultProfile(paths), config);
   return fallback ? [fallback] : [];
 }

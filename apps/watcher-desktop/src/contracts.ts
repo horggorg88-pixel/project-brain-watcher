@@ -375,6 +375,7 @@ export interface WatcherDesktopApi {
   readonly projects: {
     list(): Promise<readonly SavedProjectProfile[]>;
     save(project: ProjectDraft): Promise<SavedProjectProfile>;
+    remove(projectId: string, root?: string | null): Promise<readonly SavedProjectProfile[]>;
     selectRoot(): Promise<string | null>;
     importConfig(): Promise<ProjectImportResult | null>;
     buildConfigPackage(projectId: string): Promise<DesktopConfigPackage>;

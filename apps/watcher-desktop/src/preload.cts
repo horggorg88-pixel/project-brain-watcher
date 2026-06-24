@@ -61,6 +61,9 @@ const api: WatcherDesktopApi = {
     save: (project: ProjectDraft) => (
       ipcRenderer.invoke('projects:save', project) as Promise<SavedProjectProfile>
     ),
+    remove: (projectId: string, root?: string | null) => (
+      ipcRenderer.invoke('projects:remove', projectId, root) as Promise<readonly SavedProjectProfile[]>
+    ),
     selectRoot: () => ipcRenderer.invoke('projects:select-root') as Promise<string | null>,
     importConfig: () => (
       ipcRenderer.invoke('projects:import-config') as Promise<ProjectImportResult | null>

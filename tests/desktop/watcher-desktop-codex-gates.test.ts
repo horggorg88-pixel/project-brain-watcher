@@ -151,6 +151,40 @@ describe('watcher desktop codex gates', () => {
     expect(qualityGateScript).toContain('shell=use_shell');
   });
 
+  it('skips project smoke when package.json has no test script', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    mkdirSync(root, { recursive: true });
+    writeTrustedCodexProject(paths.homePath, root);
+    stagePersistentVerifierHookFiles(paths.homePath);
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { build: 'vite build' } }), 'utf-8');
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const commands: string[] = [];
+    const result = await verifyDesktopCodexGates(paths, 'demo-project', {
+      runner: async request => {
+        commands.push([request.command, ...request.args].join(' '));
+        return { exitCode: 0, output: 'ok' };
+      },
+      now: () => new Date('2026-06-15T10:00:00.000Z'),
+    });
+
+    expect(commands).not.toContain('npm test');
+    expect(result.evidence.verification.smoke).toMatchObject({
+      command: 'package.json scripts.test',
+      exitCode: 0,
+      passed: true,
+      source: 'desktop-codex-gates',
+    });
+    expect(result.evidence.verification.smoke?.detail).toContain('пропущен');
+  });
+
   it('preserves existing Codex user hooks while installing the persistent-verifier bridge', async () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');
@@ -268,6 +302,7 @@ describe('watcher desktop codex gates', () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');
     mkdirSync(root, { recursive: true });
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
     stagePersistentVerifierHookFiles(paths.homePath);
     saveProfile(paths, {
       id: 'demo-project',
