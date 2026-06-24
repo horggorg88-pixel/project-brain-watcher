@@ -83,6 +83,44 @@ describe('watcher desktop core', () => {
     expect(JSON.stringify(readProfiles(paths))).not.toContain('Bearer ');
   });
 
+  it('aligns stale desktop profile identity with the local brain config', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'Тест для Лизы');
+    mkdirSync(join(root, '.brain'), { recursive: true });
+
+    saveProfile(paths, {
+      id: 'mcp-project',
+      name: 'Тест для Лизы',
+      root,
+      indexId: 'idx-mcp-project',
+      serverUrl: 'http://127.0.0.1:3020',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    writeFileSync(join(root, '.brain', 'config.json'), JSON.stringify({
+      project_id: 'mcp-server',
+      server: 'http://149.33.14.250',
+      token_env: 'PROJECT_BRAIN_TOKEN',
+      mcp_endpoint: 'http://149.33.14.250/mcp/p/mcp-server',
+    }), 'utf-8');
+    writeFileSync(join(root, '.brain', 'mcp.json'), JSON.stringify({
+      project_id: 'mcp-server',
+      endpoint: 'http://149.33.14.250/mcp/p/mcp-server',
+    }), 'utf-8');
+
+    const profiles = readProfiles(paths);
+    const projects = listDesktopProjectProfiles(paths);
+
+    expect(profiles).toHaveLength(1);
+    expect(profiles[0]).toMatchObject({
+      id: 'mcp-server',
+      indexId: 'idx-mcp-server',
+      root,
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'PROJECT_BRAIN_TOKEN',
+    });
+    expect(projects[0]?.id).toBe('mcp-server');
+  });
+
   it('stores base MCP server URL when a new profile starts from an existing project route', () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'HyinahiTEst');

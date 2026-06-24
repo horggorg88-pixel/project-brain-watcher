@@ -16,7 +16,7 @@ export function readProfiles(paths: DesktopCorePaths): readonly SavedProjectProf
   if (!existsSync(path)) return [];
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, 'utf-8'));
-    return Array.isArray(parsed) ? parsed.flatMap(toSavedProfile) : [];
+    return Array.isArray(parsed) ? dedupeProfiles(parsed.flatMap(toSavedProfile).map(applyLocalBrainConfigToSavedProfile)) : [];
   } catch {
     return [];
   }
@@ -92,6 +92,19 @@ export function applyMcpConfigToProfile(
   };
 }
 
+function applyLocalBrainConfigToSavedProfile(profile: SavedProjectProfile): SavedProjectProfile {
+  const local = readLocalBrainProfileConfig(profile.root);
+  if (!local) return profile;
+  const id = local.projectId ?? profile.id;
+  return {
+    ...profile,
+    id,
+    indexId: profile.indexId === `idx-${profile.id}` ? `idx-${id}` : profile.indexId,
+    serverUrl: local.serverUrl || profile.serverUrl || '',
+    tokenEnv: local.tokenEnv || profile.tokenEnv || 'MCP_BEARER_TOKEN',
+  };
+}
+
 export function serviceExePath(profile: SavedProjectProfile): string {
   return join(profile.root, '.brain', 'service', `${serviceName(profile.id)}.exe`);
 }
@@ -138,6 +151,58 @@ function toSavedProfile(value: unknown): SavedProjectProfile[] {
   } catch {
     return [];
   }
+}
+
+function dedupeProfiles(profiles: readonly SavedProjectProfile[]): readonly SavedProjectProfile[] {
+  const result: SavedProjectProfile[] = [];
+  for (const profile of profiles) {
+    const duplicateIndex = result.findIndex(item => item.id === profile.id && normalizePath(item.root) === normalizePath(profile.root));
+    if (duplicateIndex >= 0) {
+      result[duplicateIndex] = profile;
+    } else {
+      result.push(profile);
+    }
+  }
+  return result;
+}
+
+function readLocalBrainProfileConfig(root: string): {
+  readonly projectId: string | null;
+  readonly serverUrl: string | null;
+  readonly tokenEnv: string | null;
+} | null {
+  const config = readJson(join(root, '.brain', 'config.json'));
+  const mcp = readJson(join(root, '.brain', 'mcp.json'));
+  const projectId = readString(config?.project_id) ?? readString(mcp?.project_id);
+  const serverUrl = readString(config?.server) ?? endpointToServer(readString(config?.mcp_endpoint) ?? readString(mcp?.endpoint), projectId);
+  const tokenEnv = readString(config?.token_env);
+  return projectId || serverUrl || tokenEnv ? { projectId, serverUrl, tokenEnv } : null;
+}
+
+function readJson(path: string): Record<string, unknown> | null {
+  if (!existsSync(path)) return null;
+  try {
+    const value: unknown = JSON.parse(readFileSync(path, 'utf-8'));
+    return isRecord(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function endpointToServer(endpoint: string | null, projectId: string | null): string | null {
+  if (!endpoint) return null;
+  const normalized = normalizeMcpServerUrl(endpoint);
+  if (normalized) return normalized;
+  const suffix = projectId ? `/mcp/p/${encodeURIComponent(projectId)}` : '/mcp';
+  return endpoint.endsWith(suffix) ? endpoint.slice(0, -suffix.length) : endpoint.replace(/\/+$/, '');
+}
+
+function readString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, '/').replace(/\/+$/g, '').toLowerCase();
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
