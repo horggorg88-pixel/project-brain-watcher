@@ -91,7 +91,7 @@ describe('watcher desktop service repair', () => {
     mkdirSync(serviceDir, { recursive: true });
     writeFileSync(watcherEntry, '#!/usr/bin/env node\n', 'utf-8');
     writeFileSync(join(serviceDir, 'active-runtime.json'), JSON.stringify({ entry: watcherEntry }), 'utf-8');
-    writeFileSync(join(serviceDir, 'launch-watcher.ps1'), [
+    writeUtf8BomFile(join(serviceDir, 'launch-watcher.ps1'), [
       '$ErrorActionPreference = "Stop"',
       '$npmCache = Join-Path $PSScriptRoot "npm-cache"',
       '[Environment]::SetEnvironmentVariable("NPM_CONFIG_CACHE", $npmCache, "Process")',
@@ -127,6 +127,30 @@ describe('watcher desktop service repair', () => {
     expect(state.reasons).toContain('launcher_uses_npx_runner');
   });
 
+  it('requires repair for PowerShell launchers without UTF-8 BOM', () => {
+    const profile = profileFixture();
+    const serviceDir = join(profile.root, '.brain', 'service');
+    const watcherEntry = join(serviceDir, 'runtime-entry.cjs');
+    mkdirSync(serviceDir, { recursive: true });
+    writeFileSync(watcherEntry, '#!/usr/bin/env node\n', 'utf-8');
+    writeFileSync(join(serviceDir, 'active-runtime.json'), JSON.stringify({ entry: watcherEntry }), 'utf-8');
+    writeFileSync(join(serviceDir, 'launch-watcher.ps1'), [
+      '$ErrorActionPreference = "Stop"',
+      '[Environment]::SetEnvironmentVariable("MCP_BEARER_TOKEN", [IO.File]::ReadAllText("D:\\Проект\\.brain\\service\\MCP_BEARER_TOKEN.secret").Trim(), "Process")',
+      '$serviceRoot = $PSScriptRoot',
+      '$npmCache = Join-Path $serviceRoot "npm-cache"',
+      '[Environment]::SetEnvironmentVariable("NPM_CONFIG_CACHE", $npmCache, "Process")',
+      '[Environment]::SetEnvironmentVariable("NO_UPDATE_NOTIFIER", "1", "Process")',
+      '$exe = "node.exe"',
+      `$argsList = @("${watcherEntry}", "start")`,
+    ].join('\n'));
+
+    const state = readServiceLauncherRepairState(profile);
+
+    expect(state.requiresRepair).toBe(true);
+    expect(state.reasons).toContain('launcher_missing_utf8_bom');
+  });
+
   it('requires repair when a node launcher points at a missing local service runtime', () => {
     const profile = profileFixture();
     const serviceDir = join(profile.root, '.brain', 'service');
@@ -153,14 +177,14 @@ describe('watcher desktop service repair', () => {
     const watcherEntry = join(serviceDir, 'runtime-entry.cjs');
     mkdirSync(serviceDir, { recursive: true });
     writeFileSync(watcherEntry, '#!/usr/bin/env node\n', 'utf-8');
-    writeFileSync(join(serviceDir, 'launch-watcher.ps1'), [
+    writeUtf8BomFile(join(serviceDir, 'launch-watcher.ps1'), [
       '$ErrorActionPreference = "Stop"',
       '$npmCache = Join-Path $PSScriptRoot "npm-cache"',
       '[Environment]::SetEnvironmentVariable("NPM_CONFIG_CACHE", $npmCache, "Process")',
       '[Environment]::SetEnvironmentVariable("NO_UPDATE_NOTIFIER", "1", "Process")',
       '$exe = "node.exe"',
       `$argsList = @("${watcherEntry}", "start")`,
-    ].join('\n'), 'utf-8');
+    ].join('\n'));
 
     const state = readServiceLauncherRepairState(profile);
 
@@ -335,4 +359,8 @@ function statusFixture(overrides: Partial<WatcherServiceStatus>): WatcherService
     logs: null,
     ...overrides,
   };
+}
+
+function writeUtf8BomFile(path: string, content: string): void {
+  writeFileSync(path, `\uFEFF${content}`, 'utf-8');
 }

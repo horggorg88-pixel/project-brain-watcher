@@ -23,9 +23,13 @@ export function readServiceLauncherRepairState(profile: SavedProjectProfile): Se
   if (!existsSync(launcherPath)) {
     return { launcherPath, requiresRepair: true, reasons: ['launcher_missing'] };
   }
-  const source = readFileSync(launcherPath, 'utf-8');
+  const launcherBytes = readFileSync(launcherPath);
+  const source = launcherBytes.toString('utf-8');
   const reasons: string[] = [];
   const watcherEntry = serviceRuntimeWatcherEntry(profile);
+  if (!hasUtf8Bom(launcherBytes)) {
+    reasons.push('launcher_missing_utf8_bom');
+  }
   if (!source.includes('NPM_CONFIG_CACHE') || !source.includes('npm-cache')) {
     reasons.push('launcher_missing_service_npm_cache');
   }
@@ -138,4 +142,8 @@ function containsNormalizedPath(source: string, expectedPath: string): boolean {
 
 function normalizePathText(value: string): string {
   return value.replace(/\\/g, '/').toLowerCase();
+}
+
+function hasUtf8Bom(bytes: Readonly<Uint8Array>): boolean {
+  return bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
 }
