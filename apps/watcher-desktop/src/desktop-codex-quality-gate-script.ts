@@ -61,6 +61,14 @@ def read_json(path):
         return {}
 
 
+def hook_event(input_data):
+    for key in ("hookEventName", "hook_event_name", "eventName", "event_name", "event", "hookName", "hook_name"):
+        value = input_data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def input_cwd(input_data):
     cwd = input_data.get("cwd")
     if isinstance(cwd, str) and cwd.strip():
@@ -299,8 +307,8 @@ def failure_message(root, failures):
 
 def main():
     input_data = read_input()
-    hook_event_name = input_data.get("hookEventName") or input_data.get("hook_event_name")
-    if input_data and hook_event_name not in {"Stop", "stop"}:
+    hook_event_name = hook_event(input_data)
+    if hook_event_name and hook_event_name not in {"Stop", "stop"}:
         succeed()
     root = find_root(input_cwd(input_data).resolve())
     if not root:

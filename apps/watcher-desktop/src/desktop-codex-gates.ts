@@ -254,6 +254,14 @@ def read_json(path):
         return {}
 
 
+def hook_event(input_data):
+    for key in ("hookEventName", "hook_event_name", "eventName", "event_name", "event", "hookName", "hook_name"):
+        value = input_data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def input_cwd(input_data):
     cwd = input_data.get("cwd")
     if isinstance(cwd, str) and cwd.strip():
@@ -335,8 +343,8 @@ def write_evidence(root, project_id, hook_event_name):
 
 def main():
     input_data = read_input()
-    hook_event_name = input_data.get("hookEventName") or input_data.get("hook_event_name")
-    if input_data and hook_event_name not in {"SessionStart", "session_start"}:
+    hook_event_name = hook_event(input_data)
+    if hook_event_name and hook_event_name not in {"SessionStart", "session_start"}:
         succeed()
     candidates = []
     cwd_root = find_root(input_cwd(input_data).resolve())
@@ -353,7 +361,7 @@ def main():
         if key in seen or not resolved.exists():
             continue
         seen.add(key)
-        write_evidence(resolved, project_id or read_project_id(resolved), hook_event_name)
+        write_evidence(resolved, project_id or read_project_id(resolved), hook_event_name or "SessionStart")
     succeed()
 
 
@@ -394,6 +402,14 @@ def read_json(path):
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
+
+
+def hook_event(input_data):
+    for key in ("hookEventName", "hook_event_name", "eventName", "event_name", "event", "hookName", "hook_name"):
+        value = input_data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
 
 
 def input_cwd(input_data):
@@ -500,7 +516,7 @@ def write_evidence(root, project_id, hook_event_name):
 
 def main():
     input_data = read_input()
-    hook_event_name = input_data.get("hookEventName") or input_data.get("hook_event_name")
+    hook_event_name = hook_event(input_data)
     runtime_events = {
         "UserPromptSubmit",
         "user_prompt_submit",
@@ -517,7 +533,7 @@ def main():
         "PostCompact",
         "post_compact",
     }
-    if input_data and hook_event_name not in runtime_events:
+    if hook_event_name and hook_event_name not in runtime_events:
         succeed()
     candidates = []
     cwd_root = find_root(input_cwd(input_data).resolve())
@@ -534,7 +550,7 @@ def main():
         if key in seen or not resolved.exists():
             continue
         seen.add(key)
-        write_evidence(resolved, project_id or read_project_id(resolved), hook_event_name)
+        write_evidence(resolved, project_id or read_project_id(resolved), hook_event_name or "UserPromptSubmit")
     succeed()
 
 

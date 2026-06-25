@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -823,6 +824,39 @@ describe('watcher desktop codex gates', () => {
     expect(result.evidence.verification.runtimeContext).toBeUndefined();
   });
 
+  it('records native hook evidence when Codex omits hookEventName from stdin', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    mkdirSync(root, { recursive: true });
+    writeTrustedCodexProject(paths.homePath, root);
+    stagePersistentVerifierHookFiles(paths.homePath);
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf-8');
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const runner: DesktopCodexCommandRunner = async () => ({ exitCode: 0, output: 'ok' });
+    await verifyDesktopCodexGates(paths, 'demo-project', { runner });
+
+    runPythonHook(join(paths.homePath, '.codex', 'project-brain-hooks', 'sessionstart.py'), root, { cwd: root });
+    runPythonHook(join(paths.homePath, '.codex', 'project-brain-hooks', 'runtimecontext.py'), root, { cwd: root });
+
+    const result = readDesktopCodexGateEvidence(paths, 'demo-project');
+    expect(result.ready).toBe(true);
+    expect(result.evidence.verification.hookPersistence).toMatchObject({
+      command: 'codex features list',
+      source: 'persistent-verifier',
+    });
+    expect(result.evidence.verification.runtimeContext).toMatchObject({
+      command: 'project-brain runtime context proof',
+      source: 'project-brain-runtime-context',
+    });
+  });
+
   it('uses Windows command shims for Codex CLI and npm gates', () => {
     expect(resolveCodexGateExecutable('codex', 'win32')).toBe('codex.cmd');
     expect(resolveCodexGateExecutable('npm', 'win32')).toBe('npm.cmd');
@@ -915,6 +949,28 @@ function passedRun(
     command,
     exitCode: 0,
   };
+}
+
+function runPythonHook(scriptPath: string, cwd: string, payload: Record<string, unknown>): void {
+  const input = JSON.stringify(payload);
+  const candidates = process.platform === 'win32' ? ['python', 'py'] : ['python3', 'python'];
+  const errors: string[] = [];
+  for (const command of candidates) {
+    const result = spawnSync(command, [scriptPath], {
+      cwd,
+      input,
+      encoding: 'utf-8',
+    });
+    if (result.error && 'code' in result.error && result.error.code === 'ENOENT') {
+      errors.push(`${command}: ${result.error.message}`);
+      continue;
+    }
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    return;
+  }
+  throw new Error(`Python runtime is unavailable for hook smoke: ${errors.join('; ')}`);
 }
 
 function expectCodexHooksPendingMessage(message: string): void {
