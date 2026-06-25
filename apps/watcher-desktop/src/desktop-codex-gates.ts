@@ -58,6 +58,71 @@ const PERSISTENT_VERIFIER_HOOKS = {
         ],
       },
     ],
+    UserPromptSubmit: [
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/runtimecontext.py"',
+            commandWindows: 'python "${CLAUDE_PLUGIN_ROOT}/hooks/runtimecontext.py"',
+            timeout: 15,
+            statusMessage: 'Hydrating Project Brain runtime context',
+          },
+        ],
+      },
+    ],
+    SubagentStart: [
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/runtimecontext.py"',
+            commandWindows: 'python "${CLAUDE_PLUGIN_ROOT}/hooks/runtimecontext.py"',
+            timeout: 15,
+            statusMessage: 'Hydrating Project Brain runtime context',
+          },
+        ],
+      },
+    ],
+    SubagentStop: [
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/runtimecontext.py"',
+            commandWindows: 'python "${CLAUDE_PLUGIN_ROOT}/hooks/runtimecontext.py"',
+            timeout: 15,
+            statusMessage: 'Recording subagent completion context',
+          },
+        ],
+      },
+    ],
+    PreToolUse: [
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/runtimecontext.py"',
+            commandWindows: 'python "${CLAUDE_PLUGIN_ROOT}/hooks/runtimecontext.py"',
+            timeout: 15,
+            statusMessage: 'Checking Project Brain rail context',
+          },
+        ],
+      },
+    ],
+    PermissionRequest: [
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/runtimecontext.py"',
+            commandWindows: 'python "${CLAUDE_PLUGIN_ROOT}/hooks/runtimecontext.py"',
+            timeout: 15,
+            statusMessage: 'Recording permission request context',
+          },
+        ],
+      },
+    ],
     PostToolUse: [
       {
         matcher: 'Write|Edit|MultiEdit|apply_patch',
@@ -68,6 +133,32 @@ const PERSISTENT_VERIFIER_HOOKS = {
             commandWindows: 'python "${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse.py"',
             timeout: 180,
             statusMessage: 'Running persistent verifier',
+          },
+        ],
+      },
+    ],
+    PreCompact: [
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/runtimecontext.py"',
+            commandWindows: 'python "${CLAUDE_PLUGIN_ROOT}/hooks/runtimecontext.py"',
+            timeout: 15,
+            statusMessage: 'Persisting Project Brain compact context',
+          },
+        ],
+      },
+    ],
+    PostCompact: [
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/runtimecontext.py"',
+            commandWindows: 'python "${CLAUDE_PLUGIN_ROOT}/hooks/runtimecontext.py"',
+            timeout: 15,
+            statusMessage: 'Restoring Project Brain compact context',
           },
         ],
       },
@@ -94,7 +185,18 @@ const PERSISTENT_VERIFIER_HOOKS = {
     ],
   },
 } as const;
-const CODEX_LIFECYCLE_HOOKS = ['SessionStart', 'UserPromptSubmit', 'SubagentStart', 'PostToolUse', 'Stop'] as const;
+const CODEX_LIFECYCLE_HOOKS = [
+  'SessionStart',
+  'UserPromptSubmit',
+  'SubagentStart',
+  'SubagentStop',
+  'PreToolUse',
+  'PermissionRequest',
+  'PostToolUse',
+  'PreCompact',
+  'PostCompact',
+  'Stop',
+] as const;
 const QUALITY_GATE_RAILS = ['typecheck', 'lint', 'test', 'build', 'check', 'verify'] as const;
 const evidenceFiles = [
   join('.brain', 'service', 'quality-gate-runs.json'),
@@ -399,7 +501,23 @@ def write_evidence(root, project_id, hook_event_name):
 def main():
     input_data = read_input()
     hook_event_name = input_data.get("hookEventName") or input_data.get("hook_event_name")
-    if input_data and hook_event_name not in {"UserPromptSubmit", "user_prompt_submit", "SubagentStart", "subagent_start"}:
+    runtime_events = {
+        "UserPromptSubmit",
+        "user_prompt_submit",
+        "SubagentStart",
+        "subagent_start",
+        "SubagentStop",
+        "subagent_stop",
+        "PreToolUse",
+        "pre_tool_use",
+        "PermissionRequest",
+        "permission_request",
+        "PreCompact",
+        "pre_compact",
+        "PostCompact",
+        "post_compact",
+    }
+    if input_data and hook_event_name not in runtime_events:
         succeed()
     candidates = []
     cwd_root = find_root(input_cwd(input_data).resolve())
@@ -718,11 +836,18 @@ function repairPersistentVerifierPluginHooks(homePath: string): PersistentVerifi
       continue;
     }
     try {
+      ensurePersistentVerifierPluginScripts(dirname(path));
       const current = readFileSync(path, 'utf-8');
       if (
         current.includes('${CLAUDE_PLUGIN_ROOT}')
         && current.includes('commandWindows')
+        && current.includes('runtimecontext.py')
         && current.includes('qualitygate.py')
+        && current.includes('PreToolUse')
+        && current.includes('PermissionRequest')
+        && current.includes('PreCompact')
+        && current.includes('PostCompact')
+        && current.includes('SubagentStop')
         && current.includes('apply_patch')
         && !current.includes('"description"')
         && !current.includes('command_windows')
@@ -844,10 +969,7 @@ function ensurePersistentVerifierScriptRoot(homePath: string): string | null {
   const pluginRoot = join(homePath, 'plugins', 'persistent-verifier');
   const scriptRoot = join(pluginRoot, 'hooks');
   try {
-    mkdirSync(scriptRoot, { recursive: true });
-    writeFileSync(join(scriptRoot, 'sessionstart.py'), SESSION_START_BRIDGE_SCRIPT, 'utf-8');
-    writeFileSync(join(scriptRoot, 'posttooluse.py'), POST_TOOL_USE_HOOK_SCRIPT, 'utf-8');
-    writeFileSync(join(scriptRoot, 'stop.py'), STOP_HOOK_SCRIPT, 'utf-8');
+    ensurePersistentVerifierPluginScripts(pluginRoot);
     writeFileSync(join(pluginRoot, 'hooks.json'), JSON.stringify(PERSISTENT_VERIFIER_HOOKS, null, 2) + '\n', 'utf-8');
     return scriptRoot;
   } catch {
@@ -997,6 +1119,33 @@ commandWindows = ${tomlString(`python "${runtimeContext}"`)}
 timeout = 15
 statusMessage = 'Hydrating Project Brain runtime context'
 
+[[hooks.SubagentStop]]
+
+[[hooks.SubagentStop.hooks]]
+type = 'command'
+command = ${tomlString(`python3 ${toPortablePath(runtimeContext)}`)}
+commandWindows = ${tomlString(`python "${runtimeContext}"`)}
+timeout = 15
+statusMessage = 'Recording subagent completion context'
+
+[[hooks.PreToolUse]]
+
+[[hooks.PreToolUse.hooks]]
+type = 'command'
+command = ${tomlString(`python3 ${toPortablePath(runtimeContext)}`)}
+commandWindows = ${tomlString(`python "${runtimeContext}"`)}
+timeout = 15
+statusMessage = 'Checking Project Brain rail context'
+
+[[hooks.PermissionRequest]]
+
+[[hooks.PermissionRequest.hooks]]
+type = 'command'
+command = ${tomlString(`python3 ${toPortablePath(runtimeContext)}`)}
+commandWindows = ${tomlString(`python "${runtimeContext}"`)}
+timeout = 15
+statusMessage = 'Recording permission request context'
+
 [[hooks.PostToolUse]]
 matcher = 'Write|Edit|MultiEdit|apply_patch'
 
@@ -1006,6 +1155,24 @@ command = ${tomlString(`python3 ${toPortablePath(postToolUse)}`)}
 commandWindows = ${tomlString(`python "${postToolUse}"`)}
 timeout = 180
 statusMessage = 'Running persistent verifier'
+
+[[hooks.PreCompact]]
+
+[[hooks.PreCompact.hooks]]
+type = 'command'
+command = ${tomlString(`python3 ${toPortablePath(runtimeContext)}`)}
+commandWindows = ${tomlString(`python "${runtimeContext}"`)}
+timeout = 15
+statusMessage = 'Persisting Project Brain compact context'
+
+[[hooks.PostCompact]]
+
+[[hooks.PostCompact.hooks]]
+type = 'command'
+command = ${tomlString(`python3 ${toPortablePath(runtimeContext)}`)}
+commandWindows = ${tomlString(`python "${runtimeContext}"`)}
+timeout = 15
+statusMessage = 'Restoring Project Brain compact context'
 
 [[hooks.Stop]]
 
@@ -1193,9 +1360,29 @@ function mergePersistentVerifierUserHooks(
   hooks['SubagentStart'] = mergeHookGroup(hooks['SubagentStart'], persistentVerifierUserRuntimeHookGroup(
     commandForScript(runtimeContextScript ?? sessionStartScript ?? join(scriptRoot, 'sessionstart.py')),
   ));
+  hooks['SubagentStop'] = mergeHookGroup(hooks['SubagentStop'], persistentVerifierUserRuntimeHookGroup(
+    commandForScript(runtimeContextScript ?? sessionStartScript ?? join(scriptRoot, 'sessionstart.py')),
+    'Recording subagent completion context',
+  ));
+  hooks['PreToolUse'] = mergeHookGroup(hooks['PreToolUse'], persistentVerifierUserRuntimeHookGroup(
+    commandForScript(runtimeContextScript ?? sessionStartScript ?? join(scriptRoot, 'sessionstart.py')),
+    'Checking Project Brain rail context',
+  ));
+  hooks['PermissionRequest'] = mergeHookGroup(hooks['PermissionRequest'], persistentVerifierUserRuntimeHookGroup(
+    commandForScript(runtimeContextScript ?? sessionStartScript ?? join(scriptRoot, 'sessionstart.py')),
+    'Recording permission request context',
+  ));
   hooks['PostToolUse'] = mergeHookGroup(hooks['PostToolUse'], persistentVerifierUserHookGroup(
     'Write|Edit|MultiEdit|apply_patch',
     commandForScript(join(scriptRoot, 'posttooluse.py')),
+  ));
+  hooks['PreCompact'] = mergeHookGroup(hooks['PreCompact'], persistentVerifierUserRuntimeHookGroup(
+    commandForScript(runtimeContextScript ?? sessionStartScript ?? join(scriptRoot, 'sessionstart.py')),
+    'Persisting Project Brain compact context',
+  ));
+  hooks['PostCompact'] = mergeHookGroup(hooks['PostCompact'], persistentVerifierUserRuntimeHookGroup(
+    commandForScript(runtimeContextScript ?? sessionStartScript ?? join(scriptRoot, 'sessionstart.py')),
+    'Restoring Project Brain compact context',
   ));
   hooks['Stop'] = mergeHookGroup(hooks['Stop'], persistentVerifierUserStopHookGroup(scriptRoot));
   return { ...document, hooks };
@@ -1223,7 +1410,10 @@ function persistentVerifierUserHookGroup(matcher: string, command: string): Reco
   };
 }
 
-function persistentVerifierUserRuntimeHookGroup(command: string): Record<string, unknown> {
+function persistentVerifierUserRuntimeHookGroup(
+  command: string,
+  statusMessage = 'Hydrating Project Brain runtime context',
+): Record<string, unknown> {
   return {
     hooks: [
       {
@@ -1231,7 +1421,7 @@ function persistentVerifierUserRuntimeHookGroup(command: string): Record<string,
         command,
         commandWindows: command,
         timeout: 15,
-        statusMessage: 'Hydrating Project Brain runtime context',
+        statusMessage,
       },
     ],
   };
@@ -1268,12 +1458,24 @@ function commandForScript(scriptPath: string): string {
   return `python "${scriptPath}"`;
 }
 
+function ensurePersistentVerifierPluginScripts(pluginRoot: string): void {
+  const scriptRoot = join(pluginRoot, 'hooks');
+  mkdirSync(scriptRoot, { recursive: true });
+  writeFileSync(join(scriptRoot, 'sessionstart.py'), SESSION_START_BRIDGE_SCRIPT, 'utf-8');
+  writeFileSync(join(scriptRoot, 'runtimecontext.py'), RUNTIME_CONTEXT_BRIDGE_SCRIPT, 'utf-8');
+  writeFileSync(join(scriptRoot, 'posttooluse.py'), POST_TOOL_USE_HOOK_SCRIPT, 'utf-8');
+  writeFileSync(join(scriptRoot, 'qualitygate.py'), QUALITY_GATE_HOOK_SCRIPT, 'utf-8');
+  writeFileSync(join(scriptRoot, 'stop.py'), STOP_HOOK_SCRIPT, 'utf-8');
+}
+
 function resolvePersistentVerifierScriptRoot(homePath: string): string | null {
   for (const root of persistentVerifierPluginRoots(homePath)) {
     const scriptRoot = join(root, 'hooks');
     if (
       existsSync(join(scriptRoot, 'sessionstart.py'))
+      && existsSync(join(scriptRoot, 'runtimecontext.py'))
       && existsSync(join(scriptRoot, 'posttooluse.py'))
+      && existsSync(join(scriptRoot, 'qualitygate.py'))
       && existsSync(join(scriptRoot, 'stop.py'))
     ) {
       return scriptRoot;

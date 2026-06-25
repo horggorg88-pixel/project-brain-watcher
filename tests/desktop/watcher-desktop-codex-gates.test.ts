@@ -93,11 +93,23 @@ describe('watcher desktop codex gates', () => {
     expect(managedRequirements).toContain('windows_managed_dir');
     expect(managedRequirements).toContain('sessionstart.py');
     expect(managedRequirements).toContain('runtimecontext.py');
-    expect(managedRequirements).toContain('UserPromptSubmit');
-    expect(managedRequirements).toContain('SubagentStart');
     expect(managedRequirements).toContain('posttooluse.py');
     expect(managedRequirements).toContain('qualitygate.py');
     expect(managedRequirements).toContain('stop.py');
+    for (const hookName of [
+      'SessionStart',
+      'UserPromptSubmit',
+      'SubagentStart',
+      'SubagentStop',
+      'PreToolUse',
+      'PermissionRequest',
+      'PostToolUse',
+      'PreCompact',
+      'PostCompact',
+      'Stop',
+    ]) {
+      expect(managedRequirements).toContain(hookName);
+    }
     const pluginHooks = readFileSync(join(
       paths.homePath,
       '.codex',
@@ -120,11 +132,26 @@ describe('watcher desktop codex gates', () => {
     expect(userHooks).toContain('Write|Edit|MultiEdit|apply_patch');
     expect(userHooks).toContain('sessionstart.py');
     expect(userHooks).toContain('runtimecontext.py');
-    expect(userHooks).toContain('UserPromptSubmit');
-    expect(userHooks).toContain('SubagentStart');
     expect(userHooks).toContain('qualitygate.py');
+    for (const hookName of [
+      'SessionStart',
+      'UserPromptSubmit',
+      'SubagentStart',
+      'SubagentStop',
+      'PreToolUse',
+      'PermissionRequest',
+      'PostToolUse',
+      'PreCompact',
+      'PostCompact',
+      'Stop',
+    ]) {
+      expect(userHooks).toContain(hookName);
+    }
     expect(pluginHooks).toContain('qualitygate.py');
     expect(pluginHooks).toContain('Write|Edit|MultiEdit|apply_patch');
+    for (const hookName of ['PreToolUse', 'PermissionRequest', 'PreCompact', 'PostCompact', 'SubagentStop']) {
+      expect(pluginHooks).toContain(hookName);
+    }
     const bridgeScript = readFileSync(join(paths.homePath, '.codex', 'project-brain-hooks', 'sessionstart.py'), 'utf-8');
     expect(bridgeScript).toContain('registry_projects');
     expect(bridgeScript).toContain('def succeed()');
@@ -134,8 +161,17 @@ describe('watcher desktop codex gates', () => {
     expect(bridgeScript).not.toContain('emit({})');
     expect(bridgeScript).not.toContain('emit({"projects":');
     const runtimeContextScript = readFileSync(join(paths.homePath, '.codex', 'project-brain-hooks', 'runtimecontext.py'), 'utf-8');
-    expect(runtimeContextScript).toContain('UserPromptSubmit');
-    expect(runtimeContextScript).toContain('SubagentStart');
+    for (const hookName of [
+      'UserPromptSubmit',
+      'SubagentStart',
+      'SubagentStop',
+      'PreToolUse',
+      'PermissionRequest',
+      'PreCompact',
+      'PostCompact',
+    ]) {
+      expect(runtimeContextScript).toContain(hookName);
+    }
     expect(runtimeContextScript).toContain('runtime-context.json');
     expect(runtimeContextScript).toContain('"runtimeContext"');
     const registry = JSON.parse(readFileSync(join(paths.homePath, '.codex', 'project-brain-hooks', 'sessionstart-projects.json'), 'utf-8')) as {
@@ -781,7 +817,7 @@ describe('watcher desktop codex gates', () => {
       passed: true,
       source: 'desktop-codex-gates',
     });
-    expect(result.evidence.verification.desktopBootstrap?.detail).toContain('5 lifecycle hooks');
+    expect(result.evidence.verification.desktopBootstrap?.detail).toContain('10 lifecycle hooks');
     expect(result.evidence.verification.desktopBootstrap?.detail).toContain('6 rails');
     expect(result.evidence.verification.hookPersistence).toBeUndefined();
     expect(result.evidence.verification.runtimeContext).toBeUndefined();
@@ -883,7 +919,7 @@ function passedRun(
 
 function expectCodexHooksPendingMessage(message: string): void {
   expect(message).toContain('Codex hooks установлены');
-  expect(message).toContain('5 lifecycle hooks');
+  expect(message).toContain('10 lifecycle hooks');
   expect(message).toContain('6 rails');
   expect(message).toContain('native SessionStart');
 }
