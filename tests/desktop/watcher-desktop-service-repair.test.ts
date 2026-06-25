@@ -220,6 +220,59 @@ describe('watcher desktop service repair', () => {
     expect(state.reasons).toContain('service_xml_uses_npx_runner');
   });
 
+  it('requires repair when service launcher contains corrupted non-latin path text', () => {
+    const profile = profileFixture();
+    const serviceDir = join(profile.root, '.brain', 'service');
+    const watcherEntry = join(serviceDir, 'runtime-entry.cjs');
+    mkdirSync(serviceDir, { recursive: true });
+    writeFileSync(watcherEntry, '#!/usr/bin/env node\n', 'utf-8');
+    writeFileSync(join(serviceDir, 'active-runtime.json'), JSON.stringify({ entry: watcherEntry }), 'utf-8');
+    writeUtf8BomFile(join(serviceDir, 'launch-watcher.ps1'), [
+      '$ErrorActionPreference = "Stop"',
+      '[Environment]::SetEnvironmentVariable("MCP_BEARER_TOKEN", [IO.File]::ReadAllText("D:\\�஥��\\.brain\\service\\MCP_BEARER_TOKEN.secret").Trim(), "Process")',
+      '$serviceRoot = $PSScriptRoot',
+      '$npmCache = Join-Path $serviceRoot "npm-cache"',
+      '[Environment]::SetEnvironmentVariable("NPM_CONFIG_CACHE", $npmCache, "Process")',
+      '[Environment]::SetEnvironmentVariable("NO_UPDATE_NOTIFIER", "1", "Process")',
+      '$exe = "node.exe"',
+      `$argsList = @("${watcherEntry}", "start")`,
+    ].join('\n'));
+
+    const state = readServiceLauncherRepairState(profile);
+
+    expect(state.requiresRepair).toBe(true);
+    expect(state.reasons).toContain('launcher_contains_corrupted_path_text');
+  });
+
+  it('requires repair when service XML contains corrupted non-latin path text', () => {
+    const profile = profileFixture();
+    const serviceDir = join(profile.root, '.brain', 'service');
+    const watcherEntry = join(serviceDir, 'runtime-entry.cjs');
+    mkdirSync(serviceDir, { recursive: true });
+    writeFileSync(watcherEntry, '#!/usr/bin/env node\n', 'utf-8');
+    writeFileSync(join(serviceDir, 'active-runtime.json'), JSON.stringify({ entry: watcherEntry }), 'utf-8');
+    writeUtf8BomFile(join(serviceDir, 'launch-watcher.ps1'), [
+      '$ErrorActionPreference = "Stop"',
+      '$serviceRoot = $PSScriptRoot',
+      '$npmCache = Join-Path $serviceRoot "npm-cache"',
+      '[Environment]::SetEnvironmentVariable("NPM_CONFIG_CACHE", $npmCache, "Process")',
+      '[Environment]::SetEnvironmentVariable("NO_UPDATE_NOTIFIER", "1", "Process")',
+      '$exe = "node.exe"',
+      `$argsList = @("${watcherEntry}", "start")`,
+    ].join('\n'));
+    writeFileSync(join(serviceDir, 'ProjectBrainWatcher-demo.xml'), [
+      '<service>',
+      '  <executable>C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe</executable>',
+      '  <arguments>-NoProfile -File "D:\\�஥��\\.brain\\service\\launch-watcher.ps1"</arguments>',
+      '</service>',
+    ].join('\n'), 'utf-8');
+
+    const state = readServiceLauncherRepairState(profile);
+
+    expect(state.requiresRepair).toBe(true);
+    expect(state.reasons).toContain('service_xml_contains_corrupted_path_text');
+  });
+
   it('requests launcher repair before starting an installed service with stale metadata', () => {
     const stale = { requiresRepair: true, reasons: ['launcher_missing_service_npm_cache'] };
     const current = { requiresRepair: false, reasons: [] };

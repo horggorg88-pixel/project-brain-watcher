@@ -23,11 +23,11 @@ import {
 import { readDesktopServiceSecret, readDesktopServiceSecretState } from '../../apps/watcher-desktop/src/desktop-service-secret.js';
 import { stageDesktopServiceSecret } from '../../apps/watcher-desktop/src/desktop-service-secret.js';
 import { isServiceActionSettled, prepareServiceSecretForLaunch, resolveVerifiedServiceActionToken, summarizeServiceActionSettlement } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
-import { parseWindowsServiceConfigOutput, parseWindowsServiceOutput, readServiceLogChunk } from '../../apps/watcher-desktop/src/desktop-service-status.js';
+import { parseWindowsServiceConfigOutput, parseWindowsServiceOutput, readServiceLogChunk, windowsServiceMetadataError } from '../../apps/watcher-desktop/src/desktop-service-status.js';
 import { readDesktopUiState, saveDesktopUiState } from '../../apps/watcher-desktop/src/desktop-ui-state.js';
 import { defaultProfile, serviceName } from '../../apps/watcher-desktop/src/desktop-profile-store.js';
 import { formatCodexGateDiagnostics, formatSupportEnrollmentLog, withCodexGateProgress } from '../../apps/watcher-desktop/src/renderer-view.js';
-import type { DesktopCodexGateRunEvidence, DesktopCodexGateStatus, DesktopConnectionCheck, ManagedDeviceStatus, WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
+import type { DesktopCodexGateRunEvidence, DesktopCodexGateStatus, DesktopConnectionCheck, ManagedDeviceStatus, SavedProjectProfile, WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
 
 const tempDirs: string[] = [];
 const VALID_TEST_BEARER = 'valid_test_bearer_12345678901234567890';
@@ -507,6 +507,23 @@ describe('watcher desktop core', () => {
     expect(config.binaryPath).toBe('C:\\Users\\New\\Desktop\\MCP\\.brain\\service\\ProjectBrainWatcher-mcp-monorepo.exe');
   });
 
+  it('explains corrupted Windows service metadata roots without losing the repair classifier phrase', () => {
+    const profile = profileFixture({
+      id: 'mcp-project',
+      root: 'D:\\Проект',
+    });
+
+    const message = windowsServiceMetadataError(profile, {
+      binaryPath: 'D:\\�஥��\\.brain\\service\\ProjectBrainWatcher-mcp-project.exe',
+    });
+
+    expect(message).toContain('Windows Service metadata указывает на другой root');
+    expect(message).toContain('D:\\�஥��');
+    expect(message).toContain('Ожидался D:\\Проект');
+    expect(message).toContain('Metadata содержит нечитаемые символы');
+    expect(message).toContain('Починить службу');
+  });
+
   it('blocks start actions when a profile has no MCP server', async () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'repo');
@@ -690,16 +707,22 @@ describe('watcher desktop core', () => {
     const outStream = status.logs?.transport.streams.find(stream => stream.id === 'out');
     const firstChunk = readServiceLogChunk(profile, outStream?.firstCursor ?? '');
     const secondChunk = readServiceLogChunk(profile, firstChunk?.nextCursor ?? '');
+    const tailChunk = readServiceLogChunk(profile, outStream?.tailCursor ?? '');
 
     expect(status.logs?.out).toContain('last-line');
     expect(status.logs?.out).not.toContain('first-line');
     expect(outStream?.tail.truncated).toBe(true);
+    expect(outStream?.tailCursor).toBeTruthy();
     expect(firstChunk?.bytes).toBeLessThanOrEqual(24_000);
     expect(firstChunk?.textEncoding).toBe('utf8-best-effort');
     expect(firstChunk?.textIntegrity).toBe('exact');
     expect(firstChunk?.complete).toBe(false);
     expect(firstChunk?.nextCursor).toBeTruthy();
     expect(secondChunk?.offset).toBe(firstChunk?.bytes);
+    expect(tailChunk?.offset).toBe(outStream?.tail.offset);
+    expect(tailChunk?.complete).toBe(true);
+    expect(tailChunk?.text).toContain('last-line');
+    expect(tailChunk?.text).not.toContain('first-line');
     expect(readServiceLogChunk(profile, 'not-a-valid-cursor')).toBeNull();
   });
 
@@ -2540,6 +2563,19 @@ function statusFixture(overrides: Partial<WatcherServiceStatus>): WatcherService
     root: 'C:\\repo',
     running: false,
     logs: null,
+    ...overrides,
+  };
+}
+
+function profileFixture(overrides: Partial<SavedProjectProfile> = {}): SavedProjectProfile {
+  return {
+    id: 'demo',
+    name: 'Demo',
+    root: 'C:\\repo',
+    indexId: 'idx-demo',
+    serverUrl: 'https://brain.example',
+    tokenEnv: 'MCP_BEARER_TOKEN',
+    createdAt: new Date(0).toISOString(),
     ...overrides,
   };
 }

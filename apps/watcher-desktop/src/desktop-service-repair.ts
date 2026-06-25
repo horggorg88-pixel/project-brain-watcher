@@ -27,6 +27,9 @@ export function readServiceLauncherRepairState(profile: SavedProjectProfile): Se
   const source = launcherBytes.toString('utf-8');
   const reasons: string[] = [];
   const watcherEntry = serviceRuntimeWatcherEntry(profile);
+  if (containsCorruptedPathText(source)) {
+    reasons.push('launcher_contains_corrupted_path_text');
+  }
   if (!hasUtf8Bom(launcherBytes)) {
     reasons.push('launcher_missing_utf8_bom');
   }
@@ -47,8 +50,14 @@ export function readServiceLauncherRepairState(profile: SavedProjectProfile): Se
     reasons.push('service_runtime_manifest_missing');
   }
   const xmlPath = serviceXmlPath(profile);
-  if (existsSync(xmlPath) && usesNpxRunner(readFileSync(xmlPath, 'utf-8'))) {
-    reasons.push('service_xml_uses_npx_runner');
+  if (existsSync(xmlPath)) {
+    const xmlSource = readFileSync(xmlPath, 'utf-8');
+    if (containsCorruptedPathText(xmlSource)) {
+      reasons.push('service_xml_contains_corrupted_path_text');
+    }
+    if (usesNpxRunner(xmlSource)) {
+      reasons.push('service_xml_uses_npx_runner');
+    }
   }
   return { launcherPath, requiresRepair: reasons.length > 0, reasons };
 }
@@ -138,6 +147,10 @@ function usesNpxRunner(source: string): boolean {
 
 function containsNormalizedPath(source: string, expectedPath: string): boolean {
   return normalizePathText(source).includes(normalizePathText(expectedPath));
+}
+
+function containsCorruptedPathText(source: string): boolean {
+  return source.includes('\uFFFD');
 }
 
 function normalizePathText(value: string): string {

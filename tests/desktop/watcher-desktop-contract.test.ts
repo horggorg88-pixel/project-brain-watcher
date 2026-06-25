@@ -372,6 +372,15 @@ describe('watcher desktop contract', () => {
     expect(rendererSource).not.toContain('openServiceLogsButtons');
     expect(rendererSource).toContain('serviceAiLogsText');
     expect(rendererSource).toContain('watcher-ai-context/v1');
+    expect(rendererSource).toContain('output_profiles');
+    expect(rendererSource).toContain('artifact_policy');
+    expect(rendererSource).toContain('tail-bounded-redacted');
+    expect(rendererSource).toContain('ai_context_bundle');
+    expect(rendererSource).toContain('SERVICE_AI_COMMAND_TEXT_LIMIT');
+    expect(rendererSource).toContain('SERVICE_AI_CONTEXT_TEXT_LIMIT');
+    expect(rendererSource).toContain('stream.tailCursor ?? stream.firstCursor');
+    expect(rendererSource).toContain('[OLDER_LOG_BYTES_TRUNCATED]');
+    expect(rendererSource).toContain('isCurrentSmokeSatisfied');
     expect(rendererSource).toContain('desktopNextActionRailStatus');
     expect(rendererSource).not.toContain("status: diagnostics.length ? 'blocked' : 'ready'");
     expect(rendererSource).toContain('renderConsoleToggle');

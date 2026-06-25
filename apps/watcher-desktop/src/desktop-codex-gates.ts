@@ -109,6 +109,8 @@ const commandRunIds = [
   'coverage',
   'e2e',
   'build',
+  'check',
+  'verify',
   'noAny',
   'securityScan',
   'dependencyAudit',
@@ -1372,14 +1374,12 @@ async function projectSmokeEvidence(
   const command = projectSmokeCommand(root);
   if (!command) {
     return {
-      available: true,
-      passed: true,
-      detail: 'Project smoke gate пропущен: в выбранном проекте нет package.json scripts.test.',
+      available: false,
+      detail: 'Project smoke gate не настроен: в выбранном проекте нет package.json test scripts (test, test:run, unit, test:unit).',
       checkedAt,
       staleAfterMs: CODEX_SETUP_EVIDENCE_TTL_MS,
       source: SOURCE,
-      command: 'package.json scripts.test',
-      exitCode: 0,
+      command: 'package.json test scripts',
     };
   }
   return evidenceFromResult(
@@ -1400,9 +1400,13 @@ function projectSmokeCommand(root: string): {
   if (!isRecord(manifest)) return null;
   const scripts = manifest.scripts;
   if (!isRecord(scripts)) return null;
-  const testScript = scripts.test;
-  if (typeof testScript !== 'string' || testScript.trim().length === 0) return null;
-  return { command: 'npm', args: ['test'], label: 'npm test' };
+  for (const scriptName of ['test', 'test:run', 'unit', 'test:unit'] as const) {
+    const script = scripts[scriptName];
+    if (typeof script !== 'string' || script.trim().length === 0) continue;
+    if (scriptName === 'test') return { command: 'npm', args: ['test'], label: 'npm test' };
+    return { command: 'npm', args: ['run', scriptName], label: `npm run ${scriptName}` };
+  }
+  return null;
 }
 
 function evidenceFromResult(
@@ -1504,7 +1508,7 @@ function codexHookTopologyDetail(): string {
 }
 
 function smokeBlockerMessage(value: DesktopCodexGateRunEvidence | undefined, checkedAt: string): string | null {
-  if (hasCurrentPassed(value, checkedAt)) return null;
+  if (hasSmokeSatisfied(value, checkedAt)) return null;
   if (value?.available === true && value.passed === false) return `Smoke gate Codex упал: ${value.detail}`;
   if (hasPassed(value) && isStale(value, checkedAt)) return 'Smoke gate Codex устарел. Запусти Codex Gates заново, чтобы обновить npm test evidence.';
   if (value?.available === true) return value.detail;
@@ -1515,8 +1519,16 @@ function hasBaseVerification(evidence: DesktopCodexGateEvidence, checkedAt: stri
   return hasCurrentPassed(evidence.verification.codexTrust, checkedAt)
     && hasCurrentPassed(evidence.verification.codexRuntime, checkedAt)
     && hasCurrentPassed(evidence.commandRuns.codexHooks, checkedAt)
-    && hasCurrentPassed(evidence.verification.smoke, checkedAt)
+    && hasSmokeSatisfied(evidence.verification.smoke, checkedAt)
     && hasCurrentPassed(evidence.verification.rollback, checkedAt);
+}
+
+function hasSmokeSatisfied(
+  value: DesktopCodexGateRunEvidence | undefined,
+  checkedAt: string,
+): boolean {
+  if (hasCurrentPassed(value, checkedAt)) return true;
+  return value?.available === false && !isStale(value, checkedAt);
 }
 
 function hasCurrentPassed(

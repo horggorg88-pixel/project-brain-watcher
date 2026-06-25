@@ -143,8 +143,13 @@ describe('watcher desktop codex gates', () => {
     expect(JSON.stringify(result.evidence)).not.toContain('pb_secret_value');
     const qualityGateScript = readFileSync(join(paths.homePath, 'plugins', 'persistent-verifier', 'hooks', 'qualitygate.py'), 'utf-8');
     expect(qualityGateScript).toContain('QUALITY_GATE_ORDER');
+    expect(qualityGateScript).toContain('"check": "check"');
+    expect(qualityGateScript).toContain('"verify": "verify"');
     expect(qualityGateScript).toContain('("test",');
     expect(qualityGateScript).toContain('("build",');
+    expect(qualityGateScript).toContain('def merge_command_run(existing, current):');
+    expect(qualityGateScript).toContain('passed = existing_passed and current_passed');
+    expect(qualityGateScript).toContain('command_runs[gate_id] = merge_command_run(command_runs.get(gate_id), {');
     expect(qualityGateScript).toContain('return shutil.which("npm.cmd") or shutil.which("npm") or "npm.cmd"');
     expect(qualityGateScript).toContain('return shutil.which("npx.cmd") or shutil.which("npx") or "npx.cmd"');
     expect(qualityGateScript).toContain('seen = {canonical_command for _, _, canonical_command in commands}');
@@ -177,12 +182,49 @@ describe('watcher desktop codex gates', () => {
 
     expect(commands).not.toContain('npm test');
     expect(result.evidence.verification.smoke).toMatchObject({
-      command: 'package.json scripts.test',
+      available: false,
+      command: 'package.json test scripts',
+      source: 'desktop-codex-gates',
+    });
+    expect(result.evidence.verification.smoke?.passed).toBeUndefined();
+    expect(result.evidence.verification.smoke?.exitCode).toBeUndefined();
+    expect(result.evidence.verification.smoke?.detail).toContain('не настроен');
+    expect(result.message).not.toContain('Smoke gate Codex');
+  });
+
+  it('uses the first available package test runner script for project smoke', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    mkdirSync(root, { recursive: true });
+    writeTrustedCodexProject(paths.homePath, root);
+    stagePersistentVerifierHookFiles(paths.homePath);
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { 'test:run': 'vitest run' } }), 'utf-8');
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    const commands: string[] = [];
+
+    const result = await verifyDesktopCodexGates(paths, 'demo-project', {
+      runner: async request => {
+        commands.push([request.command, ...request.args].join(' '));
+        return { exitCode: 0, output: 'ok' };
+      },
+      now: () => new Date('2026-06-15T10:00:00.000Z'),
+    });
+
+    expect(commands).toContain('npm run test:run');
+    expect(commands).not.toContain('npm test');
+    expect(result.evidence.verification.smoke).toMatchObject({
+      command: 'npm run test:run',
       exitCode: 0,
       passed: true,
       source: 'desktop-codex-gates',
     });
-    expect(result.evidence.verification.smoke?.detail).toContain('пропущен');
   });
 
   it('preserves existing Codex user hooks while installing the persistent-verifier bridge', async () => {
@@ -761,6 +803,8 @@ describe('watcher desktop codex gates', () => {
       commandRuns: {
         codexHooks: passedRun('Codex persistent-verifier plugin установлен.', 'desktop-codex-gates', 'codex plugin add persistent-verifier@claude-migrated-home', checkedAt),
         typecheck: passedRun('Typecheck passed from native qualitygate hook.', 'quality-gate-runner', 'npm run typecheck', checkedAt),
+        check: passedRun('Check passed from native qualitygate hook.', 'quality-gate-runner', 'npm run check', checkedAt),
+        verify: passedRun('Verify passed from native qualitygate hook.', 'quality-gate-runner', 'npm run verify', checkedAt),
       },
     }), 'utf-8');
 
@@ -768,6 +812,16 @@ describe('watcher desktop codex gates', () => {
 
     expect(result.evidence.commandRuns.typecheck).toMatchObject({
       command: 'npm run typecheck',
+      exitCode: 0,
+      source: 'quality-gate-runner',
+    });
+    expect(result.evidence.commandRuns.check).toMatchObject({
+      command: 'npm run check',
+      exitCode: 0,
+      source: 'quality-gate-runner',
+    });
+    expect(result.evidence.commandRuns.verify).toMatchObject({
+      command: 'npm run verify',
       exitCode: 0,
       source: 'quality-gate-runner',
     });

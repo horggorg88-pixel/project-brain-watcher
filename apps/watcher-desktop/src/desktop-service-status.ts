@@ -238,11 +238,14 @@ function readWindowsServiceConfigState(profile: SavedProjectProfile): WindowsSer
   return result.status === 0 ? parseWindowsServiceConfigOutput(output) : { binaryPath: null };
 }
 
-function windowsServiceMetadataError(profile: SavedProjectProfile, config: WindowsServiceConfigState): string | null {
+export function windowsServiceMetadataError(profile: SavedProjectProfile, config: WindowsServiceConfigState): string | null {
   if (!config.binaryPath) return null;
   const expectedExe = serviceExePath(profile);
   if (normalizePath(config.binaryPath) === normalizePath(expectedExe)) return null;
   const actualRoot = serviceRootFromBinaryPath(config.binaryPath) ?? config.binaryPath;
+  if (containsCorruptedPathText(actualRoot)) {
+    return `Windows Service metadata указывает на другой root: ${actualRoot}. Ожидался ${profile.root}. Metadata содержит нечитаемые символы; нажмите «Починить службу», чтобы переписать launcher/XML в UTF-8.`;
+  }
   return `Windows Service metadata указывает на другой root: ${actualRoot}. Ожидался ${profile.root}.`;
 }
 
@@ -261,6 +264,10 @@ function extractExecutablePath(value: string): string | null {
   }
   const executable = trimmed.match(/[A-Za-z]:\\[^\r\n"]*?\.exe\b/i)?.[0];
   return executable ?? null;
+}
+
+function containsCorruptedPathText(value: string): boolean {
+  return value.includes('\uFFFD');
 }
 
 function emptyWindowsServiceState(): WindowsServiceState {
@@ -324,11 +331,13 @@ function logStream(id: ServiceLogStreamId, label: string, path: string): Watcher
       modifiedAt: null,
       tail: { offset: 0, bytes: 0, truncated: false },
       firstCursor: null,
+      tailCursor: null,
     };
   }
   try {
     const stat = statSync(path);
     const tailBytes = Math.min(stat.size, SERVICE_LOG_TAIL_BYTES);
+    const tailOffset = safeUtf8TailOffset(path, Math.max(0, stat.size - tailBytes), stat.size);
     return {
       id,
       label,
@@ -337,11 +346,12 @@ function logStream(id: ServiceLogStreamId, label: string, path: string): Watcher
       sizeBytes: stat.size,
       modifiedAt: stat.mtime.toISOString(),
       tail: {
-        offset: Math.max(0, stat.size - tailBytes),
-        bytes: tailBytes,
+        offset: tailOffset,
+        bytes: stat.size - tailOffset,
         truncated: stat.size > SERVICE_LOG_TAIL_BYTES,
       },
       firstCursor: stat.size > 0 ? encodeServiceLogCursor(id, 0, path, stat) : null,
+      tailCursor: stat.size > 0 ? encodeServiceLogCursor(id, tailOffset, path, stat) : null,
     };
   } catch {
     return {
@@ -353,6 +363,7 @@ function logStream(id: ServiceLogStreamId, label: string, path: string): Watcher
       modifiedAt: null,
       tail: { offset: 0, bytes: 0, truncated: false },
       firstCursor: null,
+      tailCursor: null,
     };
   }
 }
@@ -465,6 +476,14 @@ function safeUtf8ChunkEnd(path: string, offset: number, size: number): number {
 function isSafeUtf8Offset(path: string, offset: number, size: number): boolean {
   if (offset <= 0 || offset >= size) return true;
   return !isUtf8ContinuationByte(readBytes(path, offset, 1)[0] ?? 0);
+}
+
+function safeUtf8TailOffset(path: string, offset: number, size: number): number {
+  let current = Math.min(Math.max(0, offset), size);
+  while (current > 0 && current < size && isUtf8ContinuationByte(readBytes(path, current, 1)[0] ?? 0)) {
+    current -= 1;
+  }
+  return current;
 }
 
 function isUtf8ContinuationByte(byte: number): boolean {

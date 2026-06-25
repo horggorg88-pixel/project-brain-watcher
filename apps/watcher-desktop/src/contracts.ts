@@ -81,6 +81,7 @@ export interface WatcherServiceLogStream {
   readonly modifiedAt: string | null;
   readonly tail: WatcherServiceLogRange;
   readonly firstCursor: string | null;
+  readonly tailCursor: string | null;
 }
 
 export interface WatcherServiceLogRange {
@@ -269,6 +270,8 @@ export type DesktopCodexCommandRunId =
   | 'coverage'
   | 'e2e'
   | 'build'
+  | 'check'
+  | 'verify'
   | 'noAny'
   | 'securityScan'
   | 'dependencyAudit'

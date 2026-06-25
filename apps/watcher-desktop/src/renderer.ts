@@ -61,7 +61,21 @@ interface DesktopAiRailNode {
 
 interface DesktopAiRailMap {
   readonly version: 'watcher-rail-map/v1'; readonly required_next: string; readonly rails: readonly DesktopAiRailNode[];
-  readonly machine_contract: { readonly read_order: readonly string[]; readonly completion_rule: string; readonly redaction: 'required'; readonly chunking: 'cursor-or-tail' };
+  readonly machine_contract: {
+    readonly read_order: readonly string[];
+    readonly completion_rule: string;
+    readonly redaction: 'required';
+    readonly chunking: 'cursor-or-tail';
+    readonly output_profiles: {
+      readonly human: { readonly surface: string; readonly purpose: string };
+      readonly machine: { readonly surface: string; readonly schema: string };
+      readonly ai: { readonly surface: string; readonly schema: 'watcher-ai-context/v1' };
+    };
+    readonly artifact_policy: {
+      readonly log_text: 'tail-bounded-redacted';
+      readonly copy_target: 'ai_context_bundle';
+    };
+  };
 }
 
 const authForm = document.querySelector<HTMLFormElement>('[data-auth-form]');
@@ -109,6 +123,8 @@ const automaticCodexGateAttempts = new Set<string>();
 const automaticSupportEnrollmentAttempts = new Map<string, number>();
 const serverHeartbeatRefreshMs = 60 * 1000;
 const SERVICE_AI_LOG_CHUNK_LIMIT = 6;
+const SERVICE_AI_COMMAND_TEXT_LIMIT = 24_000;
+const SERVICE_AI_CONTEXT_TEXT_LIMIT = 120_000;
 const supportEnrollmentRetryMs = 2 * 60 * 1000;
 
 void refresh();
@@ -491,7 +507,7 @@ function hasCodexBaseVerification(check: DesktopConnectionCheck): boolean {
   return isCurrentPassed(evidence.verification.codexTrust, check.codexGates.checkedAt)
     && isCurrentPassed(evidence.verification.codexRuntime, check.codexGates.checkedAt)
     && isCurrentPassed(evidence.commandRuns.codexHooks, check.codexGates.checkedAt)
-    && isCurrentPassed(evidence.verification.smoke, check.codexGates.checkedAt)
+    && isCurrentSmokeSatisfied(evidence.verification.smoke, check.codexGates.checkedAt)
     && isCurrentPassed(evidence.verification.rollback, check.codexGates.checkedAt);
 }
 
@@ -520,6 +536,10 @@ function isPassed(value: DesktopCodexGateRunEvidence | undefined): boolean {
 
 function isCurrentPassed(value: DesktopCodexGateRunEvidence | undefined, checkedAt: string): boolean {
   return isPassed(value) && !isStale(value, checkedAt);
+}
+
+function isCurrentSmokeSatisfied(value: DesktopCodexGateRunEvidence | undefined, checkedAt: string): boolean {
+  return isCurrentPassed(value, checkedAt) || (value?.available === false && !isStale(value, checkedAt));
 }
 
 function isStale(value: DesktopCodexGateRunEvidence | undefined, checkedAt: string): boolean {
@@ -862,10 +882,18 @@ function writeLog(value: string): void {
 
 async function serviceAiLogsText(): Promise<string> {
   const statusText = serviceStatusEl?.textContent?.trim() ?? '';
-  const commandText = serviceOutputEl?.textContent?.trim() ?? '';
+  const commandText = tailText(
+    serviceOutputEl?.textContent?.trim() ?? '',
+    SERVICE_AI_COMMAND_TEXT_LIMIT,
+    '[TRUNCATED_COMMAND_OUTPUT_FOR_AI_COPY]',
+  );
   const expandedLogsText = await serviceAiExpandedLogsText(currentServiceStatus);
   const rawText = [statusText, commandText, expandedLogsText].filter(Boolean).join('\n\n');
-  const safeText = redactAiLogText(rawText);
+  const safeText = tailText(
+    redactAiLogText(rawText),
+    SERVICE_AI_CONTEXT_TEXT_LIMIT,
+    '[TRUNCATED_BY_AI_CONTEXT_LIMIT]',
+  );
   const diagnostics = classifyDesktopAiDiagnostics(safeText, currentServiceStatus);
   const nextActions = diagnostics.map(item => item.nextAction);
   const requiredNext = desktopRequiredNext(nextActions, currentServiceStatus);
@@ -904,9 +932,10 @@ async function serviceAiExpandedLogsText(status: WatcherServiceStatus | null): P
 }
 
 async function serviceAiStreamText(projectId: string, stream: WatcherServiceLogStream): Promise<string | null> {
-  if (!stream.firstCursor) return null;
+  const initialCursor = stream.tailCursor ?? stream.firstCursor;
+  if (!initialCursor) return null;
   const chunks: string[] = [];
-  let cursor: string | null = stream.firstCursor;
+  let cursor: string | null = initialCursor;
   for (let index = 0; cursor && index < SERVICE_AI_LOG_CHUNK_LIMIT; index += 1) {
     const chunk = await window.watcherDesktop.service.logChunk(projectId, cursor);
     if (!chunk) break;
@@ -916,7 +945,13 @@ async function serviceAiStreamText(projectId: string, stream: WatcherServiceLogS
   }
   if (!chunks.length) return null;
   const suffix = cursor ? '\n[TRUNCATED_BY_AI_COPY_LIMIT]' : '';
-  return `Лог ${stream.label} (${stream.id}):\n${chunks.join('')}${suffix}`;
+  const prefix = stream.tail.truncated ? '[OLDER_LOG_BYTES_TRUNCATED]\n' : '';
+  return `Лог ${stream.label} (${stream.id}):\n${prefix}${chunks.join('')}${suffix}`;
+}
+
+function tailText(value: string, limit: number, marker: string): string {
+  if (value.length <= limit) return value;
+  return `${marker}\n${value.slice(value.length - limit)}`;
 }
 
 function classifyDesktopAiDiagnostics(text: string, status: WatcherServiceStatus | null): readonly DesktopAiDiagnostic[] {
@@ -989,6 +1024,24 @@ function desktopRailMap(status: WatcherServiceStatus | null, diagnostics: readon
       completion_rule: 'follow required_next until diagnostics are empty and service rails are ready',
       redaction: 'required',
       chunking: 'cursor-or-tail',
+      output_profiles: {
+        human: {
+          surface: 'desktop-status/logs-panel',
+          purpose: 'operator-readable diagnosis',
+        },
+        machine: {
+          surface: 'desktop-ipc-json',
+          schema: 'watcher-service-status/v1',
+        },
+        ai: {
+          surface: 'watcher-ai-context',
+          schema: 'watcher-ai-context/v1',
+        },
+      },
+      artifact_policy: {
+        log_text: 'tail-bounded-redacted',
+        copy_target: 'ai_context_bundle',
+      },
     },
   };
 }

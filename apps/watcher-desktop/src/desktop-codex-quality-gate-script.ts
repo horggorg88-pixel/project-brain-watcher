@@ -22,6 +22,8 @@ EVIDENCE_GATE_IDS = {
     "lint": "lint",
     "test": "test",
     "build": "build",
+    "check": "check",
+    "verify": "verify",
 }
 QUALITY_GATE_ORDER = (
     ("typecheck", ("typecheck", "check-types", "lint:types")),
@@ -202,6 +204,32 @@ def run_command(name, command, canonical_command, cwd):
     return False, f"{name}: завершился с кодом {result.returncode}", result.returncode, duration_ms
 
 
+def merge_command_run(existing, current):
+    if not existing:
+        return current
+    existing_passed = bool(existing.get("passed"))
+    current_passed = bool(current.get("passed"))
+    passed = existing_passed and current_passed
+    failed_exit_code = existing.get("exitCode") if not existing_passed else current.get("exitCode")
+    return {
+        "available": True,
+        "passed": passed,
+        "detail": "; ".join(
+            item for item in (existing.get("detail"), current.get("detail"))
+            if isinstance(item, str) and item
+        ),
+        "checkedAt": current.get("checkedAt"),
+        "staleAfterMs": EVIDENCE_TTL_MS,
+        "source": "quality-gate-runner",
+        "command": " && ".join(
+            item for item in (existing.get("command"), current.get("command"))
+            if isinstance(item, str) and item
+        ),
+        "exitCode": 0 if passed else failed_exit_code,
+        "runId": current.get("runId"),
+    }
+
+
 def read_project_id(root):
     config = read_json(root / ".brain" / "config.json")
     if isinstance(config, dict):
@@ -267,7 +295,7 @@ def main():
         ok, output, exit_code, duration_ms = run_command(name, command, canonical_command, root)
         gate_id = EVIDENCE_GATE_IDS.get(name)
         if gate_id:
-            command_runs[gate_id] = {
+            command_runs[gate_id] = merge_command_run(command_runs.get(gate_id), {
                 "available": True,
                 "passed": ok,
                 "detail": f"{canonical_command}: exitCode={exit_code}, durationMs={duration_ms}",
@@ -277,7 +305,7 @@ def main():
                 "command": canonical_command,
                 "exitCode": exit_code,
                 "runId": f"{gate_id}-{int(time.time())}",
-            }
+            })
         if not ok:
             failures.append(output)
     write_quality_evidence(root, command_runs)
