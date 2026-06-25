@@ -383,6 +383,8 @@ describe('watcher desktop contract', () => {
     expect(html).toContain('data-tooltip="Скопировать статус службы и последние логи watcher"');
     expect(rendererSource).not.toContain('openServiceLogsButtons');
     expect(rendererSource).toContain('serviceAiLogsText');
+    expect(rendererSource).toContain('formatServicePrimaryCause');
+    expect(rendererSource).toContain('formatServiceProgress');
     expect(rendererSource).toContain('watcher-ai-context/v1');
     expect(rendererSource).toContain('output_profiles');
     expect(rendererSource).toContain('artifact_policy');

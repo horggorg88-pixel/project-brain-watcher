@@ -1,12 +1,16 @@
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type {
   SavedProjectProfile,
   WatcherCommandStatus,
   WatcherPolicyGate,
+  WatcherServiceAction,
+  WatcherServiceActionProgress,
+  WatcherServiceActionProgressStep,
   WatcherServiceActionRequest,
   WatcherServiceActionResult,
+  WatcherServicePrimaryCause,
   WatcherServiceStatus,
 } from './contracts.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
@@ -31,7 +35,7 @@ import {
 } from './desktop-service-repair.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.99/project-brain-watcher-1.4.99.tgz';
+const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.100/project-brain-watcher-1.4.100.tgz';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 const WATCHER_COMMAND_TIMEOUT_MS = 60_000;
@@ -54,29 +58,30 @@ export async function runServiceAction(
   paths: DesktopCorePaths,
   request: WatcherServiceActionRequest,
 ): Promise<WatcherServiceActionResult> {
+  const finalize = (result: WatcherServiceActionResult): WatcherServiceActionResult => withServiceActionDiagnostics(request.action, result);
   const profile = applyMcpConfigToProfile(
     resolveServiceProfile(paths, request.projectId),
     discoverMcpConfig(paths),
   );
-  if (request.action === 'health') return healthResult(paths, request.projectId);
-  if (request.action === 'check_update') return checkUpdateResult(paths, request.projectId);
+  if (request.action === 'health') return finalize(healthResult(paths, request.projectId));
+  if (request.action === 'check_update') return finalize(await checkUpdateResult(paths, request.projectId));
   let token = profile ? readDesktopServiceToken(profile) : null;
   const status = readServiceStatus(paths, request.projectId);
   if (request.action === 'start' && status.running) {
-    return {
+    return finalize({
       executed: false,
       policy: { decision: 'allow', risk: 'low', reasons: ['Watcher уже работает'] },
       status,
       exitCode: 0,
       output: `Watcher уже работает, pid=${status.pid ?? 'нет'}. Повторный запуск не требуется.`,
-    };
+    });
   }
   const policy = servicePolicy(request, profile, token);
   if (policy.decision !== 'allow') {
-    return { executed: false, policy, status: readServiceStatus(paths, request.projectId), exitCode: null, output: policy.reasons.join('\n') };
+    return finalize({ executed: false, policy, status: readServiceStatus(paths, request.projectId), exitCode: null, output: policy.reasons.join('\n') });
   }
   if (!profile) {
-    return { executed: false, policy, status: readServiceStatus(paths, request.projectId), exitCode: null, output: 'Проект не найден' };
+    return finalize({ executed: false, policy, status: readServiceStatus(paths, request.projectId), exitCode: null, output: 'Проект не найден' });
   }
   if (request.action !== 'stop') {
     if (request.action === 'update') {
@@ -87,7 +92,7 @@ export async function runServiceAction(
       const serverAccess = verifiedToken.serverAccess;
       if (!serverAccess.verified) {
         const denied: WatcherPolicyGate = { decision: 'deny', risk: 'high', reasons: [serverAccess.message] };
-        return { executed: false, policy: denied, status: readServiceStatus(paths, profile.id), exitCode: null, output: serverAccess.message };
+        return finalize({ executed: false, policy: denied, status: readServiceStatus(paths, profile.id), exitCode: null, output: serverAccess.message });
       }
       prepareServiceSecretForLaunch(profile, token);
     }
@@ -96,36 +101,36 @@ export async function runServiceAction(
   const command = defaultNpxExecutable();
   const imagePathRepair = await repairServiceImagePathIfNeeded(profile, status, request.action);
   if (imagePathRepair && imagePathRepair.exitCode !== 0) {
-    return {
+    return finalize({
       executed: true,
       policy,
       status: readServiceStatus(paths, profile.id),
       exitCode: imagePathRepair.exitCode,
       output: imagePathRepair.output,
       commandStatus: imagePathRepair.commandStatus,
-    };
+    });
   }
-  if (request.action === 'update') return runUpdateAction(paths, profile, token, policy, imagePathRepair);
+  if (request.action === 'update') return finalize(await runUpdateAction(paths, profile, token, policy, imagePathRepair));
   const repair = await repairServiceLauncherIfNeeded(profile, status, request.action, command, env);
   if (repair && repair.exitCode !== 0) {
-    return {
+    return finalize({
       executed: true,
       policy,
       status: readServiceStatus(paths, profile.id),
       exitCode: repair.exitCode,
       output: repair.output,
       commandStatus: repair.commandStatus,
-    };
+    });
   }
   if (request.action === 'install' && repair) {
-    return {
+    return finalize({
       executed: true,
       policy,
       status: readServiceStatus(paths, profile.id),
       exitCode: repair.exitCode,
       output: repair.output,
       commandStatus: repair.commandStatus,
-    };
+    });
   }
   const rawResult = await spawnWatcher(command, buildServiceActionArgs(request.action, profile), profile.root, env, serviceSpawnOptions(request.action));
   const result = request.action === 'install'
@@ -134,14 +139,14 @@ export async function runServiceAction(
   const finalStatus = await waitForServiceActionStatus(paths, request.action, profile.id);
   const commandOutput = [imagePathRepair?.output, repair?.output, result.output].filter(Boolean).join('\n\n');
   const settlement = summarizeServiceActionSettlement(request.action, result.exitCode, commandOutput, finalStatus);
-  return {
+  return finalize({
     executed: true,
     policy,
     status: finalStatus,
     exitCode: settlement.exitCode,
     output: settlement.output,
     commandStatus: rawResult.commandStatus,
-  };
+  });
 }
 
 async function repairServiceImagePathIfNeeded(
@@ -300,9 +305,13 @@ function serviceSettlementError(
 
 function serviceFailureDiagnostics(status: WatcherServiceStatus): string | null {
   const reasons: string[] = [];
-  const logText = [status.logs?.err, status.logs?.out, status.logs?.wrapper].filter(Boolean).join('\n');
+  const logText = serviceDiagnosticText(status, '');
+  const primaryCause = classifyServicePrimaryCause(status, logText);
   if (status.projectId || status.root) {
     reasons.push(`field-node ${status.projectId || 'unknown'}: ${status.root || 'root не определён'}. Проверяй именно этот профиль и его Windows service metadata.`);
+  }
+  if (primaryCause) {
+    reasons.push(`${primaryCause.title}: ${primaryCause.detail} ${primaryCause.nextAction}`);
   }
   if (/\b_npx\b|npm-cache|npm warn cleanup/i.test(logText)) {
     reasons.push('launcher всё ещё запускает npx/npm; служба должна идти через локальный .brain/service/runtime node package.');
@@ -330,6 +339,164 @@ function serviceFailureDiagnostics(status: WatcherServiceStatus): string | null 
     reasons.push('1067 означает, что Windows Service-процесс завершился после старта; первичная ошибка находится выше в watcher/npm логах.');
   }
   return reasons.length > 0 ? ['Диагностика службы:', ...reasons.map(reason => `- ${reason}`)].join('\n') : null;
+}
+
+function withServiceActionDiagnostics(
+  action: WatcherServiceAction,
+  result: WatcherServiceActionResult,
+): WatcherServiceActionResult {
+  const primaryCause = classifyServicePrimaryCause(result.status, result.output, result.commandStatus);
+  return {
+    ...result,
+    primaryCause,
+    progress: buildServiceActionProgress(action, result.status, result.commandStatus, result.output, primaryCause),
+  };
+}
+
+export function classifyServicePrimaryCause(
+  status: WatcherServiceStatus,
+  output = '',
+  commandStatus?: WatcherCommandStatus,
+): WatcherServicePrimaryCause | null {
+  const text = serviceDiagnosticText(status, output);
+  if (/ENOSPC|no space left on device/i.test(text)) {
+    return {
+      code: 'ENOSPC',
+      severity: 'error',
+      title: 'Недостаточно места для записи watcher state',
+      detail: 'Node не смог записать локальное состояние watcher: ENOSPC/no space left on device.',
+      nextAction: 'Освободи место на диске или очисти .brain/service/cache/runtime-staging, затем нажми «Починить службу» и повтори запуск.',
+    };
+  }
+  const staleRuntime = readStaleServiceRuntime(status.root);
+  if (staleRuntime) {
+    return {
+      code: 'SERVICE_RUNTIME_STALE',
+      severity: 'error',
+      title: 'Service runtime устарел',
+      detail: `Служба запускает watcher ${staleRuntime.activeVersion}, а пульт ожидает ${staleRuntime.expectedVersion}.`,
+      nextAction: 'Обнови пульт/watcher или нажми «Починить службу», чтобы пересоздать локальный .brain/service runtime.',
+    };
+  }
+  if (/lease already has an active owner|active_owner|owner mismatch|SSE HTTP 409/i.test(text)) {
+    return {
+      code: 'LEASE_ACTIVE_OWNER',
+      severity: 'warning',
+      title: 'Watcher lease занят другим owner',
+      detail: 'Сервер видит уже активный watcher для этого проекта или старый процесс ещё держит lease.',
+      nextAction: 'Останови лишний watcher, подожди lease timeout или перезапусти службу через «Починить службу».',
+    };
+  }
+  if (commandStatus?.timedOut) {
+    return {
+      code: 'COMMAND_TIMEOUT',
+      severity: 'error',
+      title: 'Команда службы превысила таймаут',
+      detail: `${commandStatus.label} выполнялась ${commandStatus.durationMs} мс и была остановлена.`,
+      nextAction: 'Смотри live-прогресс и последние логи; если причина не видна, нажми «Копировать логи» и передай AI snapshot.',
+    };
+  }
+  if (/WIN32_EXIT_CODE=1067/i.test(status.lastError ?? text)) {
+    return {
+      code: 'SERVICE_1067',
+      severity: 'error',
+      title: 'Windows Service завершилась после старта',
+      detail: 'Код 1067 означает падение процесса watcher после запуска; первичная ошибка обычно выше в err/out/runtime-install логах.',
+      nextAction: 'Открой или скопируй логи службы, затем исправь первичную ошибку и повтори запуск.',
+    };
+  }
+  if (status.lastError) {
+    return {
+      code: 'SERVICE_FAILURE',
+      severity: 'error',
+      title: 'Watcher требует диагностики',
+      detail: status.lastError,
+      nextAction: 'Скопируй AI snapshot логов службы и проверь rail_map.required_next.',
+    };
+  }
+  return null;
+}
+
+export function buildServiceActionProgress(
+  action: WatcherServiceAction,
+  status: WatcherServiceStatus,
+  commandStatus?: WatcherCommandStatus,
+  output = '',
+  primaryCause: WatcherServicePrimaryCause | null = classifyServicePrimaryCause(status, output, commandStatus),
+): WatcherServiceActionProgress {
+  const commandStepStatus = commandProgressStatus(commandStatus);
+  const healthPassed = status.running && status.health === 'healthy';
+  const healthRelevant = action === 'start' || action === 'restart' || action === 'update' || action === 'install' || action === 'health';
+  const healthStatus = healthPassed ? 'passed' : primaryCause ? 'failed' : healthRelevant ? 'running' : 'skipped';
+  const steps: readonly WatcherServiceActionProgressStep[] = [
+    progressStep('preflight', 'Профиль, bearer и доступ к MCP', status.root ? 'passed' : 'failed', status.root ?? 'root не выбран'),
+    progressStep('repair', 'Проверка launcher/XML/service runtime', primaryCause?.code === 'SERVICE_RUNTIME_STALE' ? 'failed' : 'passed', primaryCause?.code === 'SERVICE_RUNTIME_STALE' ? primaryCause.detail : 'metadata проверены перед командой'),
+    progressStep('command', 'Команда Windows-службы', commandStepStatus, commandStatus ? `${commandStatus.label}, ${commandStatus.durationMs} мс` : 'команда ещё не запускалась или выполняется'),
+    progressStep('health', 'Healthy, lease и синхронизация', healthStatus, healthPassed ? 'watcher healthy' : status.lastError ?? status.health),
+    progressStep('diagnostics', 'Логи и первопричина', primaryCause ? 'failed' : status.logs ? 'passed' : 'running', primaryCause?.title ?? 'собираю tail логов службы'),
+  ];
+  const activeStep = steps.find(step => step.status === 'failed' || step.status === 'running') ?? null;
+  return {
+    action,
+    label: actionLabel(action),
+    startedAt: null,
+    elapsedMs: commandStatus?.durationMs ?? null,
+    activeStepId: activeStep?.id ?? null,
+    summary: primaryCause?.title ?? (healthPassed ? 'Watcher healthy' : 'Операция watcher выполняется или требует проверки'),
+    primaryCause,
+    steps,
+  };
+}
+
+function commandProgressStatus(commandStatus?: WatcherCommandStatus): WatcherServiceActionProgressStep['status'] {
+  if (!commandStatus) return 'running';
+  if (commandStatus.status === 'timed_out' || commandStatus.status === 'spawn_error' || commandStatus.exitCode !== 0) return 'failed';
+  return 'passed';
+}
+
+function progressStep(
+  id: WatcherServiceActionProgressStep['id'],
+  label: string,
+  status: WatcherServiceActionProgressStep['status'],
+  detail: string,
+): WatcherServiceActionProgressStep {
+  return { id, label, status, detail };
+}
+
+function serviceDiagnosticText(status: WatcherServiceStatus, output: string): string {
+  return [
+    output,
+    status.lastError,
+    status.logs?.err,
+    status.logs?.out,
+    status.logs?.wrapper,
+    status.logs?.runtimeInstall,
+  ].filter(Boolean).join('\n');
+}
+
+function readStaleServiceRuntime(root: string | null): { readonly activeVersion: string; readonly expectedVersion: string } | null {
+  if (!root) return null;
+  const manifestPath = join(root, '.brain', 'service', 'active-runtime.json');
+  if (!existsSync(manifestPath)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(manifestPath, 'utf-8')) as unknown;
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const manifest = parsed as Record<string, unknown>;
+    const packageSpec = typeof manifest.packageSpec === 'string' ? manifest.packageSpec : '';
+    const activeVersion = serviceRuntimeVersion(packageSpec);
+    const expectedVersion = watcherPackageVersion(WATCHER_PACKAGE);
+    if (!activeVersion || activeVersion === expectedVersion) return null;
+    return { activeVersion, expectedVersion };
+  } catch {
+    return null;
+  }
+}
+
+function serviceRuntimeVersion(packageSpec: string): string | null {
+  const tgzMatch = packageSpec.match(/project-brain-watcher-(\d+\.\d+\.\d+)\.tgz/i);
+  if (tgzMatch?.[1]) return tgzMatch[1];
+  const tagMatch = packageSpec.match(/(?:download\/v|#v)(\d+\.\d+\.\d+)/i);
+  return tagMatch?.[1] ?? null;
 }
 
 function findStaleServiceRoot(expectedRoot: string | null, logText: string): string | null {

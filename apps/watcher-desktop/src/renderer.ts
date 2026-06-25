@@ -13,9 +13,11 @@ import type {
   ProjectImportResult,
   SavedProjectProfile,
   WatcherServiceAction,
+  WatcherServiceActionProgress,
   WatcherServiceActionResult,
   WatcherServiceLogStream,
   WatcherServiceLogTail,
+  WatcherServicePrimaryCause,
   WatcherServiceStatus,
 } from './contracts.js';
 import {
@@ -37,7 +39,7 @@ import {
   setText,
   withCodexGateProgress,
 } from './renderer-view.js';
-import { actionLabel, decisionLabel, isServiceAction, setServiceActionState, setServiceBusy } from './renderer-service-ui.js';
+import { actionLabel, decisionLabel, isServiceAction, serviceActionProgressLines, setServiceActionState, setServiceBusy } from './renderer-service-ui.js';
 import {
   resolveServiceActionConfirmation,
   setServiceConfirmationHint,
@@ -376,7 +378,7 @@ async function runServiceActionFromUi(action: WatcherServiceAction, confirmActio
     return;
   }
   setServiceBusy(serviceButtons, true);
-  writeLog(`Выполняем: ${actionLabel(action)}...`);
+  const stopProgress = startServiceActionProgress(action);
   try {
     const result = await window.watcherDesktop.service.run({ action, projectId, confirmed: true });
     writeLog(serviceActionLog(result));
@@ -384,6 +386,7 @@ async function runServiceActionFromUi(action: WatcherServiceAction, confirmActio
   } catch (error) {
     writeLog(errorMessage(error));
   } finally {
+    stopProgress();
     setServiceBusy(serviceButtons, false);
     setServiceConfirmationHint(serviceButtons, pendingServiceAction);
   }
@@ -880,6 +883,16 @@ function writeLog(value: string): void {
   if (!uiState.consoleOpen) void saveUiState({ ...uiState, consoleOpen: true }).then(() => renderUiState());
 }
 
+function startServiceActionProgress(action: WatcherServiceAction): () => void {
+  const startedAt = Date.now();
+  const renderProgress = (): void => {
+    setText(serviceOutputEl, serviceActionProgressLines(action, Date.now() - startedAt).join('\n'));
+  };
+  writeLog(serviceActionProgressLines(action, 0).join('\n'));
+  const timer = window.setInterval(renderProgress, 1000);
+  return () => window.clearInterval(timer);
+}
+
 async function serviceAiLogsText(): Promise<string> {
   const statusText = serviceStatusEl?.textContent?.trim() ?? '';
   const commandText = tailText(
@@ -1127,10 +1140,14 @@ function redactAiLogText(value: string): string {
 function serviceActionLog(result: WatcherServiceActionResult): string {
   const output = result.output.trim() || 'Команда завершилась без вывода';
   const commandStatus = result.commandStatus ? serviceCommandStatusLine(result.commandStatus) : null;
+  const primaryCause = formatServicePrimaryCause(result.primaryCause ?? result.progress?.primaryCause ?? null);
+  const progress = formatServiceProgress(result.progress);
   const lines = [
     `${decisionLabel(result.policy.decision)}: код=${result.exitCode ?? 'нет'}`,
     `Проект: ${result.status.projectId ?? currentProjectId()}`,
     `Папка: ${result.status.root ?? selectedProject()?.root ?? 'не определена'}`,
+    primaryCause,
+    progress,
     commandStatus,
     output,
   ].filter((line): line is string => Boolean(line));
@@ -1140,6 +1157,36 @@ function serviceActionLog(result: WatcherServiceActionResult): string {
   const logs = serviceLogSummary(result.status.logs);
   if (logs) lines.push('', logs);
   return lines.join('\n');
+}
+
+function formatServicePrimaryCause(cause: WatcherServicePrimaryCause | null): string | null {
+  if (!cause) return null;
+  return [
+    'Главная причина:',
+    `${cause.title} (${cause.code})`,
+    `Деталь: ${cause.detail}`,
+    `Что сделать: ${cause.nextAction}`,
+  ].join('\n');
+}
+
+function formatServiceProgress(progress: WatcherServiceActionProgress | undefined): string | null {
+  if (!progress) return null;
+  return [
+    'Прогресс операции:',
+    `Итог: ${progress.summary}`,
+    ...progress.steps.map(step => `${progressStatusLabel(step.status)} ${step.label}: ${step.detail}`),
+  ].join('\n');
+}
+
+function progressStatusLabel(status: WatcherServiceActionProgress['steps'][number]['status']): string {
+  const labels = {
+    pending: '[ожидает]',
+    running: '[идёт]',
+    passed: '[готово]',
+    failed: '[ошибка]',
+    skipped: '[пропуск]',
+  };
+  return labels[status];
 }
 
 function serviceLogSummary(logs: WatcherServiceLogTail | null): string | null {

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { SavedProjectProfile, WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
+import type { SavedProjectProfile, WatcherServiceLogTail, WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
 import {
   buildServiceImagePathRepairArgs,
   normalizeServiceInstallResult,
@@ -15,9 +15,10 @@ import {
   shouldRepairServiceImagePathBeforeAction,
   shouldRepairServiceLauncherBeforeAction,
 } from '../../apps/watcher-desktop/src/desktop-service-repair.js';
-import { spawnWatcher } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
+import { buildServiceActionProgress, classifyServicePrimaryCause, spawnWatcher } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
 import { readServiceLogTail } from '../../apps/watcher-desktop/src/desktop-service-status.js';
 import { serviceCommandStatusLine } from '../../apps/watcher-desktop/src/renderer-service-command-status.js';
+import { serviceActionProgressLines } from '../../apps/watcher-desktop/src/renderer-service-ui.js';
 
 const tempDirs: string[] = [];
 
@@ -318,6 +319,64 @@ describe('watcher desktop service repair', () => {
     expect(shouldRepairServiceLauncherBeforeAction('start', statusFixture({ installed: true }), current)).toBe(false);
   });
 
+  it('surfaces disk exhaustion as the primary service failure instead of generic 1067', () => {
+    const status = statusFixture({
+      lastError: 'Windows Service STOPPED, WIN32_EXIT_CODE=1067',
+      logs: logsFixture([
+        'Error: ENOSPC: no space left on device, write',
+        'Watcher lease rejected: watcher lease already has an active owner',
+      ].join('\n')),
+    });
+
+    const cause = classifyServicePrimaryCause(status, '');
+    const progress = buildServiceActionProgress('start', status, {
+      status: 'timed_out',
+      command: 'node',
+      label: 'service start',
+      durationMs: 60009,
+      exitCode: null,
+      signal: null,
+      timedOut: true,
+      timeoutMs: 60000,
+      killed: true,
+    }, '', cause);
+
+    expect(cause?.code).toBe('ENOSPC');
+    expect(cause?.title).toContain('мест');
+    expect(cause?.nextAction).toContain('Освободи место');
+    expect(progress.primaryCause?.code).toBe('ENOSPC');
+    expect(progress.steps.map(step => step.id)).toEqual(['preflight', 'repair', 'command', 'health', 'diagnostics']);
+    expect(progress.steps.find(step => step.id === 'command')?.status).toBe('failed');
+  });
+
+  it('detects stale local service runtime from active-runtime metadata', () => {
+    const profile = profileFixture();
+    const serviceDir = join(profile.root, '.brain', 'service');
+    mkdirSync(serviceDir, { recursive: true });
+    writeFileSync(join(serviceDir, 'active-runtime.json'), JSON.stringify({
+      packageSpec: 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.91/project-brain-watcher-1.4.91.tgz',
+    }), 'utf-8');
+
+    const cause = classifyServicePrimaryCause(statusFixture({
+      root: profile.root,
+      lastError: 'Windows Service STOPPED, WIN32_EXIT_CODE=1067',
+      logs: logsFixture('runtime install completed'),
+    }), '');
+
+    expect(cause?.code).toBe('SERVICE_RUNTIME_STALE');
+    expect(cause?.detail).toContain('1.4.91');
+    expect(cause?.nextAction).toContain('Обнови');
+  });
+
+  it('formats a live progress checklist for long service actions', () => {
+    const lines = serviceActionProgressLines('start', 65_000);
+
+    expect(lines[0]).toBe('Выполняем: Запустить watcher...');
+    expect(lines[1]).toContain('1:05');
+    expect(lines).toContain('3/5 Запуск Windows-службы и локального runtime');
+    expect(lines).toContain('4/5 Ожидание healthy, lease и первой синхронизации');
+  });
+
   it('reports command timeouts with a diagnostic message instead of a silent exit code', async () => {
     const result = await spawnWatcher(
       process.execPath,
@@ -444,6 +503,24 @@ function statusFixture(overrides: Partial<WatcherServiceStatus>): WatcherService
     running: false,
     logs: null,
     ...overrides,
+  };
+}
+
+function logsFixture(err: string): WatcherServiceLogTail {
+  return {
+    wrapperPath: 'wrapper.log',
+    outPath: 'out.log',
+    errPath: 'err.log',
+    runtimeInstallPath: 'runtime-install.log',
+    wrapper: '',
+    out: '',
+    err,
+    runtimeInstall: '',
+    transport: {
+      version: 'watcher-log-transport/v1',
+      chunkSizeBytes: 24000,
+      streams: [],
+    },
   };
 }
 

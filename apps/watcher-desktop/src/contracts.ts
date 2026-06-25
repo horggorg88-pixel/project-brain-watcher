@@ -201,6 +201,34 @@ export interface WatcherServiceActionRequest {
   readonly confirmed: boolean;
 }
 
+export interface WatcherServicePrimaryCause {
+  readonly code: 'ENOSPC' | 'SERVICE_RUNTIME_STALE' | 'LEASE_ACTIVE_OWNER' | 'COMMAND_TIMEOUT' | 'SERVICE_1067' | 'SERVICE_FAILURE';
+  readonly severity: 'info' | 'warning' | 'error';
+  readonly title: string;
+  readonly detail: string;
+  readonly nextAction: string;
+}
+
+export type WatcherServiceActionProgressStepStatus = 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+
+export interface WatcherServiceActionProgressStep {
+  readonly id: 'preflight' | 'repair' | 'command' | 'health' | 'diagnostics';
+  readonly label: string;
+  readonly status: WatcherServiceActionProgressStepStatus;
+  readonly detail: string;
+}
+
+export interface WatcherServiceActionProgress {
+  readonly action: WatcherServiceAction;
+  readonly label: string;
+  readonly startedAt: string | null;
+  readonly elapsedMs: number | null;
+  readonly activeStepId: WatcherServiceActionProgressStep['id'] | null;
+  readonly summary: string;
+  readonly primaryCause: WatcherServicePrimaryCause | null;
+  readonly steps: readonly WatcherServiceActionProgressStep[];
+}
+
 export interface WatcherServiceActionResult {
   readonly executed: boolean;
   readonly policy: WatcherPolicyGate;
@@ -208,6 +236,8 @@ export interface WatcherServiceActionResult {
   readonly exitCode: number | null;
   readonly output: string;
   readonly commandStatus?: WatcherCommandStatus;
+  readonly primaryCause?: WatcherServicePrimaryCause | null;
+  readonly progress?: WatcherServiceActionProgress;
 }
 
 export type WatcherCommandStatusKind = 'completed' | 'timed_out' | 'spawn_error' | 'killed';

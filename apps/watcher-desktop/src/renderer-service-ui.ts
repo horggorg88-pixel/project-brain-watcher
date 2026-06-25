@@ -97,6 +97,29 @@ export function actionLabel(action: WatcherServiceAction): string {
   return labels[action];
 }
 
+export function serviceActionProgressLines(action: WatcherServiceAction, elapsedMs: number): readonly string[] {
+  const steps = action === 'update'
+    ? [
+      '1/5 Проверка версии и release assets',
+      '2/5 Скачивание и запуск обновления пульта',
+      '3/5 Установка локального watcher runtime',
+      '4/5 Перезапуск Windows-службы и ожидание healthy',
+      '5/5 Сбор логов и первопричины',
+    ]
+    : [
+      '1/5 Проверка профиля, bearer и MCP-доступа',
+      '2/5 Проверка/ремонт launcher, XML и service runtime',
+      '3/5 Запуск Windows-службы и локального runtime',
+      '4/5 Ожидание healthy, lease и первой синхронизации',
+      '5/5 Сбор логов и первопричины',
+    ];
+  return [
+    `Выполняем: ${actionLabel(action)}...`,
+    `Прогресс: ${formatElapsed(elapsedMs)} · операция ещё выполняется, финальный лог появится после завершения команды.`,
+    ...steps,
+  ];
+}
+
 function serviceActionTooltip(action: WatcherServiceAction): string {
   const labels = {
     health: 'Проверить MCP-доступ и состояние службы без изменений',
@@ -176,4 +199,11 @@ function actionState(order: number, variant: ServiceActionVariant): ServiceActio
 
 function hiddenAction(): ServiceActionPresentation {
   return { order: 99, variant: 'secondary', visible: false };
+}
+
+function formatElapsed(elapsedMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
