@@ -1662,6 +1662,58 @@ describe('watcher desktop core', () => {
     expect(node?.detail).toBe('Native hook failed');
   });
 
+  it('keeps Codex gates ready when project smoke fails after native proofs pass', async () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'repo');
+    const source = join(paths.homePath, 'codex-ready-smoke-failed-mcp-config.json');
+    mkdirSync(join(root, '.brain', 'service'), { recursive: true });
+    writeFileSync(source, JSON.stringify({
+      project_id: 'codex-ready-smoke-failed',
+      endpoint: 'http://149.33.14.250/mcp/p/codex-ready-smoke-failed',
+      local_path: root,
+      token_env: 'MCP_BEARER_TOKEN',
+      mcpServers: {
+        'project-brain': {
+          url: 'http://149.33.14.250/mcp/p/codex-ready-smoke-failed',
+          headers: { Authorization: `Bearer ${VALID_TEST_BEARER}` },
+        },
+      },
+    }), 'utf-8');
+    importProjectConfig(paths, source);
+    writeFileSync(join(root, '.brain', 'service', 'quality-gate-runs.json'), JSON.stringify({
+      schemaVersion: 1,
+      projectId: 'codex-ready-smoke-failed',
+      commandRuns: {
+        codexHooks: codexGateRun('Codex hooks ready', 'codex plugin add persistent-verifier@claude-migrated-home'),
+      },
+      verification: {
+        codexTrust: codexGateRun('Codex project trust подтверждён.', 'read ~/.codex/config.toml projects trust'),
+        codexRuntime: codexGateRun('Codex CLI проверен.', 'codex --version'),
+        hookPersistence: codexGateRun('Codex SessionStart hook loaded persistent-verifier.', 'codex features list'),
+        runtimeContext: codexGateRun('Codex Runtime Context proof recorded.', 'project-brain runtime context proof'),
+        smoke: {
+          ...codexGateRun('Команда завершилась с ошибкой: npm test failed', 'npm test'),
+          passed: false,
+          exitCode: 1,
+        },
+        rollback: codexGateRun('Rollback доступен.', 'codex plugin remove persistent-verifier@claude-migrated-home'),
+      },
+    }), 'utf-8');
+    vi.stubGlobal('fetch', verifiedMcpFetch());
+
+    const check = await buildDesktopConnectionCheck(paths, 'codex-ready-smoke-failed');
+    const node = check.nodes.find(item => item.id === 'codexGates');
+
+    expect(check.codexGates.ready).toBe(true);
+    expect(node).toMatchObject({
+      status: 'active',
+      detail: 'Codex Runtime Context proof подтверждён native hooks.',
+      action: 'none',
+      actionLabel: null,
+    });
+    expect(formatCodexGateDiagnostics(check.codexGates, 'codex-ready-smoke-failed')).toContain('Project smoke (smoke): failed');
+  });
+
   it('shows Codex gate progress instead of a stale smoke failure while verification is running', () => {
     const check = {
       overall: 'action_required',

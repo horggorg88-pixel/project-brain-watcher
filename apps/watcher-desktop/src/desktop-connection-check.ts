@@ -198,7 +198,6 @@ function hasCodexBaseVerification(status: DesktopCodexGateStatus): boolean {
   return hasCurrentPassed(evidence.verification.codexTrust, status.checkedAt)
     && hasCurrentPassed(evidence.verification.codexRuntime, status.checkedAt)
     && hasCurrentPassed(evidence.commandRuns.codexHooks, status.checkedAt)
-    && hasSmokeSatisfied(evidence.verification.smoke, status.checkedAt)
     && hasCurrentPassed(evidence.verification.rollback, status.checkedAt);
 }
 
@@ -210,7 +209,6 @@ function hasCodexRuntimeGateFailure(status: DesktopCodexGateStatus): boolean {
     evidence.verification.desktopBootstrap,
     evidence.verification.hookPersistence,
     evidence.verification.runtimeContext,
-    evidence.verification.smoke,
     evidence.verification.rollback,
   ].some(item => item?.available === true && item.passed === false);
 }
@@ -221,11 +219,6 @@ function hasPassed(value: DesktopCodexGateRunEvidence | undefined): boolean {
 
 function hasCurrentPassed(value: DesktopCodexGateRunEvidence | undefined, checkedAt: string): boolean {
   return hasPassed(value) && !isStale(value, checkedAt);
-}
-
-function hasSmokeSatisfied(value: DesktopCodexGateRunEvidence | undefined, checkedAt: string): boolean {
-  if (hasCurrentPassed(value, checkedAt)) return true;
-  return value?.available === false && !isStale(value, checkedAt);
 }
 
 function isStale(value: DesktopCodexGateRunEvidence | undefined, checkedAt: string): boolean {

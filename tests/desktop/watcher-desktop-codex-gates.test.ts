@@ -498,7 +498,7 @@ describe('watcher desktop codex gates', () => {
     expect(config).toContain('trust_level = "trusted"');
   });
 
-  it('surfaces the failing smoke command reason instead of a generic pending message', async () => {
+  it('keeps failing project smoke evidence while native hook proof remains the actionable blocker', async () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');
     mkdirSync(root, { recursive: true });
@@ -529,13 +529,14 @@ describe('watcher desktop codex gates', () => {
     });
 
     expect(result.ready).toBe(false);
-    expect(result.message).toContain('Smoke gate Codex упал');
-    expect(result.message).toContain('tests/runtime-start/app-version.test.ts');
-    expect(result.message).toContain('TOKEN=[redacted]');
-    expect(result.message).not.toContain('pb_secret_value');
+    expect(result.message).toContain('native SessionStart');
+    expect(result.message).not.toContain('Smoke gate Codex упал');
+    expect(result.evidence.verification.smoke?.detail).toContain('tests/runtime-start/app-version.test.ts');
+    expect(result.evidence.verification.smoke?.detail).toContain('TOKEN=[redacted]');
+    expect(result.evidence.verification.smoke?.detail).not.toContain('pb_secret_value');
   });
 
-  it('keeps the failing smoke tail when vitest writes a long green header first', async () => {
+  it('keeps the failing smoke tail in evidence when vitest writes a long green header first', async () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'demo-project');
     mkdirSync(root, { recursive: true });
@@ -574,9 +575,10 @@ describe('watcher desktop codex gates', () => {
     });
 
     expect(result.ready).toBe(false);
-    expect(result.message).toContain('Smoke gate Codex упал');
-    expect(result.message).toContain('FAIL tests/sql-admin-remaining-endpoint-retirement-contract.test.js');
-    expect(result.message).toContain('Received: 200');
+    expect(result.message).toContain('native SessionStart');
+    expect(result.message).not.toContain('Smoke gate Codex упал');
+    expect(result.evidence.verification.smoke?.detail).toContain('FAIL tests/sql-admin-remaining-endpoint-retirement-contract.test.js');
+    expect(result.evidence.verification.smoke?.detail).toContain('Received: 200');
   });
 
   it('reads native hook persistence evidence written by Codex hooks', () => {

@@ -1,6 +1,6 @@
 {
   "name": "@project-brain/watcher-desktop",
-  "version": "1.4.94",
+  "version": "1.4.95",
   "description": "Desktop control panel for Project Brain Watcher service",
   "author": "Project Brain",
   "private": true,
