@@ -331,9 +331,17 @@ describe('watcher desktop contract', () => {
 
     expect(releaseWorkflow).toContain('"project-brain-watcher-$watcherVersion.tgz"');
     expect(releaseWorkflow).toContain('"ProjectBrainWatcher-$desktopVersion-x64.exe"');
+    expect(releaseWorkflow).toContain('"ProjectBrainWatcher-$desktopVersion-x64.exe.blockmap"');
     expect(releaseWorkflow).toContain('"SHA256SUMS.txt"');
     expect(releaseWorkflow).toContain('$missingRequiredAssets');
     expect(releaseWorkflow).toContain('Missing watcher release assets');
+  });
+
+  it('does not require live desktop E2E fixtures on hosted release runners', () => {
+    const releaseWorkflow = readFileSync(join(process.cwd(), '.github', 'workflows', 'release.yml'), 'utf-8');
+
+    expect(releaseWorkflow).toContain('Skipping live desktop E2E');
+    expect(releaseWorkflow).toContain('Test-Path -LiteralPath $env:PB_E2E_PROJECT_ROOT');
   });
 
   it('repairs existing service metadata before start and update flows', () => {

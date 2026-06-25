@@ -35,7 +35,24 @@ jobs:
         run: npm run verify-release
 
       - name: Desktop E2E
-        run: npm --prefix apps/watcher-desktop run test:e2e
+        shell: pwsh
+        env:
+          PB_E2E_EMAIL: ${{ secrets.PB_E2E_EMAIL }}
+          PB_E2E_PASSWORD: ${{ secrets.PB_E2E_PASSWORD }}
+          PB_E2E_PROJECT_ROOT: ${{ vars.PB_E2E_PROJECT_ROOT }}
+          PB_E2E_PROJECT_ID: ${{ vars.PB_E2E_PROJECT_ID }}
+          PB_E2E_SERVER_URL: ${{ vars.PB_E2E_SERVER_URL }}
+          PB_E2E_CONSOLE_URL: ${{ vars.PB_E2E_CONSOLE_URL }}
+        run: |
+          if (-not $env:PB_E2E_PROJECT_ROOT -or -not (Test-Path -LiteralPath $env:PB_E2E_PROJECT_ROOT)) {
+            Write-Host "Skipping live desktop E2E: PB_E2E_PROJECT_ROOT is not configured on this runner."
+            exit 0
+          }
+          if (-not $env:PB_E2E_EMAIL -or -not $env:PB_E2E_PASSWORD) {
+            Write-Host "Skipping live desktop E2E: PB_E2E_EMAIL/PB_E2E_PASSWORD secrets are not configured."
+            exit 0
+          }
+          npm --prefix apps/watcher-desktop run test:e2e
 
       - name: Build desktop installer
         run: npm run desktop:dist
@@ -51,7 +68,9 @@ jobs:
         run: |
           $files = @()
           $files += Get-ChildItem -LiteralPath release -File
-          $files += Get-ChildItem -LiteralPath apps/watcher-desktop/release -File | Where-Object { $_.Name -match '^ProjectBrainWatcher-.+-x64\.exe$' }
+          $desktopVersion = (Get-Content -LiteralPath apps/watcher-desktop/package.json | ConvertFrom-Json).version
+          $desktopAssetPattern = "^ProjectBrainWatcher-$([regex]::Escape($desktopVersion))-x64\.exe(\.blockmap)?$"
+          $files += Get-ChildItem -LiteralPath apps/watcher-desktop/release -File | Where-Object { $_.Name -match $desktopAssetPattern }
           $lines = foreach ($file in $files) {
             $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $($file.Name)"
@@ -70,7 +89,7 @@ jobs:
           }
           $watcherVersion = (Get-Content -LiteralPath package.json | ConvertFrom-Json).version
           $desktopVersion = (Get-Content -LiteralPath apps/watcher-desktop/package.json | ConvertFrom-Json).version
-          $desktopAssetPattern = "^ProjectBrainWatcher-$([regex]::Escape($desktopVersion))-x64\.exe$"
+          $desktopAssetPattern = "^ProjectBrainWatcher-$([regex]::Escape($desktopVersion))-x64\.exe(\.blockmap)?$"
           $assets = @()
           $assets += Get-ChildItem -LiteralPath release -File | Where-Object { $_.Name -eq "project-brain-watcher-$watcherVersion.tgz" }
           $assets += Get-ChildItem -LiteralPath apps/watcher-desktop/release -File | Where-Object { $_.Name -match $desktopAssetPattern }
@@ -79,6 +98,7 @@ jobs:
           $expectedRequiredAssetNames = @(
             "project-brain-watcher-$watcherVersion.tgz",
             "ProjectBrainWatcher-$desktopVersion-x64.exe",
+            "ProjectBrainWatcher-$desktopVersion-x64.exe.blockmap",
             "SHA256SUMS.txt"
           )
           $actualAssetNames = @($assetPaths | ForEach-Object { Split-Path -Leaf $_ })
