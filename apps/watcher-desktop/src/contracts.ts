@@ -60,9 +60,11 @@ export interface WatcherServiceLogTail {
   readonly wrapperPath: string;
   readonly outPath: string;
   readonly errPath: string;
+  readonly runtimeInstallPath: string;
   readonly wrapper: string;
   readonly out: string;
   readonly err: string;
+  readonly runtimeInstall: string;
   readonly transport: WatcherServiceLogTransport;
 }
 
@@ -73,7 +75,7 @@ export interface WatcherServiceLogTransport {
 }
 
 export interface WatcherServiceLogStream {
-  readonly id: 'out' | 'err' | 'wrapper';
+  readonly id: 'out' | 'err' | 'wrapper' | 'runtime_install';
   readonly label: string;
   readonly path: string;
   readonly exists: boolean;
@@ -92,7 +94,7 @@ export interface WatcherServiceLogRange {
 
 export interface WatcherServiceLogChunk {
   readonly version: 'watcher-log-transport/v1';
-  readonly streamId: 'out' | 'err' | 'wrapper';
+  readonly streamId: 'out' | 'err' | 'wrapper' | 'runtime_install';
   readonly cursorId: string;
   readonly offset: number;
   readonly bytes: number;

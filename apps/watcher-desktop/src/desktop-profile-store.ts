@@ -54,7 +54,9 @@ export function removeProfile(
   const id = projectId.trim();
   const normalizedRoot = root ? normalizePath(root) : null;
   const profiles = readProfiles(paths).filter(profile => {
-    if (normalizedRoot) return normalizePath(profile.root) !== normalizedRoot;
+    if (normalizedRoot) {
+      return profile.id !== id && normalizePath(profile.root) !== normalizedRoot;
+    }
     return profile.id !== id;
   });
   mkdirSync(paths.userDataPath, { recursive: true });

@@ -12,9 +12,11 @@ import {
   serviceInstallAlreadyExists,
   serviceImagePathRepairRequired,
   serviceRefreshUnsupported,
+  shouldRepairServiceImagePathBeforeAction,
   shouldRepairServiceLauncherBeforeAction,
 } from '../../apps/watcher-desktop/src/desktop-service-repair.js';
 import { spawnWatcher } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
+import { readServiceLogTail } from '../../apps/watcher-desktop/src/desktop-service-status.js';
 import { serviceCommandStatusLine } from '../../apps/watcher-desktop/src/renderer-service-command-status.js';
 
 const tempDirs: string[] = [];
@@ -77,6 +79,24 @@ describe('watcher desktop service repair', () => {
     expect(serviceImagePathRepairRequired(statusFixture({
       lastError: 'Windows Service STOPPED, WIN32_EXIT_CODE=1067',
     }))).toBe(false);
+  });
+
+  it('repairs SCM binPath for launch and update actions independently from launcher repair', () => {
+    const staleStatus = statusFixture({
+      installed: true,
+      lastError: [
+        'Windows Service STOPPED, WIN32_EXIT_CODE=1067',
+        'Windows Service metadata указывает на другой root: D:\\Проект-old. Ожидался D:\\Проект.',
+      ].join('\n'),
+    });
+    const cleanStatus = statusFixture({ installed: true, lastError: 'Windows Service STOPPED' });
+
+    expect(shouldRepairServiceImagePathBeforeAction('install', staleStatus)).toBe(true);
+    expect(shouldRepairServiceImagePathBeforeAction('start', staleStatus)).toBe(true);
+    expect(shouldRepairServiceImagePathBeforeAction('restart', staleStatus)).toBe(true);
+    expect(shouldRepairServiceImagePathBeforeAction('update', staleStatus)).toBe(true);
+    expect(shouldRepairServiceImagePathBeforeAction('stop', staleStatus)).toBe(false);
+    expect(shouldRepairServiceImagePathBeforeAction('start', cleanStatus)).toBe(false);
   });
 
   it('detects missing and legacy service launchers that still use the LocalSystem npm cache', () => {
@@ -149,6 +169,19 @@ describe('watcher desktop service repair', () => {
 
     expect(state.requiresRepair).toBe(true);
     expect(state.reasons).toContain('launcher_missing_utf8_bom');
+  });
+
+  it('includes runtime install log as a first-class service log stream', () => {
+    const profile = profileFixture();
+    const serviceDir = join(profile.root, '.brain', 'service');
+    mkdirSync(serviceDir, { recursive: true });
+    writeFileSync(join(serviceDir, 'runtime-install.log'), 'runtime install failed\n', 'utf-8');
+
+    const logs = readServiceLogTail(profile);
+
+    expect(logs.runtimeInstallPath).toBe(join(serviceDir, 'runtime-install.log'));
+    expect(logs.runtimeInstall).toContain('runtime install failed');
+    expect(logs.transport.streams.map(stream => stream.id)).toContain('runtime_install');
   });
 
   it('requires repair when a node launcher points at a missing local service runtime', () => {

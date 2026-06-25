@@ -203,7 +203,6 @@ def registry_projects():
 
 def write_evidence(root, project_id, hook_event_name):
     checked_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    event_name = hook_event_name if isinstance(hook_event_name, str) and hook_event_name else "SessionStart"
     payload = {
         "schemaVersion": 1,
         "projectId": project_id,
@@ -222,18 +221,151 @@ def write_evidence(root, project_id, hook_event_name):
                 "exitCode": 0,
                 "runId": f"hookPersistence-{int(time.time())}",
             },
-            "runtimeContext": {
-                "available": True,
-                "passed": True,
-                "detail": f"Codex Runtime Context proof recorded by native {event_name} hook.",
-                "checkedAt": checked_at,
-                "staleAfterMs": NATIVE_HOOK_EVIDENCE_TTL_MS,
-                "source": "project-brain-runtime-context",
-                "command": "project-brain runtime context proof",
-                "exitCode": 0,
-                "runId": f"runtimeContext-{int(time.time())}",
-            },
         },
+    }
+    output_dir = root / ".codex"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "quality-gate-runs.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\\n",
+        encoding="utf-8",
+    )
+
+
+def main():
+    input_data = read_input()
+    hook_event_name = input_data.get("hookEventName") or input_data.get("hook_event_name")
+    if input_data and hook_event_name not in {"SessionStart", "session_start"}:
+        succeed()
+    candidates = []
+    cwd_root = find_root(input_cwd(input_data).resolve())
+    if cwd_root:
+        candidates.append((cwd_root, None))
+    candidates.extend(registry_projects())
+    seen = set()
+    for root, project_id in candidates:
+        try:
+            resolved = root.resolve()
+        except Exception:
+            continue
+        key = str(resolved).lower()
+        if key in seen or not resolved.exists():
+            continue
+        seen.add(key)
+        write_evidence(resolved, project_id or read_project_id(resolved), hook_event_name)
+    succeed()
+
+
+if __name__ == "__main__":
+    main()
+`;
+const RUNTIME_CONTEXT_BRIDGE_SCRIPT = `#!/usr/bin/env python3
+import json
+import sys
+import time
+from pathlib import Path
+
+NATIVE_HOOK_EVIDENCE_TTL_MS = 24 * 60 * 60 * 1000
+ROOT_MARKERS = (
+    "package.json",
+    "tsconfig.json",
+    "pyproject.toml",
+    "Cargo.toml",
+    "go.mod",
+)
+
+
+def succeed():
+    sys.exit(0)
+
+
+def read_input():
+    try:
+        return json.load(sys.stdin)
+    except Exception:
+        return {}
+
+
+def read_json(path):
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def input_cwd(input_data):
+    cwd = input_data.get("cwd")
+    if isinstance(cwd, str) and cwd.strip():
+        return Path(cwd)
+    return Path.cwd()
+
+
+def find_root(start):
+    current = start
+    while True:
+        if (current / ".brain" / "config.json").exists():
+            return current
+        if any((current / marker).exists() for marker in ROOT_MARKERS):
+            return current
+        if current.parent == current:
+            return None
+        current = current.parent
+
+
+def read_project_id(root):
+    path = root / ".brain" / "config.json"
+    if not path.exists():
+        return root.name
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return root.name
+    if not isinstance(value, dict):
+        return root.name
+    project_id = value.get("project_id") or value.get("projectId")
+    return project_id if isinstance(project_id, str) and project_id.strip() else root.name
+
+
+def registry_projects():
+    registry = read_json(Path(__file__).with_name("sessionstart-projects.json"))
+    projects = registry.get("projects") if isinstance(registry, dict) else []
+    if not isinstance(projects, list):
+        return []
+    result = []
+    for project in projects:
+        if not isinstance(project, dict):
+            continue
+        root = project.get("root")
+        project_id = project.get("id")
+        if isinstance(root, str) and root.strip():
+            result.append((Path(root), project_id if isinstance(project_id, str) else None))
+    return result
+
+
+def merge_verification(existing, runtime_context):
+    result = existing if isinstance(existing, dict) else {}
+    verification = result.get("verification")
+    if not isinstance(verification, dict):
+        verification = {}
+    verification["runtimeContext"] = runtime_context
+    result["verification"] = verification
+    return result
+
+
+def write_evidence(root, project_id, hook_event_name):
+    checked_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    event_name = hook_event_name if isinstance(hook_event_name, str) and hook_event_name else "UserPromptSubmit"
+    runtime_context = {
+        "available": True,
+        "passed": True,
+        "detail": f"Codex Runtime Context proof recorded by native {event_name} hook.",
+        "checkedAt": checked_at,
+        "staleAfterMs": NATIVE_HOOK_EVIDENCE_TTL_MS,
+        "source": "project-brain-runtime-context",
+        "command": "project-brain runtime context proof",
+        "exitCode": 0,
+        "runId": f"runtimeContext-{int(time.time())}",
     }
     context_payload = {
         "schemaVersion": 1,
@@ -243,11 +375,18 @@ def write_evidence(root, project_id, hook_event_name):
         "hookEventName": event_name,
         "source": "project-brain-runtime-context",
         "verdict": "ready",
-        "proofCount": 2,
+        "proofCount": 1,
     }
     output_dir = root / ".codex"
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "quality-gate-runs.json").write_text(
+    quality_gate_path = output_dir / "quality-gate-runs.json"
+    payload = merge_verification(read_json(quality_gate_path), runtime_context)
+    payload["schemaVersion"] = 1
+    payload["projectId"] = project_id
+    payload["projectRoot"] = str(root)
+    payload["checkedAt"] = checked_at
+    payload["staleAfterMs"] = NATIVE_HOOK_EVIDENCE_TTL_MS
+    quality_gate_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\\n",
         encoding="utf-8",
     )
@@ -260,7 +399,7 @@ def write_evidence(root, project_id, hook_event_name):
 def main():
     input_data = read_input()
     hook_event_name = input_data.get("hookEventName") or input_data.get("hook_event_name")
-    if input_data and hook_event_name not in {"SessionStart", "session_start", "UserPromptSubmit", "user_prompt_submit", "SubagentStart", "subagent_start"}:
+    if input_data and hook_event_name not in {"UserPromptSubmit", "user_prompt_submit", "SubagentStart", "subagent_start"}:
         succeed()
     candidates = []
     cwd_root = find_root(input_cwd(input_data).resolve())
@@ -678,7 +817,7 @@ function writeSessionStartBridge(homePath: string, profile: SavedProjectProfile)
   try {
     mkdirSync(bridgeRoot, { recursive: true });
     writeFileSync(sessionStartScript, SESSION_START_BRIDGE_SCRIPT, 'utf-8');
-    writeFileSync(runtimeContextScript, SESSION_START_BRIDGE_SCRIPT, 'utf-8');
+    writeFileSync(runtimeContextScript, RUNTIME_CONTEXT_BRIDGE_SCRIPT, 'utf-8');
     writeFileSync(registryPath, JSON.stringify(updateSessionStartRegistry(readJson(registryPath), profile), null, 2) + '\n', 'utf-8');
     return {
       installed: true,

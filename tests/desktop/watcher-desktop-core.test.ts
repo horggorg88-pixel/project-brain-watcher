@@ -116,6 +116,32 @@ describe('watcher desktop core', () => {
     expect(readProfiles(paths).map(profile => profile.root)).toEqual([secondRoot]);
   });
 
+  it('removes a selected project profile by id when the UI root is stale', () => {
+    const paths = tempPaths();
+    const projectRoot = join(paths.homePath, 'mcp-monorepo');
+    mkdirSync(projectRoot, { recursive: true });
+
+    saveProfile(paths, {
+      id: 'mcp-monorepo',
+      name: 'MCP Monorepo',
+      root: projectRoot,
+      indexId: 'idx-mcp-monorepo',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+
+    const remaining = removeProfile(
+      paths,
+      'mcp-monorepo',
+      join(paths.homePath, 'stale-root-from-ui'),
+    );
+
+    expect(existsSync(projectRoot)).toBe(true);
+    expect(remaining).toEqual([]);
+    expect(readProfiles(paths)).toEqual([]);
+    expect(listDesktopProjectProfiles(paths)).toEqual([]);
+  });
+
   it('keeps an explicit empty desktop project list empty instead of restoring a fallback', () => {
     const paths = tempPaths();
     const monorepoRoot = join(paths.homePath, 'Desktop', 'mcp-monorepo');

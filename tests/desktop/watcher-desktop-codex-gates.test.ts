@@ -129,13 +129,15 @@ describe('watcher desktop codex gates', () => {
     expect(bridgeScript).toContain('registry_projects');
     expect(bridgeScript).toContain('def succeed()');
     expect(bridgeScript).toContain('succeed()');
-    expect(bridgeScript).toContain('runtime-context.json');
-    expect(bridgeScript).toContain('runtimeContext');
+    expect(bridgeScript).not.toContain('runtime-context.json');
+    expect(bridgeScript).not.toContain('"runtimeContext"');
     expect(bridgeScript).not.toContain('emit({})');
     expect(bridgeScript).not.toContain('emit({"projects":');
     const runtimeContextScript = readFileSync(join(paths.homePath, '.codex', 'project-brain-hooks', 'runtimecontext.py'), 'utf-8');
     expect(runtimeContextScript).toContain('UserPromptSubmit');
     expect(runtimeContextScript).toContain('SubagentStart');
+    expect(runtimeContextScript).toContain('runtime-context.json');
+    expect(runtimeContextScript).toContain('"runtimeContext"');
     const registry = JSON.parse(readFileSync(join(paths.homePath, '.codex', 'project-brain-hooks', 'sessionstart-projects.json'), 'utf-8')) as {
       readonly projects: readonly { readonly root: string }[];
     };
@@ -148,8 +150,10 @@ describe('watcher desktop codex gates', () => {
     expect(qualityGateScript).toContain('("test",');
     expect(qualityGateScript).toContain('("build",');
     expect(qualityGateScript).toContain('def merge_command_run(existing, current):');
+    expect(qualityGateScript).toContain('def unavailable_command_run(gate_id, checked_at):');
     expect(qualityGateScript).toContain('passed = existing_passed and current_passed');
     expect(qualityGateScript).toContain('command_runs[gate_id] = merge_command_run(command_runs.get(gate_id), {');
+    expect(qualityGateScript).toContain('write_quality_evidence(root, {})');
     expect(qualityGateScript).toContain('return shutil.which("npm.cmd") or shutil.which("npm") or "npm.cmd"');
     expect(qualityGateScript).toContain('return shutil.which("npx.cmd") or shutil.which("npx") or "npx.cmd"');
     expect(qualityGateScript).toContain('seen = {canonical_command for _, _, canonical_command in commands}');

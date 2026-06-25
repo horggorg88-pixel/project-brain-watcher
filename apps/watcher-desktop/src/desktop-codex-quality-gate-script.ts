@@ -25,6 +25,7 @@ EVIDENCE_GATE_IDS = {
     "check": "check",
     "verify": "verify",
 }
+QUALITY_GATE_IDS = tuple(EVIDENCE_GATE_IDS.values())
 QUALITY_GATE_ORDER = (
     ("typecheck", ("typecheck", "check-types", "lint:types")),
     ("lint", ("lint", "biome", "check:lint")),
@@ -230,6 +231,20 @@ def merge_command_run(existing, current):
     }
 
 
+def unavailable_command_run(gate_id, checked_at):
+    return {
+        "available": False,
+        "passed": False,
+        "detail": f"{gate_id}: команда для quality rail не найдена в package scripts/fallback commands.",
+        "checkedAt": checked_at,
+        "staleAfterMs": EVIDENCE_TTL_MS,
+        "source": "quality-gate-runner",
+        "command": f"detect {gate_id}",
+        "exitCode": None,
+        "runId": f"{gate_id}-unavailable-{int(time.time())}",
+    }
+
+
 def read_project_id(root):
     config = read_json(root / ".brain" / "config.json")
     if isinstance(config, dict):
@@ -240,8 +255,6 @@ def read_project_id(root):
 
 
 def write_quality_evidence(root, command_runs):
-    if not command_runs:
-        return
     checked_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     output_dir = root / ".codex"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -249,7 +262,13 @@ def write_quality_evidence(root, command_runs):
     existing = read_json(output_path)
     existing_command_runs = existing.get("commandRuns") if isinstance(existing, dict) and isinstance(existing.get("commandRuns"), dict) else {}
     existing_verification = existing.get("verification") if isinstance(existing, dict) and isinstance(existing.get("verification"), dict) else {}
-    merged_command_runs = dict(existing_command_runs)
+    merged_command_runs = {
+        key: value
+        for key, value in existing_command_runs.items()
+        if key not in QUALITY_GATE_IDS
+    }
+    for gate_id in QUALITY_GATE_IDS:
+        merged_command_runs[gate_id] = command_runs.get(gate_id) or unavailable_command_run(gate_id, checked_at)
     merged_command_runs.update(command_runs)
     payload = {
         "schemaVersion": 1,
@@ -288,6 +307,7 @@ def main():
         succeed()
     commands = detect_commands(root)
     if not commands:
+        write_quality_evidence(root, {})
         succeed()
     failures = []
     command_runs = {}

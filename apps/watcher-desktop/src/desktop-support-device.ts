@@ -25,6 +25,8 @@ const SUPPORT_STATE_FILE = "desktop-support-device.json";
 const SUPPORT_VERSION = "1.0.0";
 const DEFAULT_MCP_SERVER_URL = "http://149.33.14.250";
 const DEFAULT_ACCOUNT_SERVER_URL = "http://149.33.14.250:3020";
+const SKIP_SUPPORT_ENROLLMENT =
+  process.env.PROJECT_BRAIN_DESKTOP_E2E_SKIP_SUPPORT_ENROLLMENT === "1";
 
 interface SupportDeviceState {
   readonly deviceId: string;
@@ -59,6 +61,9 @@ export function readSupportDeviceCredentials(
 export function readManagedDeviceStatus(
   paths: DesktopCorePaths,
 ): ManagedDeviceStatus {
+  if (SKIP_SUPPORT_ENROLLMENT) {
+    return skippedSupportStatus();
+  }
   const state = readSupportDeviceState(paths);
   if (!state) {
     return {
@@ -87,6 +92,9 @@ export async function enrollManagedDevice(
   account: DesktopAccountAuthorization,
   projectId?: string,
 ): Promise<ManagedDeviceEnrollment> {
+  if (SKIP_SUPPORT_ENROLLMENT) {
+    return skippedSupportEnrollment(paths);
+  }
   if (!account.ok || !account.bearerToken || !account.supportBaseUrl) {
     return {
       enrolled: false,
@@ -159,6 +167,9 @@ export async function ensureManagedDeviceEnrolled(
   paths: DesktopCorePaths,
   projectId?: string,
 ): Promise<ManagedDeviceEnrollment> {
+  if (SKIP_SUPPORT_ENROLLMENT) {
+    return skippedSupportEnrollment(paths);
+  }
   const existingState = readSupportDeviceState(paths);
   const existing = existingState
     ? toManagedDeviceStatus(existingState)
@@ -202,6 +213,9 @@ export async function enrollManagedDeviceFromHandoff(
   paths: DesktopCorePaths,
   projectId?: string,
 ): Promise<ManagedDeviceEnrollment> {
+  if (SKIP_SUPPORT_ENROLLMENT) {
+    return skippedSupportEnrollment(paths);
+  }
   const account = accountFromHandoff(paths);
   if (!account) {
     return {
@@ -232,6 +246,30 @@ function accountFromHandoff(
     bearerToken,
     tokenEnv: handoff.tokenEnv,
     message: "Личный handoff-token найден.",
+  };
+}
+
+function skippedSupportEnrollment(
+  paths: DesktopCorePaths,
+): ManagedDeviceEnrollment {
+  const status = readManagedDeviceStatus(paths);
+  return {
+    enrolled: true,
+    status,
+    message: status.message,
+  };
+}
+
+function skippedSupportStatus(): ManagedDeviceStatus {
+  return {
+    enrolled: true,
+    health: "online",
+    deviceId: "e2e-skipped",
+    supportBaseUrl: null,
+    meshUrl: null,
+    message:
+      "Support enrollment пропущен в live e2e, чтобы не создавать тестовые пульты.",
+    updatedAt: null,
   };
 }
 

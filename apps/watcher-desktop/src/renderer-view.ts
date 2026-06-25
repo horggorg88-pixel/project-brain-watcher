@@ -177,6 +177,12 @@ function codexEvidenceRows(status: DesktopCodexGateStatus): readonly {
     { id: 'codexTrust', label: 'Codex project trust', evidence: verification.codexTrust },
     { id: 'codexRuntime', label: 'Codex CLI', evidence: verification.codexRuntime },
     { id: 'codexHooks', label: 'Persistent verifier hooks', evidence: commandRuns.codexHooks },
+    { id: 'typecheck', label: 'Quality typecheck', evidence: commandRuns.typecheck },
+    { id: 'lint', label: 'Quality lint', evidence: commandRuns.lint },
+    { id: 'test', label: 'Quality test', evidence: commandRuns.test },
+    { id: 'build', label: 'Quality build', evidence: commandRuns.build },
+    { id: 'check', label: 'Quality check', evidence: commandRuns.check },
+    { id: 'verify', label: 'Quality verify', evidence: commandRuns.verify },
     { id: 'desktopBootstrap', label: 'Desktop bootstrap', evidence: verification.desktopBootstrap },
     { id: 'managedHooks', label: 'Managed hooks', evidence: verification.managedHooks },
     { id: 'smoke', label: 'Project smoke', evidence: verification.smoke },
@@ -192,7 +198,9 @@ function formatCodexEvidenceRow(row: {
   readonly evidence: DesktopCodexGateRunEvidence | undefined;
 }): string {
   if (!row.evidence) return `- ${row.label} (${row.id}): нет evidence`;
-  const state = row.evidence.passed === true ? 'passed' : row.evidence.passed === false ? 'failed' : 'unknown';
+  const state = row.evidence.available === false
+    ? 'unavailable'
+    : row.evidence.passed === true ? 'passed' : row.evidence.passed === false ? 'failed' : 'unknown';
   const exitCode = row.evidence.exitCode === undefined ? 'нет данных' : String(row.evidence.exitCode);
   const checkedAt = row.evidence.checkedAt ?? 'нет данных';
   return [
@@ -456,6 +464,7 @@ function serviceLogLines(status: WatcherServiceStatus): readonly string[] {
     logSection('Лог работы watcher', logs.out, logs.outPath),
     logSection('Ошибки watcher', logs.err, logs.errPath),
     logSection('Лог Windows-службы', logs.wrapper, logs.wrapperPath),
+    logSection('Лог установки runtime watcher', logs.runtimeInstall, logs.runtimeInstallPath),
   ].filter((line): line is string => line !== null);
   return sections.length ? ['Последние логи:', ...sections] : ['Последние логи: файлов логов пока нет'];
 }

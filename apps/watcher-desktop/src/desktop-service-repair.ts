@@ -128,6 +128,14 @@ export function shouldRepairServiceLauncherBeforeAction(
   return action === 'install' || action === 'start' || action === 'restart' || action === 'update';
 }
 
+export function shouldRepairServiceImagePathBeforeAction(
+  action: WatcherServiceAction,
+  status: WatcherServiceStatus,
+): boolean {
+  if (!status.installed || !serviceImagePathRepairRequired(status)) return false;
+  return action === 'install' || action === 'start' || action === 'restart' || action === 'update';
+}
+
 function serviceRuntimeWatcherEntry(profile: SavedProjectProfile): string {
   return join(profile.root, '.brain', 'service', 'runtime-entry.cjs');
 }

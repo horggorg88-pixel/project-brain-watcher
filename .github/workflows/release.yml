@@ -76,6 +76,16 @@ jobs:
           $assets += Get-ChildItem -LiteralPath apps/watcher-desktop/release -File | Where-Object { $_.Name -match $desktopAssetPattern }
           $assets += Get-Item -LiteralPath release/SHA256SUMS.txt
           $assetPaths = @($assets | Sort-Object -Property Name -Unique | ForEach-Object { $_.FullName })
+          $expectedRequiredAssetNames = @(
+            "project-brain-watcher-$watcherVersion.tgz",
+            "ProjectBrainWatcher-$desktopVersion-x64.exe",
+            "SHA256SUMS.txt"
+          )
+          $actualAssetNames = @($assetPaths | ForEach-Object { Split-Path -Leaf $_ })
+          $missingRequiredAssets = @($expectedRequiredAssetNames | Where-Object { $actualAssetNames -notcontains $_ })
+          if ($missingRequiredAssets.Count -gt 0) {
+            throw "Missing watcher release assets: $($missingRequiredAssets -join ', ')"
+          }
           if ($assetPaths.Count -eq 0) {
             throw "No watcher release assets were found"
           }

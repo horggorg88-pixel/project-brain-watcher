@@ -24,7 +24,7 @@ const SERVICE_LOG_TAIL_LINES = 80;
 const SERVICE_LOG_CHUNK_BYTES = 24_000;
 const SERVICE_LOG_IDENTITY_BYTES = 4096;
 
-type ServiceLogStreamId = 'out' | 'err' | 'wrapper';
+type ServiceLogStreamId = 'out' | 'err' | 'wrapper' | 'runtime_install';
 
 interface RuntimeLockFile {
   readonly owner: {
@@ -132,13 +132,16 @@ export function readServiceLogTail(profile: SavedProjectProfile): WatcherService
   const wrapperPath = `${base}.wrapper.log`;
   const outPath = `${base}.out.log`;
   const errPath = `${base}.err.log`;
+  const runtimeInstallPath = join(profile.root, '.brain', 'service', 'runtime-install.log');
   return {
     wrapperPath,
     outPath,
     errPath,
+    runtimeInstallPath,
     wrapper: readTail(wrapperPath),
     out: readTail(outPath),
     err: readTail(errPath),
+    runtimeInstall: readTail(runtimeInstallPath),
     transport: {
       version: 'watcher-log-transport/v1',
       chunkSizeBytes: SERVICE_LOG_CHUNK_BYTES,
@@ -146,6 +149,7 @@ export function readServiceLogTail(profile: SavedProjectProfile): WatcherService
         logStream('out', 'Лог работы watcher', outPath),
         logStream('err', 'Ошибки watcher', errPath),
         logStream('wrapper', 'Лог Windows-службы', wrapperPath),
+        logStream('runtime_install', 'Лог установки runtime watcher', runtimeInstallPath),
       ],
     },
   };
@@ -233,9 +237,34 @@ function parseWindowsServiceState(output: string): { readonly code: string; read
 }
 
 function readWindowsServiceConfigState(profile: SavedProjectProfile): WindowsServiceConfigState {
+  const powershellState = readWindowsServiceConfigStateViaPowerShell(profile);
+  if (powershellState) return powershellState;
   const result = spawnSync('sc.exe', ['qc', serviceName(profile.id)], { encoding: 'utf-8', windowsHide: true });
   const output = [result.stdout, result.stderr].filter(Boolean).join('\n');
   return result.status === 0 ? parseWindowsServiceConfigOutput(output) : { binaryPath: null };
+}
+
+function readWindowsServiceConfigStateViaPowerShell(profile: SavedProjectProfile): WindowsServiceConfigState | null {
+  const name = escapeWqlString(serviceName(profile.id));
+  const script = [
+    '$ErrorActionPreference = "Stop"',
+    '[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)',
+    `$service = Get-CimInstance Win32_Service -Filter "Name='${name}'" -ErrorAction SilentlyContinue`,
+    'if ($null -eq $service -or [string]::IsNullOrWhiteSpace($service.PathName)) { exit 0 }',
+    '[Console]::Out.Write($service.PathName)',
+  ].join('; ');
+  const result = spawnSync(
+    'powershell.exe',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
+    { encoding: 'utf-8', windowsHide: true },
+  );
+  if (result.status !== 0) return null;
+  const output = String(result.stdout ?? '').trim();
+  return output ? parseWindowsServiceConfigOutput(output) : { binaryPath: null };
+}
+
+function escapeWqlString(value: string): string {
+  return value.replace(/'/g, "''");
 }
 
 export function windowsServiceMetadataError(profile: SavedProjectProfile, config: WindowsServiceConfigState): string | null {
@@ -373,6 +402,7 @@ function serviceLogPath(profile: SavedProjectProfile, streamId: ServiceLogStream
   if (streamId === 'out') return `${base}.out.log`;
   if (streamId === 'err') return `${base}.err.log`;
   if (streamId === 'wrapper') return `${base}.wrapper.log`;
+  if (streamId === 'runtime_install') return join(profile.root, '.brain', 'service', 'runtime-install.log');
   return null;
 }
 
@@ -413,7 +443,7 @@ function isServiceLogCursor(value: unknown): value is ServiceLogCursor {
 }
 
 function isServiceLogStreamId(value: unknown): value is ServiceLogStreamId {
-  return value === 'out' || value === 'err' || value === 'wrapper';
+  return value === 'out' || value === 'err' || value === 'wrapper' || value === 'runtime_install';
 }
 
 function isNonNegativeSafeInteger(value: unknown): value is number {

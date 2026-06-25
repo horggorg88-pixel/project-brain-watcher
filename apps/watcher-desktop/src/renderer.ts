@@ -889,8 +889,9 @@ async function serviceAiLogsText(): Promise<string> {
   );
   const expandedLogsText = await serviceAiExpandedLogsText(currentServiceStatus);
   const rawText = [statusText, commandText, expandedLogsText].filter(Boolean).join('\n\n');
+  const redactedText = redactAiLogText(rawText);
   const safeText = tailText(
-    redactAiLogText(rawText),
+    redactedText,
     SERVICE_AI_CONTEXT_TEXT_LIMIT,
     '[TRUNCATED_BY_AI_CONTEXT_LIMIT]',
   );
@@ -920,7 +921,8 @@ async function serviceAiLogsText(): Promise<string> {
     } : null,
     log_transport: currentServiceStatus?.logs?.transport ?? null,
     rawTail: safeText,
-    redacted: safeText !== rawText,
+    redacted: redactedText !== rawText,
+    truncated: safeText !== redactedText,
   }, null, 2);
 }
 
@@ -936,15 +938,20 @@ async function serviceAiStreamText(projectId: string, stream: WatcherServiceLogS
   if (!initialCursor) return null;
   const chunks: string[] = [];
   let cursor: string | null = initialCursor;
+  let cursorError = false;
   for (let index = 0; cursor && index < SERVICE_AI_LOG_CHUNK_LIMIT; index += 1) {
     const chunk = await window.watcherDesktop.service.logChunk(projectId, cursor);
-    if (!chunk) break;
+    if (!chunk) {
+      cursorError = true;
+      break;
+    }
     chunks.push(chunk.text);
     cursor = chunk.nextCursor;
     if (chunk.complete) break;
   }
+  if (!chunks.length && cursorError) return `Лог ${stream.label} (${stream.id}):\n[LOG_CURSOR_UNAVAILABLE]`;
   if (!chunks.length) return null;
-  const suffix = cursor ? '\n[TRUNCATED_BY_AI_COPY_LIMIT]' : '';
+  const suffix = cursorError ? '\n[LOG_CURSOR_UNAVAILABLE]' : cursor ? '\n[TRUNCATED_BY_AI_COPY_LIMIT]' : '';
   const prefix = stream.tail.truncated ? '[OLDER_LOG_BYTES_TRUNCATED]\n' : '';
   return `Лог ${stream.label} (${stream.id}):\n${prefix}${chunks.join('')}${suffix}`;
 }
@@ -988,6 +995,38 @@ function classifyDesktopAiDiagnostics(text: string, status: WatcherServiceStatus
     cause: 'Node runtime has no prebuilt better-sqlite3 binary and node-gyp cannot compile it.',
     impact: 'Service exits before watcher runtime starts.',
     nextAction: 'Обнови watcher runtime или используй Node LTS / Visual Studio Build Tools C++.',
+  });
+  if (/spawnSync\s+npm\.cmd\s+EINVAL|spawn\s+npm\.cmd\s+EINVAL/i.test(text)) diagnostics.push({
+    code: 'WATCHER_NPM_SPAWN_EINVAL',
+    severity: 'error' as const,
+    message: 'npm.cmd не запустился из service runtime installer.',
+    cause: 'Windows spawn/cmd invocation failed before npm produced a useful log.',
+    impact: 'Runtime package is not installed, watcher service exits after start.',
+    nextAction: 'Обнови watcher до версии с cmd-wrapper installer и повтори «Починить службу».',
+  });
+  if (/service_runtime_missing|runtime-entry\.(?:cjs|js).+not found|Cannot find module.*runtime-entry/i.test(text)) diagnostics.push({
+    code: 'WATCHER_RUNTIME_ENTRY_MISSING',
+    severity: 'error' as const,
+    message: 'Локальный runtime-entry watcher не найден.',
+    cause: 'Service launcher points to local runtime, but runtime package was not installed or was removed.',
+    impact: 'Windows service starts PowerShell and immediately exits.',
+    nextAction: 'Нажми «Починить службу»: пульт переустановит runtime и перепишет launcher.',
+  });
+  if (/launcher_uses_npx_runner|npx(?:\.cmd)?|github:horggorg88-pixel\/project-brain-watcher#v/i.test(text)) diagnostics.push({
+    code: 'WATCHER_LEGACY_NPX_LAUNCHER',
+    severity: 'warn' as const,
+    message: 'Service launcher still uses npx/npm runner.',
+    cause: 'Old launcher path is still registered or launch-watcher.ps1 was not refreshed.',
+    impact: 'Service can fail under SYSTEM profile, wrong npm cache, or native dependency rebuild.',
+    nextAction: 'Нажми «Починить службу», чтобы launcher перешёл на локальный runtime package.',
+  });
+  if (/npm warn cleanup|EPERM:\s*operation not permitted,\s*rmdir/i.test(text)) diagnostics.push({
+    code: 'WATCHER_NPM_CACHE_CLEANUP_EPERM',
+    severity: 'warn' as const,
+    message: 'npm не смог очистить часть cache/runtime директории.',
+    cause: 'Windows locked files inside npm cache after failed install or service process.',
+    impact: 'Usually not the root cause, but can hide the real npm install failure above it.',
+    nextAction: 'Смотри runtime-install.log выше; если install повторяется, перезапусти пульт от администратора и повтори repair.',
   });
   return diagnostics;
 }
@@ -1070,6 +1109,7 @@ function serviceEvidenceRefs(status: WatcherServiceStatus | null): readonly { re
     { kind: 'log', label: 'stdout', path: logs.outPath },
     { kind: 'log', label: 'stderr', path: logs.errPath },
     { kind: 'log', label: 'wrapper', path: logs.wrapperPath },
+    { kind: 'log', label: 'runtime_install', path: logs.runtimeInstallPath },
   ];
 }
 
@@ -1108,6 +1148,7 @@ function serviceLogSummary(logs: WatcherServiceLogTail | null): string | null {
     logSummarySection('Лог работы watcher', logs.out),
     logSummarySection('Ошибки watcher', logs.err),
     logSummarySection('Лог Windows-службы', logs.wrapper),
+    logSummarySection('Лог установки runtime watcher', logs.runtimeInstall),
   ].filter((line): line is string => line !== null);
   return sections.length ? ['Последние логи:', ...sections].join('\n') : 'Последние логи: файлов логов пока нет';
 }

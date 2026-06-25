@@ -326,11 +326,23 @@ describe('watcher desktop contract', () => {
     expect(watcherBundle).toContain('project-brain-watcher-');
   });
 
+  it('requires all canonical GitHub release assets before publishing', () => {
+    const releaseWorkflow = readFileSync(join(process.cwd(), '.github', 'workflows', 'release.yml'), 'utf-8');
+
+    expect(releaseWorkflow).toContain('"project-brain-watcher-$watcherVersion.tgz"');
+    expect(releaseWorkflow).toContain('"ProjectBrainWatcher-$desktopVersion-x64.exe"');
+    expect(releaseWorkflow).toContain('"SHA256SUMS.txt"');
+    expect(releaseWorkflow).toContain('$missingRequiredAssets');
+    expect(releaseWorkflow).toContain('Missing watcher release assets');
+  });
+
   it('repairs existing service metadata before start and update flows', () => {
     const serviceRunnerSource = readFileSync(join(appRoot, 'src', 'desktop-service-runner.ts'), 'utf-8');
 
     expect(serviceRunnerSource).toContain('readServiceLauncherRepairState');
     expect(serviceRunnerSource).toContain('shouldRepairServiceLauncherBeforeAction');
+    expect(serviceRunnerSource).toContain('shouldRepairServiceImagePathBeforeAction');
+    expect(serviceRunnerSource).toContain('repairServiceImagePathIfNeeded');
     expect(serviceRunnerSource).toContain('normalizeServiceInstallResult');
     expect(serviceRunnerSource).toContain('buildServiceRefreshArgs');
     expect(serviceRunnerSource).toContain('service repair: launcher устарел');

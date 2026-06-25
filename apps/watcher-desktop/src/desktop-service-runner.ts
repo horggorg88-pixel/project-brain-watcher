@@ -26,11 +26,12 @@ import {
   normalizeServiceRefreshResult,
   readServiceLauncherRepairState,
   serviceImagePathRepairRequired,
+  shouldRepairServiceImagePathBeforeAction,
   shouldRepairServiceLauncherBeforeAction,
 } from './desktop-service-repair.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.92/project-brain-watcher-1.4.92.tgz';
+const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.93/project-brain-watcher-1.4.93.tgz';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 const WATCHER_COMMAND_TIMEOUT_MS = 60_000;
@@ -93,7 +94,18 @@ export async function runServiceAction(
   }
   const env = token ? { [profile.tokenEnv]: token } : {};
   const command = defaultNpxExecutable();
-  if (request.action === 'update') return runUpdateAction(paths, profile, token, policy);
+  const imagePathRepair = await repairServiceImagePathIfNeeded(profile, status, request.action);
+  if (imagePathRepair && imagePathRepair.exitCode !== 0) {
+    return {
+      executed: true,
+      policy,
+      status: readServiceStatus(paths, profile.id),
+      exitCode: imagePathRepair.exitCode,
+      output: imagePathRepair.output,
+      commandStatus: imagePathRepair.commandStatus,
+    };
+  }
+  if (request.action === 'update') return runUpdateAction(paths, profile, token, policy, imagePathRepair);
   const repair = await repairServiceLauncherIfNeeded(profile, status, request.action, command, env);
   if (repair && repair.exitCode !== 0) {
     return {
@@ -120,7 +132,7 @@ export async function runServiceAction(
     ? normalizeServiceInstallResult(rawResult.exitCode, rawResult.output)
     : rawResult;
   const finalStatus = await waitForServiceActionStatus(paths, request.action, profile.id);
-  const commandOutput = [repair?.output, result.output].filter(Boolean).join('\n\n');
+  const commandOutput = [imagePathRepair?.output, repair?.output, result.output].filter(Boolean).join('\n\n');
   const settlement = summarizeServiceActionSettlement(request.action, result.exitCode, commandOutput, finalStatus);
   return {
     executed: true,
@@ -130,6 +142,21 @@ export async function runServiceAction(
     output: settlement.output,
     commandStatus: rawResult.commandStatus,
   };
+}
+
+async function repairServiceImagePathIfNeeded(
+  profile: SavedProjectProfile,
+  status: WatcherServiceStatus,
+  action: WatcherServiceActionRequest['action'],
+): Promise<SpawnWatcherResult | null> {
+  if (!shouldRepairServiceImagePathBeforeAction(action, status)) return null;
+  const raw = await repairServiceImagePath(profile);
+  const normalized = normalizeServiceImagePathRepairResult(raw.exitCode, raw.output);
+  const output = [
+    'service repair: Windows SCM ImagePath указывает не на выбранный проект, переписываю metadata службы.',
+    normalized.output,
+  ].filter(Boolean).join('\n');
+  return { exitCode: normalized.exitCode, output, commandStatus: raw.commandStatus };
 }
 
 async function repairServiceLauncherIfNeeded(
@@ -338,6 +365,7 @@ async function runUpdateAction(
   profile: SavedProjectProfile,
   token: string | null,
   policy: WatcherPolicyGate,
+  preflightImagePathRepair: SpawnWatcherResult | null,
 ): Promise<WatcherServiceActionResult> {
   const versionReport = await updateVersionReport();
   const env = token ? { [profile.tokenEnv]: token } : {};
@@ -397,6 +425,8 @@ async function runUpdateAction(
     output: [
       versionReport,
       'MCP preflight: обновление не блокируется проверкой сервера. Использую локальный bearer, итоговый доступ проверится после перезапуска watcher.',
+      preflightImagePathRepair ? 'Watcher: SCM ImagePath исправлен перед обновлением.' : null,
+      preflightImagePathRepair ? compactOutput(preflightImagePathRepair.output) : null,
       'Пульт: новая версия скачана, установщик запущен.',
       compactOutput(desktop.output),
       installSummary,
