@@ -1310,10 +1310,7 @@ function codexHooksEvidence(
   }
   const action = hookRepair.repaired.length > 0 ? 'обновлён под CLAUDE_PLUGIN_ROOT' : 'проверен';
   const managed = managedHooks ? ', managed requirements готов' : '';
-  const marketplace =
-    installResult.exitCode === 0
-      ? 'Codex marketplace plugin доступен'
-      : `Codex marketplace plugin недоступен (${sanitize(installResult.output).slice(0, 160)}), использован локальный bridge`;
+  const marketplace = codexMarketplaceDetail(installResult);
   return {
     available: true,
     passed: true,
@@ -1324,6 +1321,31 @@ function codexHooksEvidence(
     command,
     exitCode: 0,
   };
+}
+
+function codexMarketplaceDetail(installResult: DesktopCodexCommandResult): string {
+  if (installResult.exitCode === 0) return 'Codex marketplace plugin доступен';
+  const reason = summarizeCodexMarketplaceFailure(installResult.output);
+  return reason
+    ? `Codex marketplace plugin недоступен, использован локальный bridge. Причина: ${reason}`
+    : 'Codex marketplace plugin недоступен, использован локальный bridge';
+}
+
+function summarizeCodexMarketplaceFailure(output: string): string | null {
+  const sanitized = sanitize(stripAnsi(output)).trim();
+  if (!sanitized) return null;
+  if (sanitized.includes('Папка не пуста')) return 'Папка не пуста (os error 145)';
+  const notFound = sanitized.match(/plugin\s+([^\s]+)\s+was not found in marketplace\s+([^\s\r\n]+)/i);
+  if (notFound) return `plugin ${notFound[1]} не найден в marketplace ${notFound[2]}`;
+  const firstLine = sanitized
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .find(line => line.length > 0 && !line.startsWith('Caused by'));
+  if (!firstLine) return null;
+  return firstLine
+    .replace(/^Error:\s*/i, '')
+    .replace(/failed to activate plugin cache entry/gi, 'кэш плагина не активирован')
+    .slice(0, 160);
 }
 
 function failedEvidence(command: string, checkedAt: string, detail: string): DesktopCodexGateRunEvidence {

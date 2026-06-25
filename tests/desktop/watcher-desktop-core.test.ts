@@ -1743,6 +1743,45 @@ describe('watcher desktop core', () => {
     expect(log).toContain('Bearer pb_[REDACTED]');
   });
 
+  it('formats pending Codex hook diagnostics as actionable waiting states', () => {
+    const status = {
+      ready: false,
+      message: 'Codex hooks установлены: открой или перезапусти Codex в проекте.',
+      checkedAt: '2026-06-25T09:16:10.102Z',
+      evidence: {
+        commandRuns: {
+          codexHooks: codexGateRun('Codex marketplace plugin недоступен, использован локальный bridge.', 'codex plugin add persistent-verifier@claude-migrated-home'),
+        },
+        verification: {
+          codexTrust: codexGateRun('Codex project trust автоматически установлен для выбранной папки.', 'read ~/.codex/config.toml projects trust'),
+          codexRuntime: codexGateRun('Codex CLI проверен.', 'codex --version'),
+          desktopBootstrap: codexGateRun('Desktop bootstrap persistent-verifier проверен.', 'verify persistent-verifier desktop bridge'),
+          managedHooks: codexGateRun('Codex managed hooks установлены.', 'write %ProgramData%/OpenAI/Codex/requirements.toml managed hooks'),
+          smoke: {
+            available: false,
+            detail: 'Project smoke gate не настроен: в выбранном проекте нет package.json test scripts.',
+            checkedAt: '2026-06-25T09:16:10.102Z',
+            staleAfterMs: 86_400_000,
+            source: 'desktop-codex-gates',
+            command: 'package.json test scripts',
+          },
+          rollback: codexGateRun('Rollback-команда доступна.', 'codex plugin remove persistent-verifier@claude-migrated-home'),
+        },
+      },
+    } satisfies DesktopCodexGateStatus;
+
+    const log = formatCodexGateDiagnostics(status, 'hyinahitest');
+
+    expect(log).toContain('Quality typecheck (typecheck): waiting');
+    expect(log).toContain('Native qualitygate.py ещё не запускал этот rail');
+    expect(log).toContain('Project smoke (smoke): not_configured');
+    expect(log).toContain('Native SessionStart (hookPersistence): waiting');
+    expect(log).toContain('Открой или перезапусти Codex в проекте');
+    expect(log).toContain('Runtime Context (runtimeContext): waiting');
+    expect(log).toContain('Отправь сообщение в Codex');
+    expect(log).not.toContain('нет evidence');
+  });
+
   it('formats support enrollment logs without leaking bearer-like values', () => {
     const status = {
       enrolled: false,

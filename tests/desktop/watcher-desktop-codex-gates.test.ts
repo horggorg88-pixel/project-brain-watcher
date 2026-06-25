@@ -323,7 +323,12 @@ describe('watcher desktop codex gates', () => {
         if ([request.command, ...request.args].join(' ') === 'codex plugin add persistent-verifier@claude-migrated-home') {
           return {
             exitCode: 1,
-            output: 'Error: plugin persistent-verifier was not found in marketplace claude-migrated-home',
+            output: [
+              'Error: failed to activate plugin cache entry: Папка не пуста. (os error 145)',
+              '',
+              'Caused by:',
+              '    0: failed to activate plugin cache entry: Папка не пуста. (os error)',
+            ].join('\n'),
           };
         }
         return { exitCode: 0, output: 'ok' };
@@ -338,6 +343,9 @@ describe('watcher desktop codex gates', () => {
       exitCode: 0,
     });
     expect(result.evidence.commandRuns.codexHooks?.detail).toContain('marketplace plugin недоступен');
+    expect(result.evidence.commandRuns.codexHooks?.detail).toContain('Папка не пуста');
+    expect(result.evidence.commandRuns.codexHooks?.detail).not.toContain('Caused by');
+    expect(result.evidence.commandRuns.codexHooks?.detail).not.toContain('failed to activate plugin cache entry');
     expect(result.evidence.verification.desktopBootstrap).toMatchObject({
       passed: true,
       command: 'verify persistent-verifier desktop bridge',

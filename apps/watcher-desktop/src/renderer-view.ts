@@ -197,10 +197,8 @@ function formatCodexEvidenceRow(row: {
   readonly label: string;
   readonly evidence: DesktopCodexGateRunEvidence | undefined;
 }): string {
-  if (!row.evidence) return `- ${row.label} (${row.id}): нет evidence`;
-  const state = row.evidence.available === false
-    ? 'unavailable'
-    : row.evidence.passed === true ? 'passed' : row.evidence.passed === false ? 'failed' : 'unknown';
+  if (!row.evidence) return formatMissingCodexEvidenceRow(row);
+  const state = codexEvidenceState(row.id, row.evidence);
   const exitCode = row.evidence.exitCode === undefined ? 'нет данных' : String(row.evidence.exitCode);
   const checkedAt = row.evidence.checkedAt ?? 'нет данных';
   return [
@@ -211,6 +209,35 @@ function formatCodexEvidenceRow(row: {
     `command=${row.evidence.command}`,
     `detail=${row.evidence.detail}`,
   ].join(' | ');
+}
+
+function formatMissingCodexEvidenceRow(row: {
+  readonly id: string;
+  readonly label: string;
+}): string {
+  const detail = missingCodexEvidenceDetail(row.id);
+  if (detail) return `- ${row.label} (${row.id}): waiting | detail=${detail}`;
+  return `- ${row.label} (${row.id}): нет evidence`;
+}
+
+function codexEvidenceState(id: string, evidence: DesktopCodexGateRunEvidence): string {
+  if (evidence.available === false) return id === 'smoke' ? 'not_configured' : 'unavailable';
+  if (evidence.passed === true) return 'passed';
+  if (evidence.passed === false) return 'failed';
+  return 'unknown';
+}
+
+function missingCodexEvidenceDetail(id: string): string | null {
+  if (['typecheck', 'lint', 'test', 'build', 'check', 'verify'].includes(id)) {
+    return 'Native qualitygate.py ещё не запускал этот rail. Открой Codex в проекте и заверши ход, чтобы Stop hook записал evidence.';
+  }
+  if (id === 'hookPersistence') {
+    return 'Открой или перезапусти Codex в проекте, чтобы native SessionStart подтвердил persistent-verifier.';
+  }
+  if (id === 'runtimeContext') {
+    return 'Отправь сообщение в Codex или запусти subagent в проекте, чтобы native hooks записали Runtime Context proof.';
+  }
+  return null;
 }
 
 function toggleClass(status: string): string {
