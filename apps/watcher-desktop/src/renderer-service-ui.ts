@@ -147,6 +147,19 @@ export function serviceActionProgressLines(
   ];
 }
 
+export function serviceActionTimeoutMs(action: WatcherServiceAction): number | null {
+  return descriptorForCommand(watcherServiceCommandId(action)).timeoutMs;
+}
+
+export function serviceActionTimeoutLog(action: WatcherServiceAction, timeoutMs = serviceActionTimeoutMs(action)): string {
+  const timeoutText = timeoutMs === null ? 'без лимита' : formatTimeout(timeoutMs);
+  return [
+    `Команда «${actionLabel(action)}» не завершилась за ${timeoutText}.`,
+    'Пульт остановил ожидание локально, чтобы интерфейс не висел на последнем шаге.',
+    `Что проверить: ${serviceActionTimeoutHint(action)}`,
+  ].join('\n');
+}
+
 const ACTION_STEP_LABELS: Record<WatcherServiceAction, ProgressStepLabels> = {
   health: {
     preflight: 'Проверяем выбранный проект, bearer и MCP-доступ',
@@ -271,6 +284,19 @@ function serviceActionFinalLog(action: WatcherServiceAction): string {
     restart: 'перезапустилась ли служба и вернулась ли она в healthy',
     check_update: 'есть ли новая версия, какая версия локально и какая доступна в GitHub release',
     update: 'что скачано, что установлено и какой статус службы после обновления',
+  };
+  return labels[action];
+}
+
+function serviceActionTimeoutHint(action: WatcherServiceAction): string {
+  const labels = {
+    health: 'MCP-доступ, состояние службы и последние логи диагностики.',
+    install: 'права Windows-службы, WinSW wrapper, launcher и runtime-install.log.',
+    start: 'Windows-службу watcher, lease, состояние сервера и последние service logs.',
+    stop: 'ответ WinSW stop и не остался ли watcher-процесс активным.',
+    restart: 'WinSW restart, launcher/XML и переход watcher обратно в healthy.',
+    check_update: 'сеть, доступ к GitHub release и повторить «Проверить обновления».',
+    update: 'скачивание release, installer/runtime package и runtime-install.log.',
   };
   return labels[action];
 }

@@ -14,6 +14,7 @@ import type {
   ProjectImportResult,
   SavedProjectProfile,
   WatcherServiceAction,
+  WatcherServiceActionRequest,
   WatcherServiceActionProgress,
   WatcherServiceActionResult,
   WatcherServiceLogStream,
@@ -40,7 +41,7 @@ import {
   setText,
   withCodexGateProgress,
 } from './renderer-view.js';
-import { actionLabel, decisionLabel, isServiceAction, serviceActionProgressLines, setServiceActionState, setServiceBusy } from './renderer-service-ui.js';
+import { actionLabel, decisionLabel, isServiceAction, serviceActionProgressLines, serviceActionTimeoutLog, serviceActionTimeoutMs, setServiceActionState, setServiceBusy } from './renderer-service-ui.js';
 import {
   resolveServiceActionConfirmation,
   setServiceConfirmationHint,
@@ -385,7 +386,7 @@ async function runServiceActionFromUi(action: WatcherServiceAction, confirmActio
   setServiceBusy(serviceButtons, true);
   const stopProgress = startServiceActionProgress(action);
   try {
-    const result = await window.watcherDesktop.service.run({ action, projectId, confirmed: true });
+    const result = await runServiceActionWithUiTimeout({ action, projectId, confirmed: true });
     writeLog(serviceActionLog(result));
     await refresh();
   } catch (error) {
@@ -395,6 +396,21 @@ async function runServiceActionFromUi(action: WatcherServiceAction, confirmActio
     setServiceBusy(serviceButtons, false);
     setServiceConfirmationHint(serviceButtons, pendingServiceAction);
   }
+}
+
+function runServiceActionWithUiTimeout(request: WatcherServiceActionRequest): Promise<WatcherServiceActionResult> {
+  const timeoutMs = serviceActionTimeoutMs(request.action);
+  const actionPromise = window.watcherDesktop.service.run(request);
+  if (timeoutMs === null) return actionPromise;
+  return new Promise<WatcherServiceActionResult>((resolve, reject) => {
+    const timeoutHandle = window.setTimeout(() => {
+      reject(new Error(serviceActionTimeoutLog(request.action, timeoutMs)));
+    }, timeoutMs);
+
+    actionPromise
+      .then(resolve, reject)
+      .finally(() => window.clearTimeout(timeoutHandle));
+  });
 }
 
 async function saveCurrentConfigPackage(): Promise<void> {

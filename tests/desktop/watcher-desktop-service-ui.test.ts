@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   resolveServiceActionConfirmation,
   serviceActionProgressLines,
+  serviceActionTimeoutLog,
+  serviceActionTimeoutMs,
   type PendingServiceActionConfirmation,
 } from '../../apps/watcher-desktop/src/renderer-service-ui.js';
 import type { WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
@@ -126,6 +128,15 @@ describe('watcher desktop service UI confirmation', () => {
     expect(lines).toContain('✓ 1/3 Сначала: Проверяем текущую версию пульта и watcher');
     expect(lines).toContain('● 2/3 Затем: Запрашиваем последний GitHub release');
     expect(lines).toContain('○ 3/3 Финал: Сравниваем версии и формируем решение об обновлении');
+  });
+
+  it('describes the local watchdog timeout for release update checks', () => {
+    const text = serviceActionTimeoutLog('check_update');
+
+    expect(serviceActionTimeoutMs('check_update')).toBe(10_000);
+    expect(text).toContain('не завершилась за 0:10');
+    expect(text).toContain('Пульт остановил ожидание локально');
+    expect(text).toContain('GitHub release');
   });
 
   it('syncs startup progress with a healthy watcher status instead of stale timer stages', () => {
