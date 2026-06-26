@@ -376,9 +376,11 @@ describe('watcher desktop service repair', () => {
     expect(text).toContain('Команда: watcher.start');
     expect(text).toContain('Таймер: 1:05');
     expect(text).toContain('Какие данные проверяем: service.status, watcher.health, watcher.logs');
-    expect(text).toContain('Маршрут команды (порядок выполнения, не список завершённых событий):');
-    expect(lines).toContain('3/5 Затем: Запускаем Windows-службу watcher');
-    expect(lines).toContain('4/5 Затем: Ждём healthy, lease и первую синхронизацию');
+    expect(text).toContain('Текущий этап: Собираем логи запуска и первопричину, если healthy не наступил');
+    expect(text).toContain('Маршрут команды (полная трасса со статусами):');
+    expect(lines).toContain('✓ 3/5 Затем: Запускаем Windows-службу watcher');
+    expect(lines).toContain('✓ 4/5 Затем: Ждём healthy, lease и первую синхронизацию');
+    expect(lines).toContain('● 5/5 Финал: Собираем логи запуска и первопричину, если healthy не наступил');
   });
 
   it('reports command timeouts with a diagnostic message instead of a silent exit code', async () => {

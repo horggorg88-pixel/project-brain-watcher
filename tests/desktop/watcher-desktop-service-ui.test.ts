@@ -98,13 +98,33 @@ describe('watcher desktop service UI confirmation', () => {
 
     expect(lines).toContain('Выполняем: Проверить обновления...');
     expect(lines).toContain('Команда: watcher.check_update · риск: низкий · timeout: 0:30');
-    expect(lines).toContain('Что происходит сейчас: команда запущена, ждём финальный результат до 0:30.');
-    expect(lines).toContain('Маршрут команды (порядок выполнения, не список завершённых событий):');
-    expect(lines).toContain('1/3 Сначала: Проверяем текущую версию пульта и watcher');
-    expect(lines).toContain('2/3 Затем: Запрашиваем последний GitHub release');
-    expect(lines).toContain('3/3 Финал: Сравниваем версии и формируем решение об обновлении');
+    expect(lines).toContain('Текущий этап: Проверяем текущую версию пульта и watcher');
+    expect(lines).toContain('Маршрут команды (полная трасса со статусами):');
+    expect(lines).toContain('● 1/3 Сначала: Проверяем текущую версию пульта и watcher');
+    expect(lines).toContain('○ 2/3 Затем: Запрашиваем последний GitHub release');
+    expect(lines).toContain('○ 3/3 Финал: Сравниваем версии и формируем решение об обновлении');
     expect(text).not.toContain('Запуск Windows-службы');
     expect(text).not.toContain('Ожидание healthy');
+  });
+
+  it('marks completed, running and waiting stages when an operation has an active route step', () => {
+    const lines = serviceActionProgressLines('update', 29_000, 2);
+
+    expect(lines).toContain('Текущий этап: Ставим локальный watcher runtime из release package');
+    expect(lines).toContain('✓ 1/5 Сначала: Проверяем текущую версию, профиль проекта и доступ к release');
+    expect(lines).toContain('✓ 2/5 Затем: Скачиваем desktop installer и проверяем checksum');
+    expect(lines).toContain('● 3/5 Затем: Ставим локальный watcher runtime из release package');
+    expect(lines).toContain('○ 4/5 Затем: Перезапускаем Windows-службу на новой версии');
+    expect(lines).toContain('○ 5/5 Финал: Собираем версии, логи установки и итоговый статус службы');
+  });
+
+  it('estimates the active route step from elapsed time when no explicit step is available', () => {
+    const lines = serviceActionProgressLines('check_update', 16_000);
+
+    expect(lines).toContain('Текущий этап: Запрашиваем последний GitHub release');
+    expect(lines).toContain('✓ 1/3 Сначала: Проверяем текущую версию пульта и watcher');
+    expect(lines).toContain('● 2/3 Затем: Запрашиваем последний GitHub release');
+    expect(lines).toContain('○ 3/3 Финал: Сравниваем версии и формируем решение об обновлении');
   });
 
   it('requires a same-action second click for every mutating service action', () => {

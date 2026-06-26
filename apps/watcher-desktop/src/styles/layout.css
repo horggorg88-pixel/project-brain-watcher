@@ -1,10 +1,13 @@
 .window-titlebar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
   height: 42px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--line);
-  background: rgba(247, 247, 244, 0.96);
+  background: var(--panel);
   -webkit-app-region: drag;
 }
 
@@ -68,6 +71,7 @@
 }
 
 .app-shell {
+  --bottom-console-space: 190px;
   min-height: calc(100vh - 42px);
   display: grid;
   grid-template-columns: 224px minmax(0, 1fr);
@@ -94,9 +98,13 @@
   grid-row: 1;
   min-width: 0;
   padding: 14px;
+  padding-bottom: var(--bottom-console-space);
 }
 
 .topbar {
+  position: sticky;
+  top: 42px;
+  z-index: 40;
   display: grid;
   grid-template-columns: minmax(260px, 1fr) repeat(3, 42px);
   align-items: end;
@@ -314,6 +322,9 @@
 }
 
 .bottom-console {
+  position: sticky;
+  bottom: 14px;
+  z-index: 35;
   grid-column: 2;
   grid-row: 2;
   min-width: 0;
