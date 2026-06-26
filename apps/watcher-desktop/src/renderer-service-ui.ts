@@ -104,14 +104,16 @@ export function serviceActionProgressLines(
   action: WatcherServiceAction,
   elapsedMs: number,
   activeStepIndex?: number,
+  status?: WatcherServiceStatus | null,
 ): readonly string[] {
   const descriptor = descriptorForCommand(watcherServiceCommandId(action));
   const route = descriptor.progressSteps.map(step => serviceActionStepLabel(action, step));
+  const settledText = serviceActionSettledText(action, status);
   const safeActiveStepIndex = clampRouteIndex(
-    activeStepIndex ?? estimatedRouteIndex(elapsedMs, descriptor.timeoutMs, route.length),
+    settledText ? route.length : activeStepIndex ?? estimatedRouteIndex(elapsedMs, descriptor.timeoutMs, route.length),
     route.length,
   );
-  const activeStep = route[safeActiveStepIndex] ?? 'ожидаем финальный результат команды';
+  const activeStep = settledText ?? route[safeActiveStepIndex] ?? 'ожидаем финальный результат команды';
   return [
     `Выполняем: ${actionLabel(action)}...`,
     `Команда: ${descriptor.id} · риск: ${riskLabel(descriptor.risk)} · timeout: ${formatTimeout(descriptor.timeoutMs)}`,
@@ -196,7 +198,21 @@ function routeStatusMarker(index: number, activeStepIndex: number): string {
 function clampRouteIndex(value: number, routeLength: number): number {
   if (routeLength <= 0) return 0;
   if (!Number.isFinite(value)) return 0;
-  return Math.min(Math.max(0, Math.trunc(value)), routeLength - 1);
+  return Math.min(Math.max(0, Math.trunc(value)), routeLength);
+}
+
+function serviceActionSettledText(action: WatcherServiceAction, status: WatcherServiceStatus | null | undefined): string | null {
+  if (!status) return null;
+  if (action === 'start' && status.running && status.health === 'healthy') {
+    return 'Watcher уже работает; визуал и логи синхронизированы';
+  }
+  if (action === 'stop' && status.installed && !status.running) {
+    return 'Watcher уже остановлен; визуал и логи синхронизированы';
+  }
+  if (action === 'install' && status.installed) {
+    return 'Служба уже установлена; визуал и логи синхронизированы';
+  }
+  return null;
 }
 
 function estimatedRouteIndex(elapsedMs: number, timeoutMs: number | null, routeLength: number): number {

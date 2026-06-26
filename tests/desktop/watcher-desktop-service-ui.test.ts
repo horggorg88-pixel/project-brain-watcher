@@ -4,6 +4,7 @@ import {
   serviceActionProgressLines,
   type PendingServiceActionConfirmation,
 } from '../../apps/watcher-desktop/src/renderer-service-ui.js';
+import type { WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
 
 describe('watcher desktop service UI confirmation', () => {
   it('prompts inline on the first mutating service action click', () => {
@@ -125,6 +126,22 @@ describe('watcher desktop service UI confirmation', () => {
     expect(lines).toContain('✓ 1/3 Сначала: Проверяем текущую версию пульта и watcher');
     expect(lines).toContain('● 2/3 Затем: Запрашиваем последний GitHub release');
     expect(lines).toContain('○ 3/3 Финал: Сравниваем версии и формируем решение об обновлении');
+  });
+
+  it('syncs startup progress with a healthy watcher status instead of stale timer stages', () => {
+    const healthyStatus = {
+      installed: true,
+      running: true,
+      health: 'healthy',
+    } as WatcherServiceStatus;
+    const lines = serviceActionProgressLines('start', 13_000, undefined, healthyStatus);
+    const text = lines.join('\n');
+
+    expect(lines).toContain('Что происходит сейчас: Watcher уже работает; визуал и логи синхронизированы.');
+    expect(lines).toContain('Текущий этап: Watcher уже работает; визуал и логи синхронизированы');
+    expect(lines).toContain('✓ 5/5 Финал: Собираем логи запуска и первопричину, если healthy не наступил');
+    expect(text).not.toContain('● 2/5 Затем: Проверяем launcher, XML и service runtime перед запуском');
+    expect(text).not.toContain('○ 5/5 Финал: Собираем логи запуска и первопричину, если healthy не наступил');
   });
 
   it('requires a same-action second click for every mutating service action', () => {

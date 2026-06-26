@@ -888,9 +888,9 @@ function writeLog(value: string): void {
 function startServiceActionProgress(action: WatcherServiceAction): () => void {
   const startedAt = Date.now();
   const renderProgress = (): void => {
-    setText(serviceOutputEl, serviceActionProgressLines(action, Date.now() - startedAt).join('\n'));
+    setText(serviceOutputEl, serviceActionProgressLines(action, Date.now() - startedAt, undefined, currentServiceStatus).join('\n'));
   };
-  writeLog(serviceActionProgressLines(action, 0).join('\n'));
+  writeLog(serviceActionProgressLines(action, 0, undefined, currentServiceStatus).join('\n'));
   const timer = window.setInterval(renderProgress, 1000);
   return () => window.clearInterval(timer);
 }
