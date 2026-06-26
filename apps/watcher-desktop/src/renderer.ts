@@ -50,6 +50,8 @@ import {
 import { serviceCommandStatusLine } from './renderer-service-command-status.js';
 import { iconSvg, isDesktopIconName } from './renderer-icons.js';
 
+const POST_SERVICE_ACTION_REFRESH_TIMEOUT_MS = 2_000;
+
 declare global {
   interface Window {
     readonly watcherDesktop: import('./contracts.js').WatcherDesktopApi;
@@ -385,14 +387,22 @@ async function runServiceActionFromUi(action: WatcherServiceAction, confirmActio
   }
   setServiceBusy(serviceButtons, true);
   const stopProgress = startServiceActionProgress(action);
+  let progressStopped = false;
+  const stopActionProgress = (): void => {
+    if (progressStopped) return;
+    progressStopped = true;
+    stopProgress();
+  };
   try {
     const result = await runServiceActionWithUiTimeout({ action, projectId, confirmed: true });
+    stopActionProgress();
     writeLog(serviceActionLog(result));
-    await refresh();
+    queuePostServiceActionRefresh(action);
   } catch (error) {
+    stopActionProgress();
     writeLog(errorMessage(error));
   } finally {
-    stopProgress();
+    stopActionProgress();
     setServiceBusy(serviceButtons, false);
     setServiceConfirmationHint(serviceButtons, pendingServiceAction);
   }
@@ -408,6 +418,26 @@ function runServiceActionWithUiTimeout(request: WatcherServiceActionRequest): Pr
     }, timeoutMs);
 
     actionPromise
+      .then(resolve, reject)
+      .finally(() => window.clearTimeout(timeoutHandle));
+  });
+}
+
+function queuePostServiceActionRefresh(action: WatcherServiceAction): void {
+  void runPostServiceActionRefresh()
+    .catch(error => {
+      console.warn(`post service action refresh failed after ${actionLabel(action)}`, error);
+    });
+}
+
+function runPostServiceActionRefresh(): Promise<void> {
+  const refreshPromise = refresh();
+  return new Promise<void>((resolve, reject) => {
+    const timeoutHandle = window.setTimeout(() => {
+      reject(new Error(`Post service action refresh exceeded ${POST_SERVICE_ACTION_REFRESH_TIMEOUT_MS}ms`));
+    }, POST_SERVICE_ACTION_REFRESH_TIMEOUT_MS);
+
+    refreshPromise
       .then(resolve, reject)
       .finally(() => window.clearTimeout(timeoutHandle));
   });
@@ -926,14 +956,17 @@ function writeLog(value: string): void {
 function startServiceActionProgress(action: WatcherServiceAction): () => void {
   const startedAt = Date.now();
   let syncInFlight = false;
+  let cancelled = false;
   const renderProgress = (): void => {
+    if (cancelled) return;
     setText(serviceOutputEl, serviceActionProgressLines(action, Date.now() - startedAt, undefined, currentServiceStatus).join('\n'));
   };
   const syncServiceContour = async (): Promise<void> => {
-    if (syncInFlight) return;
+    if (syncInFlight || cancelled) return;
     syncInFlight = true;
     try {
       const check = await safeFullCheck();
+      if (cancelled) return;
       const visibleCheck = withCodexGateProgress(check, codexGateVerificationProjectId);
       currentServiceStatus = visibleCheck.service;
       renderOverall(visibleCheck, overallStatusEl);
@@ -955,6 +988,7 @@ function startServiceActionProgress(action: WatcherServiceAction): () => void {
   }, 2500);
   void syncServiceContour().then(renderProgress);
   return () => {
+    cancelled = true;
     window.clearInterval(timer);
     window.clearInterval(syncTimer);
   };

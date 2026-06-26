@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   resolveServiceActionConfirmation,
@@ -7,6 +10,20 @@ import {
   type PendingServiceActionConfirmation,
 } from '../../apps/watcher-desktop/src/renderer-service-ui.js';
 import type { WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
+
+const testDir = dirname(fileURLToPath(import.meta.url));
+const rendererSourcePath = resolve(testDir, '../../apps/watcher-desktop/src/renderer.ts');
+
+function rendererSourceBlock(startMarker: string, endMarker: string): string {
+  const source = readFileSync(rendererSourcePath, 'utf8');
+  const startIndex = source.indexOf(startMarker);
+  const endIndex = source.indexOf(endMarker, startIndex);
+
+  expect(startIndex).toBeGreaterThanOrEqual(0);
+  expect(endIndex).toBeGreaterThan(startIndex);
+
+  return source.slice(startIndex, endIndex);
+}
 
 describe('watcher desktop service UI confirmation', () => {
   it('prompts inline on the first mutating service action click', () => {
@@ -197,5 +214,29 @@ describe('watcher desktop service UI confirmation', () => {
       expect(secondClick.confirmed).toBe(true);
       expect(secondClick.pending).toBeNull();
     }
+  });
+});
+
+describe('watcher desktop service action lifecycle', () => {
+  it('stops progress before writing the final service action log', () => {
+    const block = rendererSourceBlock(
+      'async function runServiceActionFromUi',
+      'function runServiceActionWithUiTimeout',
+    );
+
+    expect(block).toMatch(/stopActionProgress\(\);\s+writeLog\(serviceActionLog\(result\)\);\s+queuePostServiceActionRefresh\(action\);/);
+    expect(block).not.toContain('writeLog(serviceActionLog(result));\n    await refresh();');
+  });
+
+  it('cancels in-flight progress sync callbacks after the route is stopped', () => {
+    const block = rendererSourceBlock(
+      'function startServiceActionProgress',
+      'async function serviceAiLogsText',
+    );
+
+    expect(block).toContain('let cancelled = false;');
+    expect(block).toContain('if (cancelled) return;');
+    expect(block).toContain('if (syncInFlight || cancelled) return;');
+    expect(block).toContain('cancelled = true;');
   });
 });
