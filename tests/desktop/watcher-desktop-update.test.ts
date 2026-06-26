@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildReleaseVersionCheck,
+  fetchReleaseVersionCheck,
   formatReleaseVersionCheck,
   normalizeReleaseVersion,
   watcherPackageVersion,
@@ -46,5 +47,23 @@ describe('watcher desktop release update checks', () => {
     expect(watcherPackageVersion(
       'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.29/project-brain-watcher-1.4.29.tgz',
     )).toBe('1.4.29');
+  });
+
+  it('aborts a hung GitHub release lookup instead of leaving check_update pending', async () => {
+    let signalSeen = false;
+    const check = fetchReleaseVersionCheck('1.4.108', '1.4.108', async (_url, init) => {
+      if (!init?.signal) throw new Error('missing release timeout signal');
+      signalSeen = true;
+      return new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => {
+          const error = new Error('The operation was aborted.');
+          error.name = 'AbortError';
+          reject(error);
+        }, { once: true });
+      });
+    }, { timeoutMs: 25 });
+
+    await expect(check).rejects.toThrow('GitHub release timeout after 25 ms');
+    expect(signalSeen).toBe(true);
   });
 });

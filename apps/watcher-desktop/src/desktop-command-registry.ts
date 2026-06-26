@@ -109,7 +109,7 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     surface: 'electron',
     risk: 'low',
     destructive: false,
-    timeoutMs: 30_000,
+    timeoutMs: 10_000,
     requiredEvidence: ['desktop.version', 'watcher.version', 'github.release'],
     progressSteps: ['preflight', 'github_release', 'compare_versions'],
   },

@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 
 export const WATCHER_RELEASE_REPO = 'horggorg88-pixel/project-brain-watcher';
+export const DEFAULT_RELEASE_CHECK_TIMEOUT_MS = 8_000;
+export const RELEASE_CHECK_TIMEOUT_ENV = 'PROJECT_BRAIN_RELEASE_CHECK_TIMEOUT_MS';
 
 export interface ReleaseLaneVersion {
   readonly currentVersion: string;
@@ -25,6 +27,10 @@ export interface BuildReleaseVersionCheckInput {
 export interface LatestReleaseInfo {
   readonly tagName: string;
   readonly releaseUrl: string;
+}
+
+export interface ReleaseFetchOptions {
+  readonly timeoutMs?: number;
 }
 
 export type ReleaseFetch = (
@@ -59,26 +65,43 @@ export function formatReleaseVersionCheck(check: ReleaseVersionCheck): string {
   ].join('\n');
 }
 
-export async function fetchLatestReleaseInfo(fetcher: ReleaseFetch = fetch): Promise<LatestReleaseInfo> {
-  const response = await fetcher(`https://api.github.com/repos/${WATCHER_RELEASE_REPO}/releases/latest`, {
-    headers: { Accept: 'application/vnd.github+json' },
-  });
-  if (!response.ok) throw new Error(`GitHub release недоступен: HTTP ${response.status}`);
-  const payload = await response.json();
-  const tagName = field(payload, 'tag_name');
-  if (!tagName) throw new Error('GitHub release не вернул tag_name');
-  return {
-    tagName,
-    releaseUrl: field(payload, 'html_url') ?? `https://github.com/${WATCHER_RELEASE_REPO}/releases/tag/${tagName}`,
-  };
+export async function fetchLatestReleaseInfo(
+  fetcher: ReleaseFetch = fetch,
+  options: ReleaseFetchOptions = {},
+): Promise<LatestReleaseInfo> {
+  const timeoutMs = normalizeTimeoutMs(options.timeoutMs ?? releaseCheckTimeoutMs());
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetcher(`https://api.github.com/repos/${WATCHER_RELEASE_REPO}/releases/latest`, {
+      headers: { Accept: 'application/vnd.github+json' },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`GitHub release недоступен: HTTP ${response.status}`);
+    const payload = await response.json();
+    const tagName = field(payload, 'tag_name');
+    if (!tagName) throw new Error('GitHub release не вернул tag_name');
+    return {
+      tagName,
+      releaseUrl: field(payload, 'html_url') ?? `https://github.com/${WATCHER_RELEASE_REPO}/releases/tag/${tagName}`,
+    };
+  } catch (error) {
+    if (controller.signal.aborted && isAbortError(error)) {
+      throw new Error(`GitHub release timeout after ${timeoutMs} ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function fetchReleaseVersionCheck(
   currentDesktopVersion: string,
   currentWatcherVersion: string,
   fetcher: ReleaseFetch = fetch,
+  options: ReleaseFetchOptions = {},
 ): Promise<ReleaseVersionCheck> {
-  const latest = await fetchLatestReleaseInfo(fetcher);
+  const latest = await fetchLatestReleaseInfo(fetcher, options);
   return buildReleaseVersionCheck({
     currentDesktopVersion,
     currentWatcherVersion,
@@ -130,6 +153,18 @@ function compareVersions(left: string, right: string): number {
     if (leftPart > rightPart) return 1;
   }
   return 0;
+}
+
+export function releaseCheckTimeoutMs(env: Readonly<Record<string, string | undefined>> = process.env): number {
+  return normalizeTimeoutMs(Number.parseInt(env[RELEASE_CHECK_TIMEOUT_ENV] ?? '', 10));
+}
+
+function normalizeTimeoutMs(value: number): number {
+  return Number.isFinite(value) && value > 0 ? Math.trunc(value) : DEFAULT_RELEASE_CHECK_TIMEOUT_MS;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
 }
 
 function versionParts(value: string): readonly number[] {

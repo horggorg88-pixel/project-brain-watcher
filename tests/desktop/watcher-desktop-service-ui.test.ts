@@ -94,11 +94,11 @@ describe('watcher desktop service UI confirmation', () => {
   });
 
   it('renders update checks as a sequential update route, not a watcher startup checklist', () => {
-    const lines = serviceActionProgressLines('check_update', 4_000);
+    const lines = serviceActionProgressLines('check_update', 1_000);
     const text = lines.join('\n');
 
     expect(lines).toContain('Выполняем: Проверить обновления...');
-    expect(lines).toContain('Команда: watcher.check_update · риск: низкий · timeout: 0:30');
+    expect(lines).toContain('Команда: watcher.check_update · риск: низкий · timeout: 0:10');
     expect(lines).toContain('Текущий этап: Проверяем текущую версию пульта и watcher');
     expect(lines).toContain('Маршрут команды (полная трасса со статусами):');
     expect(lines).toContain('● 1/3 Сначала: Проверяем текущую версию пульта и watcher');
@@ -120,7 +120,7 @@ describe('watcher desktop service UI confirmation', () => {
   });
 
   it('estimates the active route step from elapsed time when no explicit step is available', () => {
-    const lines = serviceActionProgressLines('check_update', 16_000);
+    const lines = serviceActionProgressLines('check_update', 5_000);
 
     expect(lines).toContain('Текущий этап: Запрашиваем последний GitHub release');
     expect(lines).toContain('✓ 1/3 Сначала: Проверяем текущую версию пульта и watcher');
