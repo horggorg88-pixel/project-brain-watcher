@@ -373,6 +373,8 @@ describe('watcher desktop service repair', () => {
 
     expect(lines[0]).toBe('Выполняем: Запустить watcher...');
     expect(lines[1]).toContain('1:05');
+    expect(lines[2]).toContain('watcher.start');
+    expect(lines[3]).toContain('watcher.health');
     expect(lines).toContain('3/5 Запуск Windows-службы и локального runtime');
     expect(lines).toContain('4/5 Ожидание healthy, lease и первой синхронизации');
   });

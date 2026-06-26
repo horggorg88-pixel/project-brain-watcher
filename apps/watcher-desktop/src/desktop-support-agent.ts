@@ -1,4 +1,9 @@
 import { verifyDesktopCodexGates } from './desktop-codex-gates.js';
+import type { DesktopCommandDiagnostic, DesktopCommandProgressStep, DesktopCommandReceipt, DesktopCommandStatus } from './desktop-command-contracts.js';
+import { appendDesktopCommandReceipt } from './desktop-command-ledger.js';
+import { buildDesktopCommandReceipt } from './desktop-command-receipts.js';
+import { descriptorForCommand, supportCommandId } from './desktop-command-registry.js';
+import type { SupportAgentAction } from './contracts.js';
 import { previewDiagnostics } from './desktop-core.js';
 import { syncDesktopOnboardingProgress } from './desktop-onboarding-sync.js';
 import type { DesktopCorePaths } from './desktop-profile-store.js';
@@ -11,14 +16,7 @@ const SUPPORT_JOB_TIMEOUT_ENV = 'PROJECT_BRAIN_SUPPORT_JOB_TIMEOUT_MS';
 const DEFAULT_SUPPORT_HTTP_TIMEOUT_MS = 15_000;
 const SUPPORT_HTTP_TIMEOUT_ENV = 'PROJECT_BRAIN_SUPPORT_HTTP_TIMEOUT_MS';
 
-type SupportJobAction =
-  | 'collect_diagnostics'
-  | 'repair_watcher_service'
-  | 'restart_watcher'
-  | 'update_watcher'
-  | 'verify_codex_gates'
-  | 'refresh_mcp_config'
-  | 'mesh_status';
+type SupportJobAction = SupportAgentAction;
 
 interface SupportJob {
   readonly jobId: string;
@@ -85,6 +83,7 @@ export async function runSupportAgentOnce(
     return { enrolled: true, status: 'idle', jobId: null, message: 'Support jobs нет.' };
   }
   const projectId = projectIdFromPayload(job.payload, fallbackProjectId);
+  const jobStartedAt = new Date().toISOString();
   try {
     await postSupportProgress(credentials, job, 'claimed', 10, 'Пульт получил команду.');
     await postSupportProgress(
@@ -99,16 +98,21 @@ export async function runSupportAgentOnce(
       supportJobTimeoutMs(job.action),
       job.action,
     );
+    const receipt = supportJobReceipt(job.action, projectId, 'passed', jobStartedAt, null);
+    const receiptLedger = appendDesktopCommandReceipt(paths, receipt);
     await postSupportProgress(credentials, job, 'finalize', 95, 'Отправляем результат команды.');
     await postSupport(
       credentials.supportBaseUrl,
       `/api/support/jobs/${encodeURIComponent(job.jobId)}/complete`,
       credentials.deviceToken,
-      { status: 'succeeded', result },
+      { status: 'succeeded', result: { ...result, receipt, receiptLedger } },
     );
     return { enrolled: true, status: 'completed', jobId: job.jobId, message: `${job.action} выполнен.` };
   } catch (error) {
-    const result = { error: error instanceof Error ? error.message : 'Support job failed.' };
+    const message = error instanceof Error ? error.message : 'Support job failed.';
+    const receipt = supportJobReceipt(job.action, projectId, 'failed', jobStartedAt, supportErrorDiagnostic(message));
+    const receiptLedger = appendDesktopCommandReceipt(paths, receipt);
+    const result = { error: message, receipt, receiptLedger };
     await postSupportProgress(credentials, job, 'failed', 100, result.error);
     await postSupport(
       credentials.supportBaseUrl,
@@ -118,6 +122,65 @@ export async function runSupportAgentOnce(
     );
     return { enrolled: true, status: 'failed', jobId: job.jobId, message: result.error };
   }
+}
+
+function supportJobReceipt(
+  action: SupportJobAction,
+  projectId: string,
+  status: DesktopCommandStatus,
+  startedAt: string,
+  diagnostic: DesktopCommandDiagnostic | null,
+): DesktopCommandReceipt {
+  return buildDesktopCommandReceipt({
+    commandId: supportCommandId(action),
+    projectId,
+    status,
+    startedAt,
+    updatedAt: new Date().toISOString(),
+    ackState: 'server_pending',
+    diagnostic,
+    steps: supportReceiptSteps(action, status, diagnostic?.detail ?? 'Support job completed.'),
+  });
+}
+
+function supportErrorDiagnostic(message: string): DesktopCommandDiagnostic {
+  return {
+    code: 'SUPPORT_JOB_FAILED',
+    severity: 'error',
+    title: 'Remote support command failed',
+    detail: message,
+    nextAction: 'Открой прогресс job, receipt и результат команды в админке.',
+    evidenceRefs: ['support.job', 'support.progress'],
+  };
+}
+
+function supportReceiptSteps(
+  action: SupportJobAction,
+  status: DesktopCommandStatus,
+  message: string,
+): readonly DesktopCommandProgressStep[] {
+  const descriptor = descriptorForCommand(supportCommandId(action));
+  return descriptor.progressSteps.map((id, index) => ({
+    id,
+    label: id,
+    status: supportStepStatus(status, index),
+    detail: index === descriptor.progressSteps.length - 1 ? message : supportStepDetail(id),
+  }));
+}
+
+function supportStepStatus(status: DesktopCommandStatus, index: number): DesktopCommandProgressStep['status'] {
+  if (status === 'passed') return 'passed';
+  if (index < 2) return 'passed';
+  if (index === 2) return 'failed';
+  return 'skipped';
+}
+
+function supportStepDetail(stepId: string): string {
+  if (stepId === 'claim') return 'job получен пультом';
+  if (stepId === 'progress') return 'progress events отправлены';
+  if (stepId === 'execute') return 'команда выполнена локально';
+  if (stepId === 'complete') return 'результат отправлен на сервер';
+  return 'support step';
 }
 
 async function postSupportProgress(

@@ -1,4 +1,5 @@
 import type { WatcherPolicyDecision, WatcherServiceAction, WatcherServiceStatus } from './contracts.js';
+import { descriptorForCommand, watcherServiceCommandId } from './desktop-command-registry.js';
 
 const SERVICE_CONFIRMATION_TTL_MS = 15_000;
 type ServiceActionVariant = 'primary' | 'secondary' | 'danger';
@@ -98,6 +99,7 @@ export function actionLabel(action: WatcherServiceAction): string {
 }
 
 export function serviceActionProgressLines(action: WatcherServiceAction, elapsedMs: number): readonly string[] {
+  const descriptor = descriptorForCommand(watcherServiceCommandId(action));
   const steps = action === 'update'
     ? [
       '1/5 Проверка версии и release assets',
@@ -116,6 +118,8 @@ export function serviceActionProgressLines(action: WatcherServiceAction, elapsed
   return [
     `Выполняем: ${actionLabel(action)}...`,
     `Прогресс: ${formatElapsed(elapsedMs)} · операция ещё выполняется, финальный лог появится после завершения команды.`,
+    `Команда: ${descriptor.id} · риск: ${riskLabel(descriptor.risk)} · timeout: ${formatTimeout(descriptor.timeoutMs)}`,
+    `Evidence: ${descriptor.requiredEvidence.join(', ')}`,
     ...steps,
   ];
 }
@@ -206,4 +210,13 @@ function formatElapsed(elapsedMs: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function formatTimeout(timeoutMs: number | null): string {
+  return timeoutMs === null ? 'без лимита' : formatElapsed(timeoutMs);
+}
+
+function riskLabel(risk: 'low' | 'medium' | 'high'): string {
+  const labels = { low: 'низкий', medium: 'средний', high: 'высокий' };
+  return labels[risk];
 }

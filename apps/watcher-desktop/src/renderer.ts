@@ -1,6 +1,7 @@
 import type {
   DesktopAccessState,
   DesktopCheckAction,
+  DesktopCommandReceipt,
   DesktopCodexGateRunEvidence,
   DesktopConfigPackage,
   DesktopConfigSaveResult,
@@ -416,9 +417,8 @@ async function removeSelectedProjectFromConsole(): Promise<void> {
     return;
   }
   const profiles = await window.watcherDesktop.projects.remove(project.id, project.root);
-  const nextProject = profiles.find(profile => profile.id !== project.id) ?? profiles[0] ?? null;
   automaticSupportEnrollmentAttempts.clear();
-  await saveUiState({ ...uiState, lastProjectId: nextProject?.id ?? null, activeSection: 'start' });
+  await saveUiState({ ...uiState, lastProjectId: profiles.length ? '' : null, activeSection: 'start' });
   writeLog([
     `Проект убран из списка пульта: ${project.name}`,
     `Папка на диске не удалялась: ${project.root}`,
@@ -817,12 +817,14 @@ function renderCurrentPackage(): void {
 }
 
 function currentProjectId(): string {
-  return projectSelect?.value || uiState.lastProjectId || currentProjects[0]?.id || '';
+  if (projectSelect?.value) return projectSelect.value;
+  if (uiState.lastProjectId !== null) return uiState.lastProjectId;
+  return currentProjects[0]?.id || '';
 }
 
 function selectedProject(): SavedProjectProfile | undefined {
   const projectId = currentProjectId();
-  return currentProjects.find(project => project.id === projectId) ?? currentProjects[0];
+  return projectId ? currentProjects.find(project => project.id === projectId) : undefined;
 }
 
 function draftFromRoot(root: string): ProjectDraft {
@@ -1140,12 +1142,14 @@ function redactAiLogText(value: string): string {
 function serviceActionLog(result: WatcherServiceActionResult): string {
   const output = result.output.trim() || 'Команда завершилась без вывода';
   const commandStatus = result.commandStatus ? serviceCommandStatusLine(result.commandStatus) : null;
+  const receipt = formatCommandReceipt(result.receipt);
   const primaryCause = formatServicePrimaryCause(result.primaryCause ?? result.progress?.primaryCause ?? null);
   const progress = formatServiceProgress(result.progress);
   const lines = [
     `${decisionLabel(result.policy.decision)}: код=${result.exitCode ?? 'нет'}`,
     `Проект: ${result.status.projectId ?? currentProjectId()}`,
     `Папка: ${result.status.root ?? selectedProject()?.root ?? 'не определена'}`,
+    receipt,
     primaryCause,
     progress,
     commandStatus,
@@ -1157,6 +1161,19 @@ function serviceActionLog(result: WatcherServiceActionResult): string {
   const logs = serviceLogSummary(result.status.logs);
   if (logs) lines.push('', logs);
   return lines.join('\n');
+}
+
+function formatCommandReceipt(receipt: DesktopCommandReceipt | undefined): string | null {
+  if (!receipt) return null;
+  const diagnostic = receipt.diagnostic ? `diagnostic=${receipt.diagnostic.code}` : 'diagnostic=none';
+  const cursor = receipt.logCursor ? `logCursor=${receipt.logCursor}` : 'logCursor=none';
+  return [
+    'Квитанция команды:',
+    `id=${receipt.receiptId}`,
+    `run=${receipt.runId}`,
+    `command=${receipt.commandId}`,
+    `status=${receipt.status}; ack=${receipt.ackState}; ${diagnostic}; ${cursor}`,
+  ].join('\n');
 }
 
 function formatServicePrimaryCause(cause: WatcherServicePrimaryCause | null): string | null {

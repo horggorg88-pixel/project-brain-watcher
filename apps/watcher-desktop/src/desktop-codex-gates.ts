@@ -3,11 +3,16 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import type {
+  DesktopCommandDiagnostic,
+  DesktopCommandProgressStep,
   DesktopCodexGateEvidence,
   DesktopCodexGateRunEvidence,
   DesktopCodexGateStatus,
   SavedProjectProfile,
 } from './contracts.js';
+import { appendDesktopCommandReceipt } from './desktop-command-ledger.js';
+import { buildDesktopCommandReceipt } from './desktop-command-receipts.js';
+import { descriptorForCommand } from './desktop-command-registry.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { applyMcpConfigToProfile, type DesktopCorePaths } from './desktop-profile-store.js';
 import { resolveServiceProfile } from './desktop-service-status.js';
@@ -737,10 +742,10 @@ export function readDesktopCodexGateEvidence(
   const profile = resolveCodexProfile(paths, projectId);
   const checkedAt = new Date().toISOString();
   if (!profile) {
-    return emptyStatus(false, 'Профиль проекта для Codex gates не найден.', checkedAt);
+    return attachCodexGateReceipt(paths, projectId, emptyStatus(false, 'Профиль проекта для Codex gates не найден.', checkedAt));
   }
   const evidence = readEvidenceFiles(profile.root, profile.id);
-  return statusFromEvidence(evidence, checkedAt);
+  return attachCodexGateReceipt(paths, profile.id, statusFromEvidence(evidence, checkedAt));
 }
 
 export async function verifyDesktopCodexGates(
@@ -751,7 +756,7 @@ export async function verifyDesktopCodexGates(
   const profile = resolveCodexProfile(paths, projectId);
   const checkedAt = (options.now ?? (() => new Date()))().toISOString();
   if (!profile) {
-    return emptyStatus(false, 'Профиль проекта для Codex gates не найден.', checkedAt);
+    return attachCodexGateReceipt(paths, projectId, emptyStatus(false, 'Профиль проекта для Codex gates не найден.', checkedAt));
   }
 
   const nativeEvidence = readEvidenceFiles(profile.root, profile.id);
@@ -765,7 +770,7 @@ export async function verifyDesktopCodexGates(
       },
     };
     writeProjectEvidence(profile, evidence, checkedAt);
-    return statusFromEvidence(evidence, checkedAt);
+    return attachCodexGateReceipt(paths, profile.id, statusFromEvidence(evidence, checkedAt));
   }
 
   const runner = options.runner ?? defaultRunner;
@@ -818,7 +823,7 @@ export async function verifyDesktopCodexGates(
     },
   };
   writeProjectEvidence(profile, evidence, checkedAt);
-  return statusFromEvidence(evidence, checkedAt);
+  return attachCodexGateReceipt(paths, profile.id, statusFromEvidence(evidence, checkedAt));
 }
 
 interface PersistentVerifierHookRepair {
@@ -1836,6 +1841,99 @@ function statusFromEvidence(evidence: DesktopCodexGateEvidence, checkedAt: strin
     checkedAt,
     evidence,
   };
+}
+
+function attachCodexGateReceipt(
+  paths: DesktopCorePaths,
+  projectId: string,
+  status: DesktopCodexGateStatus,
+): DesktopCodexGateStatus {
+  const receipt = buildDesktopCommandReceipt({
+    commandId: 'codex.verify_gates',
+    projectId,
+    status: status.ready ? 'passed' : 'failed',
+    startedAt: status.checkedAt,
+    updatedAt: status.checkedAt,
+    ackState: 'local_committed',
+    diagnostic: status.ready ? null : codexGateDiagnostic(status),
+    steps: codexGateReceiptSteps(status),
+  });
+  const ledger = appendDesktopCommandReceipt(paths, receipt, status.checkedAt);
+  const ledgerMessage = ledger.saved ? null : `Receipt ledger не записан: ${ledger.error ?? 'unknown error'} (${ledger.path})`;
+  return {
+    ...status,
+    message: ledgerMessage ? `${status.message} ${ledgerMessage}` : status.message,
+    receipt,
+  };
+}
+
+function codexGateDiagnostic(status: DesktopCodexGateStatus): DesktopCommandDiagnostic {
+  return {
+    code: 'CODEX_GATES_NOT_READY',
+    severity: 'error',
+    title: 'Codex gates не готовы',
+    detail: status.message,
+    nextAction: codexGateNextAction(status.message),
+    evidenceRefs: ['codex.gates', 'quality-gate-runs.json'],
+  };
+}
+
+function codexGateReceiptSteps(status: DesktopCodexGateStatus): readonly DesktopCommandProgressStep[] {
+  const descriptor = descriptorForCommand('codex.verify_gates');
+  return descriptor.progressSteps.map(id => ({
+    id,
+    label: id,
+    status: codexGateStepStatus(id, status),
+    detail: codexGateStepDetail(id, status),
+  }));
+}
+
+function codexGateStepStatus(stepId: string, status: DesktopCodexGateStatus): DesktopCommandProgressStep['status'] {
+  const evidence = status.evidence;
+  if (stepId === 'preflight') {
+    return hasCurrentPassed(evidence.verification.codexTrust, status.checkedAt)
+      && hasCurrentPassed(evidence.verification.codexRuntime, status.checkedAt)
+      ? 'passed'
+      : 'failed';
+  }
+  if (stepId === 'hooks') {
+    return hasCurrentPassed(evidence.commandRuns.codexHooks, status.checkedAt)
+      && hasCurrentPassed(evidence.verification.rollback, status.checkedAt)
+      ? 'passed'
+      : 'failed';
+  }
+  if (stepId === 'quality_gates') {
+    const smoke = evidence.verification.smoke;
+    if (smoke?.available === false) return 'skipped';
+    return hasCurrentPassed(smoke, status.checkedAt) ? 'passed' : 'failed';
+  }
+  if (stepId === 'runtime_context') {
+    return hasCurrentPassed(evidence.verification.hookPersistence, status.checkedAt)
+      && hasCurrentPassed(evidence.verification.runtimeContext, status.checkedAt)
+      ? 'passed'
+      : 'failed';
+  }
+  return status.ready ? 'passed' : 'failed';
+}
+
+function codexGateStepDetail(stepId: string, status: DesktopCodexGateStatus): string {
+  const evidence = status.evidence;
+  if (stepId === 'preflight') return evidence.verification.codexTrust?.detail ?? evidence.verification.codexRuntime?.detail ?? status.message;
+  if (stepId === 'hooks') return evidence.commandRuns.codexHooks?.detail ?? status.message;
+  if (stepId === 'quality_gates') return evidence.verification.smoke?.detail ?? 'smoke evidence не найден';
+  if (stepId === 'runtime_context') {
+    return evidence.verification.runtimeContext?.detail
+      ?? evidence.verification.hookPersistence?.detail
+      ?? status.message;
+  }
+  return status.message;
+}
+
+function codexGateNextAction(message: string): string {
+  if (/SessionStart|перезапусти Codex/i.test(message)) return 'Открой или перезапусти Codex в выбранном проекте.';
+  if (/Runtime Context|Отправь сообщение/i.test(message)) return 'Отправь сообщение в Codex в выбранном проекте, чтобы native hook записал proof.';
+  if (/Smoke gate|smoke/i.test(message)) return 'Открой детали smoke gate и исправь падающую команду проекта.';
+  return 'Открой детали Codex gates и повтори проверку после исправления причины.';
 }
 
 function readyMessage(evidence: DesktopCodexGateEvidence, checkedAt: string): string {

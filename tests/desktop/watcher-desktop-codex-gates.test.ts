@@ -11,6 +11,7 @@ import {
   type DesktopCodexCommandRunner,
 } from '../../apps/watcher-desktop/src/desktop-codex-gates.js';
 import type { DesktopCodexGateRunEvidence } from '../../apps/watcher-desktop/src/contracts.js';
+import { readDesktopCommandReceipts } from '../../apps/watcher-desktop/src/desktop-command-ledger.js';
 import { saveProfile, type DesktopCorePaths } from '../../apps/watcher-desktop/src/desktop-core.js';
 
 const tempDirs: string[] = [];
@@ -89,6 +90,10 @@ describe('watcher desktop codex gates', () => {
     });
     expect(result.evidence.verification.hookPersistence).toBeUndefined();
     expect(result.evidence.verification.runtimeContext).toBeUndefined();
+    expect(result.receipt?.commandId).toBe('codex.verify_gates');
+    expect(result.receipt?.status).toBe('failed');
+    expect(result.receipt?.diagnostic?.code).toBe('CODEX_GATES_NOT_READY');
+    expect(readDesktopCommandReceipts(paths).some(entry => entry.receipt.commandId === 'codex.verify_gates')).toBe(true);
     const managedRequirements = readFileSync(managedRequirementsPath, 'utf-8');
     expect(managedRequirements).toContain('project-brain-managed-hooks:start');
     expect(managedRequirements).toContain('windows_managed_dir');

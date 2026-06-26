@@ -22,6 +22,8 @@ import {
   readLocalDesktopVersion,
   watcherPackageVersion,
 } from './desktop-release-update.js';
+import { appendDesktopCommandReceipt } from './desktop-command-ledger.js';
+import { attachServiceCommandReceipt } from './desktop-command-receipts.js';
 import { type DesktopServerAccessVerification, verifyProjectServerAccess } from './desktop-server-access.js';
 import {
   buildServiceImagePathRepairArgs,
@@ -35,7 +37,7 @@ import {
 } from './desktop-service-repair.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.101/project-brain-watcher-1.4.101.tgz';
+const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.102/project-brain-watcher-1.4.102.tgz';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 const WATCHER_COMMAND_TIMEOUT_MS = 60_000;
@@ -58,7 +60,8 @@ export async function runServiceAction(
   paths: DesktopCorePaths,
   request: WatcherServiceActionRequest,
 ): Promise<WatcherServiceActionResult> {
-  const finalize = (result: WatcherServiceActionResult): WatcherServiceActionResult => withServiceActionDiagnostics(request.action, result);
+  const finalize = (result: WatcherServiceActionResult): WatcherServiceActionResult =>
+    persistServiceCommandReceipt(paths, attachServiceCommandReceipt(request.action, withServiceActionDiagnostics(request.action, result)));
   const profile = applyMcpConfigToProfile(
     resolveServiceProfile(paths, request.projectId),
     discoverMcpConfig(paths),
@@ -147,6 +150,22 @@ export async function runServiceAction(
     output: settlement.output,
     commandStatus: rawResult.commandStatus,
   });
+}
+
+function persistServiceCommandReceipt(
+  paths: DesktopCorePaths,
+  result: WatcherServiceActionResult,
+): WatcherServiceActionResult {
+  if (!result.receipt) return result;
+  const ledger = appendDesktopCommandReceipt(paths, result.receipt);
+  if (ledger.saved) return result;
+  return {
+    ...result,
+    output: [
+      result.output,
+      `Receipt ledger не записан: ${ledger.error ?? 'unknown error'} (${ledger.path})`,
+    ].filter(Boolean).join('\n\n'),
+  };
 }
 
 async function repairServiceImagePathIfNeeded(

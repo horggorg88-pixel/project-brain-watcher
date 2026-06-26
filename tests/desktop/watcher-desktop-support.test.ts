@@ -72,6 +72,7 @@ describe("watcher desktop support device", () => {
   it("claims and completes diagnostics jobs with the managed device token", async () => {
     const paths = tempPaths();
     const requests: string[] = [];
+    let completeBody: Record<string, unknown> | null = null;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
@@ -103,6 +104,10 @@ describe("watcher desktop support device", () => {
           });
         }
         if (urlOf(input).endsWith("/api/support/jobs/job_test/complete")) {
+          completeBody = JSON.parse(String(init?.body ?? "{}")) as Record<
+            string,
+            unknown
+          >;
           return jsonResponse({
             ok: true,
             job: { jobId: "job_test", status: "succeeded" },
@@ -126,6 +131,15 @@ describe("watcher desktop support device", () => {
       "POST http://console.example.test/api/support/jobs/job_test/progress",
       "POST http://console.example.test/api/support/jobs/job_test/complete",
     ]);
+    const completedResult = completeBody?.result as Record<string, unknown>;
+    const receipt = completedResult.receipt as Record<string, unknown>;
+    const receiptLedger = completedResult.receiptLedger as Record<string, unknown>;
+    expect(completeBody?.status).toBe("succeeded");
+    expect(receipt.commandId).toBe("support.collect_diagnostics");
+    expect(receipt.status).toBe("passed");
+    expect(receipt.ackState).toBe("server_pending");
+    expect(receipt.receiptId).toMatch(/^dcr_[a-f0-9]{20}$/);
+    expect(receiptLedger.saved).toBe(true);
   });
 
   it("posts progress events while executing claimed support jobs", async () => {

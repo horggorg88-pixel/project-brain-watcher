@@ -1,3 +1,18 @@
+import type { DesktopCommandReceipt } from './desktop-command-contracts.js';
+export type {
+  DesktopCommandAckState,
+  DesktopCommandCategory,
+  DesktopCommandDescriptor,
+  DesktopCommandDiagnostic,
+  DesktopCommandId,
+  DesktopCommandProgressStep,
+  DesktopCommandProgressStepStatus,
+  DesktopCommandReceipt,
+  DesktopCommandRisk,
+  DesktopCommandStatus,
+  DesktopCommandSurface,
+} from './desktop-command-contracts.js';
+
 export type WatcherHealth = 'not_configured' | 'healthy' | 'degraded' | 'stopped' | 'read_only';
 export type WatcherServiceAction = 'health' | 'install' | 'start' | 'stop' | 'restart' | 'check_update' | 'update';
 export type WatcherPolicyDecision = 'allow' | 'prompt' | 'deny';
@@ -238,6 +253,7 @@ export interface WatcherServiceActionResult {
   readonly commandStatus?: WatcherCommandStatus;
   readonly primaryCause?: WatcherServicePrimaryCause | null;
   readonly progress?: WatcherServiceActionProgress;
+  readonly receipt?: DesktopCommandReceipt;
 }
 
 export type WatcherCommandStatusKind = 'completed' | 'timed_out' | 'spawn_error' | 'killed';
@@ -328,6 +344,7 @@ export interface DesktopCodexGateStatus {
   readonly message: string;
   readonly checkedAt: string;
   readonly evidence: DesktopCodexGateEvidence;
+  readonly receipt?: DesktopCommandReceipt;
 }
 
 export interface DesktopConnectionCheck {
