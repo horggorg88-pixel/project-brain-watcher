@@ -66,14 +66,30 @@ export function setServiceConfirmationHint(
   Array.from(buttons).forEach(button => {
     const action = button.dataset.serviceAction;
     if (!isServiceAction(action)) return;
-    const label = pending && pending.action === action
+    const isPendingConfirmation = pending?.action === action;
+    const label = isPendingConfirmation
       ? confirmationLabel(action)
       : actionLabel(action);
     button.innerHTML = serviceActionIcon(action);
     button.setAttribute('aria-label', label);
-    const tooltip = pending && pending.action === action
+    const tooltip = isPendingConfirmation
       ? `Подтвердить действие: ${serviceActionTooltip(action)}`
       : serviceActionTooltip(action);
+    button.toggleAttribute('data-confirmation-pending', isPendingConfirmation);
+    if (isPendingConfirmation) {
+      if (button.dataset.confirmationPreviousVariant === undefined) {
+        button.dataset.confirmationPreviousVariant = button.dataset.commandVariant ?? '';
+      }
+      button.dataset.commandVariant = 'danger';
+    } else if (button.dataset.confirmationPreviousVariant !== undefined) {
+      const previousVariant = button.dataset.confirmationPreviousVariant;
+      if (previousVariant) {
+        button.dataset.commandVariant = previousVariant;
+      } else {
+        delete button.dataset.commandVariant;
+      }
+      delete button.dataset.confirmationPreviousVariant;
+    }
     button.dataset.tooltip = tooltip;
     button.title = tooltip;
   });
@@ -278,12 +294,12 @@ function serviceActionIcon(action: WatcherServiceAction): string {
 
 function serviceActionIconName(action: WatcherServiceAction): DesktopIconName {
   const icons: Record<WatcherServiceAction, DesktopIconName> = {
-    health: 'search-check',
+    health: 'activity',
     install: 'download',
     start: 'play',
     stop: 'square',
     restart: 'refresh-cw',
-    check_update: 'search-check',
+    check_update: 'package-search',
     update: 'upload-cloud',
   };
   return icons[action];

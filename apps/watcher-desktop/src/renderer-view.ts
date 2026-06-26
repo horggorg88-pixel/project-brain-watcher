@@ -79,7 +79,7 @@ export function renderProjectSelect(
 export function renderConnectionCheck(check: DesktopConnectionCheck, element: HTMLElement | null): void {
   if (!element) return;
   element.innerHTML = check.nodes.map(node => (
-    `<article class="check-row" data-node="${escapeHtml(node.id)}">
+    `<article class="check-row" data-node="${escapeHtml(node.id)}" data-status="${escapeHtml(node.status)}">
       <span class="toggle ${toggleClass(node.status)}" aria-hidden="true"></span>
       <div><strong>${escapeHtml(node.label)}</strong><p>${escapeHtml(node.detail)}</p></div>
       ${node.actionLabel ? `<button type="button" class="ghost" data-check-action="${node.action}" title="${escapeHtml(checkActionTooltip(node.action))}" data-tooltip="${escapeHtml(checkActionTooltip(node.action))}">${escapeHtml(node.actionLabel)}</button>` : `<span class="check-ok" data-status="${escapeHtml(node.status)}">${escapeHtml(checkStatusLabel(node.status))}</span>`}

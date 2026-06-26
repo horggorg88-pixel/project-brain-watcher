@@ -20,6 +20,35 @@ button,
   transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
+@keyframes confirmPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(143, 29, 24, 0.32), inset 0 0 0 1px rgba(143, 29, 24, 0.08);
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    box-shadow: 0 0 0 7px rgba(143, 29, 24, 0), inset 0 0 0 1px rgba(143, 29, 24, 0.32);
+    transform: translateY(-1px) scale(1.04);
+  }
+}
+
+@keyframes toggleOffGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(143, 29, 24, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(143, 29, 24, 0.08);
+  }
+}
+
+@keyframes surfaceFocusSweep {
+  0% {
+    box-shadow: 0 10px 26px rgba(17, 17, 17, 0.045);
+  }
+  100% {
+    box-shadow: 0 16px 38px rgba(17, 17, 17, 0.09);
+  }
+}
+
 .window-brand strong {
   overflow: hidden;
   color: var(--ink);
@@ -397,7 +426,7 @@ h3 {
 .mode-card:hover,
 .panel:hover {
   border-color: var(--line-strong);
-  box-shadow: 0 14px 34px rgba(17, 17, 17, 0.07);
+  animation: surfaceFocusSweep 220ms ease-out both;
   transform: translateY(-1px);
 }
 
@@ -414,6 +443,7 @@ h3 {
   border: 1px solid var(--line-strong);
   background: var(--soft);
   position: relative;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
 }
 
 .toggle::after {
@@ -425,6 +455,16 @@ h3 {
   height: 12px;
   background: var(--ink);
   transition: transform 120ms ease;
+}
+
+.toggle.off {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  animation: toggleOffGlow 1.6s ease-in-out infinite;
+}
+
+.toggle.off::after {
+  background: var(--danger);
 }
 
 .toggle.on::after {
@@ -600,6 +640,26 @@ h3 {
   min-width: 42px;
   min-height: 40px;
   padding: 0;
+}
+
+.service-icon-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.service-icon-button:hover {
+  transform: translateY(-1px);
+}
+
+.service-icon-button[data-confirmation-pending="true"] {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+  animation: confirmPulse 920ms ease-in-out infinite alternate;
+}
+
+.service-icon-button[data-confirmation-pending="true"] svg {
+  stroke-width: 2.35;
 }
 
 .rail-line {

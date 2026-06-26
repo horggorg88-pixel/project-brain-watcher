@@ -15,6 +15,7 @@
   --scrollbar-track: rgba(17, 17, 17, 0.045);
   --scrollbar-thumb: rgba(17, 17, 17, 0.28);
   --scrollbar-thumb-hover: rgba(17, 17, 17, 0.46);
+  --scrollbar-thumb-active: rgba(17, 17, 17, 0.62);
   --mono: "Cascadia Mono", Consolas, monospace;
   --sans: "Segoe UI", Arial, sans-serif;
   background: var(--bg);
@@ -28,26 +29,101 @@
   scrollbar-width: thin;
 }
 
+html,
+body,
+.app-shell,
+.workspace,
+.bottom-console pre,
+.code-block,
+.custom-select-menu {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.app-shell::-webkit-scrollbar,
+.workspace::-webkit-scrollbar,
+.bottom-console pre::-webkit-scrollbar,
+.code-block::-webkit-scrollbar,
+.custom-select-menu::-webkit-scrollbar,
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
 }
 
+html::-webkit-scrollbar-button,
+body::-webkit-scrollbar-button,
+.app-shell::-webkit-scrollbar-button,
+.workspace::-webkit-scrollbar-button,
+.bottom-console pre::-webkit-scrollbar-button,
+.code-block::-webkit-scrollbar-button,
+.custom-select-menu::-webkit-scrollbar-button,
+::-webkit-scrollbar-button {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track,
+.app-shell::-webkit-scrollbar-track,
+.workspace::-webkit-scrollbar-track,
+.bottom-console pre::-webkit-scrollbar-track,
+.code-block::-webkit-scrollbar-track,
+.custom-select-menu::-webkit-scrollbar-track,
 ::-webkit-scrollbar-track {
+  border: 4px solid transparent;
+  border-radius: 999px;
   background: var(--scrollbar-track);
+  background-clip: padding-box;
 }
 
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
+.app-shell::-webkit-scrollbar-thumb,
+.workspace::-webkit-scrollbar-thumb,
+.bottom-console pre::-webkit-scrollbar-thumb,
+.code-block::-webkit-scrollbar-thumb,
+.custom-select-menu::-webkit-scrollbar-thumb,
 ::-webkit-scrollbar-thumb {
   min-height: 42px;
-  border: 2px solid var(--scrollbar-track);
+  border: 4px solid transparent;
   border-radius: 999px;
   background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 18%, transparent);
 }
 
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover,
+.app-shell::-webkit-scrollbar-thumb:hover,
+.workspace::-webkit-scrollbar-thumb:hover,
+.bottom-console pre::-webkit-scrollbar-thumb:hover,
+.code-block::-webkit-scrollbar-thumb:hover,
+.custom-select-menu::-webkit-scrollbar-thumb:hover,
 ::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover);
 }
 
+html::-webkit-scrollbar-thumb:active,
+body::-webkit-scrollbar-thumb:active,
+.app-shell::-webkit-scrollbar-thumb:active,
+.workspace::-webkit-scrollbar-thumb:active,
+.bottom-console pre::-webkit-scrollbar-thumb:active,
+.code-block::-webkit-scrollbar-thumb:active,
+.custom-select-menu::-webkit-scrollbar-thumb:active,
+::-webkit-scrollbar-thumb:active {
+  background: var(--scrollbar-thumb-active);
+}
+
+html::-webkit-scrollbar-corner,
+body::-webkit-scrollbar-corner,
+.app-shell::-webkit-scrollbar-corner,
+.workspace::-webkit-scrollbar-corner,
+.bottom-console pre::-webkit-scrollbar-corner,
+.code-block::-webkit-scrollbar-corner,
+.custom-select-menu::-webkit-scrollbar-corner,
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
@@ -174,14 +250,14 @@ pre {
 .bottom-console pre::-webkit-scrollbar,
 .code-block::-webkit-scrollbar,
 .custom-select-menu::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
+  width: 12px;
+  height: 12px;
 }
 
 .bottom-console pre::-webkit-scrollbar-thumb,
 .code-block::-webkit-scrollbar-thumb,
 .custom-select-menu::-webkit-scrollbar-thumb {
-  border-width: 2px;
+  border-width: 3px;
   background: var(--scrollbar-thumb);
 }
 
