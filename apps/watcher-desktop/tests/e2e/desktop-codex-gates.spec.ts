@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import {
   cleanupLiveDesktopFixture,
+  captureDesktopScreenshot,
   collectMainErrors,
   collectRendererErrors,
   createLiveDesktopFixture,
@@ -42,7 +43,7 @@ test('runs Codex Gates from the desktop control panel on the real project', asyn
     await expect(page.locator('[data-node="codexGates"]')).not.toContainText('Ждём project_id');
     expect(rendererErrors).toEqual([]);
     expect(mainErrors).toEqual([]);
-    await page.screenshot({ path: testInfo.outputPath('desktop-live-codex-gates.png'), fullPage: true });
+    await captureDesktopScreenshot(page, testInfo, 'desktop-live-codex-gates.png');
   } finally {
     await app.close();
     cleanupLiveDesktopFixture(fixture);

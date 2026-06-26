@@ -30,6 +30,8 @@ interface ServiceActionPresentation {
   readonly visible: boolean;
 }
 
+type ProgressStepLabels = Partial<Record<string, string>>;
+
 export function isServiceAction(value: string | undefined): value is WatcherServiceAction {
   return value === 'health' || value === 'install' || value === 'start' || value === 'stop' || value === 'restart' || value === 'check_update' || value === 'update';
 }
@@ -100,28 +102,90 @@ export function actionLabel(action: WatcherServiceAction): string {
 
 export function serviceActionProgressLines(action: WatcherServiceAction, elapsedMs: number): readonly string[] {
   const descriptor = descriptorForCommand(watcherServiceCommandId(action));
-  const steps = action === 'update'
-    ? [
-      '1/5 Проверка версии и release assets',
-      '2/5 Скачивание и запуск обновления пульта',
-      '3/5 Установка локального watcher runtime',
-      '4/5 Перезапуск Windows-службы и ожидание healthy',
-      '5/5 Сбор логов и первопричины',
-    ]
-    : [
-      '1/5 Проверка профиля, bearer и MCP-доступа',
-      '2/5 Проверка/ремонт launcher, XML и service runtime',
-      '3/5 Запуск Windows-службы и локального runtime',
-      '4/5 Ожидание healthy, lease и первой синхронизации',
-      '5/5 Сбор логов и первопричины',
-    ];
+  const route = descriptor.progressSteps.map(step => serviceActionStepLabel(action, step));
   return [
     `Выполняем: ${actionLabel(action)}...`,
-    `Прогресс: ${formatElapsed(elapsedMs)} · операция ещё выполняется, финальный лог появится после завершения команды.`,
     `Команда: ${descriptor.id} · риск: ${riskLabel(descriptor.risk)} · timeout: ${formatTimeout(descriptor.timeoutMs)}`,
-    `Evidence: ${descriptor.requiredEvidence.join(', ')}`,
-    ...steps,
+    `Что происходит сейчас: команда запущена, ждём финальный результат до ${formatTimeout(descriptor.timeoutMs)}.`,
+    `Таймер: ${formatElapsed(elapsedMs)} · если команда зависнет, пульт остановит ожидание по timeout.`,
+    `Какие данные проверяем: ${descriptor.requiredEvidence.join(', ')}`,
+    `Финальный лог покажет: ${serviceActionFinalLog(action)}.`,
+    'Маршрут команды (порядок выполнения, не список завершённых событий):',
+    ...route.map((label, index) => `${index + 1}/${route.length} ${routeStageLabel(index, route.length)}: ${label}`),
   ];
+}
+
+const ACTION_STEP_LABELS: Record<WatcherServiceAction, ProgressStepLabels> = {
+  health: {
+    preflight: 'Проверяем выбранный проект, bearer и MCP-доступ',
+    repair: 'Сверяем launcher, XML и service runtime без ремонта',
+    command: 'Запрашиваем состояние Windows-службы watcher',
+    health: 'Сравниваем service status, lease и последнюю синхронизацию',
+    diagnostics: 'Собираем последние логи и понятную причину статуса',
+  },
+  install: {
+    preflight: 'Проверяем выбранный проект, bearer и MCP-доступ',
+    repair: 'Готовим launcher, XML, WinSW wrapper и локальный service runtime',
+    command: 'Устанавливаем или обновляем Windows-службу watcher',
+    health: 'Проверяем, что служба может перейти в healthy',
+    diagnostics: 'Собираем логи установки и первопричину, если служба не стартовала',
+  },
+  start: {
+    preflight: 'Проверяем выбранный проект, bearer и MCP-доступ',
+    repair: 'Проверяем launcher, XML и service runtime перед запуском',
+    command: 'Запускаем Windows-службу watcher',
+    health: 'Ждём healthy, lease и первую синхронизацию',
+    diagnostics: 'Собираем логи запуска и первопричину, если healthy не наступил',
+  },
+  stop: {
+    preflight: 'Проверяем выбранный проект и текущий профиль службы',
+    repair: 'Сверяем service metadata перед остановкой',
+    command: 'Останавливаем Windows-службу watcher',
+    health: 'Проверяем, что служба действительно остановлена',
+    diagnostics: 'Собираем логи остановки и итоговый статус',
+  },
+  restart: {
+    preflight: 'Проверяем выбранный проект, bearer и MCP-доступ',
+    repair: 'Проверяем launcher, XML и service runtime перед перезапуском',
+    command: 'Перезапускаем Windows-службу watcher',
+    health: 'Ждём healthy, lease и первую синхронизацию после перезапуска',
+    diagnostics: 'Собираем логи перезапуска и первопричину, если healthy не наступил',
+  },
+  check_update: {
+    preflight: 'Проверяем текущую версию пульта и watcher',
+    github_release: 'Запрашиваем последний GitHub release',
+    compare_versions: 'Сравниваем версии и формируем решение об обновлении',
+  },
+  update: {
+    preflight: 'Проверяем текущую версию, профиль проекта и доступ к release',
+    download: 'Скачиваем desktop installer и проверяем checksum',
+    runtime_install: 'Ставим локальный watcher runtime из release package',
+    restart: 'Перезапускаем Windows-службу на новой версии',
+    diagnostics: 'Собираем версии, логи установки и итоговый статус службы',
+  },
+};
+
+function serviceActionStepLabel(action: WatcherServiceAction, step: string): string {
+  return ACTION_STEP_LABELS[action][step] ?? step;
+}
+
+function routeStageLabel(index: number, total: number): string {
+  if (index === 0) return 'Сначала';
+  if (index === total - 1) return 'Финал';
+  return 'Затем';
+}
+
+function serviceActionFinalLog(action: WatcherServiceAction): string {
+  const labels = {
+    health: 'доступ к MCP-серверу, состояние службы и последние логи',
+    install: 'что установлено, где лежит launcher/XML и почему служба готова или не готова',
+    start: 'запущена ли служба, получен ли lease и прошла ли первая синхронизация',
+    stop: 'остановлена ли служба и какой код вернул WinSW',
+    restart: 'перезапустилась ли служба и вернулась ли она в healthy',
+    check_update: 'есть ли новая версия, какая версия локально и какая доступна в GitHub release',
+    update: 'что скачано, что установлено и какой статус службы после обновления',
+  };
+  return labels[action];
 }
 
 function serviceActionTooltip(action: WatcherServiceAction): string {

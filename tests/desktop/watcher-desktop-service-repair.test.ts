@@ -370,13 +370,15 @@ describe('watcher desktop service repair', () => {
 
   it('formats a live progress checklist for long service actions', () => {
     const lines = serviceActionProgressLines('start', 65_000);
+    const text = lines.join('\n');
 
     expect(lines[0]).toBe('Выполняем: Запустить watcher...');
-    expect(lines[1]).toContain('1:05');
-    expect(lines[2]).toContain('watcher.start');
-    expect(lines[3]).toContain('watcher.health');
-    expect(lines).toContain('3/5 Запуск Windows-службы и локального runtime');
-    expect(lines).toContain('4/5 Ожидание healthy, lease и первой синхронизации');
+    expect(text).toContain('Команда: watcher.start');
+    expect(text).toContain('Таймер: 1:05');
+    expect(text).toContain('Какие данные проверяем: service.status, watcher.health, watcher.logs');
+    expect(text).toContain('Маршрут команды (порядок выполнения, не список завершённых событий):');
+    expect(lines).toContain('3/5 Затем: Запускаем Windows-службу watcher');
+    expect(lines).toContain('4/5 Затем: Ждём healthy, lease и первую синхронизацию');
   });
 
   it('reports command timeouts with a diagnostic message instead of a silent exit code', async () => {

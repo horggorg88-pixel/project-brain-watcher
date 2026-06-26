@@ -111,7 +111,7 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     destructive: false,
     timeoutMs: 30_000,
     requiredEvidence: ['desktop.version', 'watcher.version', 'github.release'],
-    progressSteps: ['preflight', 'command', 'diagnostics'],
+    progressSteps: ['preflight', 'github_release', 'compare_versions'],
   },
   {
     id: 'watcher.update',
@@ -122,7 +122,7 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     destructive: true,
     timeoutMs: 600_000,
     requiredEvidence: ['desktop.version', 'watcher.version', 'runtime-install.log', 'service.status'],
-    progressSteps: DEFAULT_SERVICE_STEPS,
+    progressSteps: ['preflight', 'download', 'runtime_install', 'restart', 'diagnostics'],
   },
   {
     id: 'codex.verify_gates',

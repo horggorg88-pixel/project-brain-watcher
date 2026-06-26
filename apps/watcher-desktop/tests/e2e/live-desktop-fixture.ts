@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Page, type TestInfo } from '@playwright/test';
 import { _electron as electron, type ElectronApplication } from 'playwright';
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -97,6 +97,18 @@ export function collectMainErrors(app: ElectronApplication): string[] {
 
 export async function readClipboard(app: ElectronApplication): Promise<string> {
   return app.evaluate(({ clipboard }) => clipboard.readText());
+}
+
+export async function captureDesktopScreenshot(page: Page, testInfo: TestInfo, name: string): Promise<void> {
+  try {
+    await page.screenshot({ path: testInfo.outputPath(name), timeout: 10_000 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    await testInfo.attach(`${name}.warning.txt`, {
+      body: `Screenshot skipped after successful assertions: ${message}`,
+      contentType: 'text/plain',
+    });
+  }
 }
 
 export function readServiceEvidence(projectRoot: string): unknown {

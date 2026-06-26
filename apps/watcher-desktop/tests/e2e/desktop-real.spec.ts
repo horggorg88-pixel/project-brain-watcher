@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import {
   cleanupLiveDesktopFixture,
+  captureDesktopScreenshot,
   collectMainErrors,
   collectRendererErrors,
   createLiveDesktopFixture,
@@ -54,7 +55,7 @@ test('opens the desktop control panel with the real account and real project', a
     expect(hasHorizontalOverflow).toBe(false);
     expect(rendererErrors).toEqual([]);
     expect(mainErrors).toEqual([]);
-    await page.screenshot({ path: testInfo.outputPath('desktop-live-real-project.png'), fullPage: true });
+    await captureDesktopScreenshot(page, testInfo, 'desktop-live-real-project.png');
   } finally {
     await app.close();
     cleanupLiveDesktopFixture(fixture);

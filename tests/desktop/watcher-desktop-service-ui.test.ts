@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   resolveServiceActionConfirmation,
+  serviceActionProgressLines,
   type PendingServiceActionConfirmation,
 } from '../../apps/watcher-desktop/src/renderer-service-ui.js';
 
@@ -89,6 +90,21 @@ describe('watcher desktop service UI confirmation', () => {
     expect(decision.confirmed).toBe(true);
     expect(decision.pending).toBeNull();
     expect(decision.message).toBeNull();
+  });
+
+  it('renders update checks as a sequential update route, not a watcher startup checklist', () => {
+    const lines = serviceActionProgressLines('check_update', 4_000);
+    const text = lines.join('\n');
+
+    expect(lines).toContain('Выполняем: Проверить обновления...');
+    expect(lines).toContain('Команда: watcher.check_update · риск: низкий · timeout: 0:30');
+    expect(lines).toContain('Что происходит сейчас: команда запущена, ждём финальный результат до 0:30.');
+    expect(lines).toContain('Маршрут команды (порядок выполнения, не список завершённых событий):');
+    expect(lines).toContain('1/3 Сначала: Проверяем текущую версию пульта и watcher');
+    expect(lines).toContain('2/3 Затем: Запрашиваем последний GitHub release');
+    expect(lines).toContain('3/3 Финал: Сравниваем версии и формируем решение об обновлении');
+    expect(text).not.toContain('Запуск Windows-службы');
+    expect(text).not.toContain('Ожидание healthy');
   });
 
   it('requires a same-action second click for every mutating service action', () => {

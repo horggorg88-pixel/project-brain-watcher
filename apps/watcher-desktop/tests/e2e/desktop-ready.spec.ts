@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import {
   cleanupLiveDesktopFixture,
+  captureDesktopScreenshot,
   collectMainErrors,
   collectRendererErrors,
   createLiveDesktopFixture,
@@ -46,7 +47,7 @@ test('keeps live desktop navigation and mode controls clean for the real project
     expect(hasHorizontalOverflow).toBe(false);
     expect(rendererErrors).toEqual([]);
     expect(mainErrors).toEqual([]);
-    await page.screenshot({ path: testInfo.outputPath('desktop-live-modes.png'), fullPage: true });
+    await captureDesktopScreenshot(page, testInfo, 'desktop-live-modes.png');
   } finally {
     await app.close();
     cleanupLiveDesktopFixture(fixture);
