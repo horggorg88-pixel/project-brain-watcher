@@ -12,6 +12,7 @@ import type {
   SavedProjectProfile,
   WatcherServiceStatus,
 } from './contracts.js';
+import { iconSvg } from './renderer-icons.js';
 
 export interface ShellRenderTargets {
   readonly accountEl: HTMLElement | null;
@@ -317,10 +318,10 @@ export function renderModes(modes: readonly DesktopModeSummary[], element: HTMLE
       </div>
       <div class="mode-browser-actions">
         <button type="button" class="ghost icon-button" data-mode-step="prev" aria-label="Предыдущий режим" title="Предыдущий режим" data-tooltip="Предыдущий режим">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+          ${iconSvg('chevron-left')}
         </button>
         <button type="button" class="ghost icon-button" data-mode-step="next" aria-label="Следующий режим" title="Следующий режим" data-tooltip="Следующий режим">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          ${iconSvg('chevron-right')}
         </button>
       </div>
     </div>
@@ -331,7 +332,7 @@ export function renderModes(modes: readonly DesktopModeSummary[], element: HTMLE
       </select>
       <button type="button" class="custom-select-trigger" data-custom-select-toggle data-mode-select-button aria-haspopup="listbox" aria-expanded="false" title="Открыть список режимов" data-tooltip="Открыть список режимов">
         <span data-custom-select-value>${escapeHtml(activeMode.group)} / ${escapeHtml(activeMode.title)}</span>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        ${iconSvg('chevron-down')}
       </button>
       <div class="custom-select-menu" data-custom-select-menu data-mode-select-menu role="listbox" hidden>
         ${modes.map(mode => customSelectOption({

@@ -17,9 +17,9 @@
         <span class="window-version" data-app-version>v...</span>
       </div>
       <div class="window-controls" aria-label="Управление окном">
-        <button type="button" title="Свернуть" aria-label="Свернуть" data-window-control="minimize">-</button>
-        <button type="button" title="Развернуть" aria-label="Развернуть" data-window-control="maximize">□</button>
-        <button type="button" title="Закрыть" aria-label="Закрыть" data-window-control="close">×</button>
+        <button type="button" title="Свернуть" aria-label="Свернуть" data-window-control="minimize" data-icon="minus">-</button>
+        <button type="button" title="Развернуть" aria-label="Развернуть" data-window-control="maximize" data-icon="maximize">□</button>
+        <button type="button" title="Закрыть" aria-label="Закрыть" data-window-control="close" data-icon="x">×</button>
       </div>
     </header>
 
@@ -67,10 +67,10 @@
                 <div class="custom-select-menu" data-custom-select-menu data-project-select-menu role="listbox" hidden></div>
               </div>
               <div class="project-dock-actions" aria-label="Управление проектами">
-                <button type="button" class="ghost icon-button" data-select-root aria-label="Выбрать папку" title="Выбрать папку проекта" data-tooltip="Выбрать папку проекта">
+                <button type="button" class="ghost icon-button" data-select-root data-icon="folder-open" aria-label="Выбрать папку" title="Выбрать папку проекта" data-tooltip="Выбрать папку проекта">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v2"/></svg>
                 </button>
-                <button type="button" class="ghost icon-button" data-remove-project aria-label="Убрать проект из пульта" title="Убрать проект из списка пульта" data-tooltip="Убрать выбранный проект из списка пульта. Папка на диске не удаляется.">
+                <button type="button" class="ghost icon-button" data-remove-project data-icon="trash-2" aria-label="Убрать проект из пульта" title="Убрать проект из списка пульта" data-tooltip="Убрать выбранный проект из списка пульта. Папка на диске не удаляется.">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M7 6l1 14h8l1-14"/><path d="M10 10v6"/><path d="M14 10v6"/></svg>
                 </button>
               </div>
@@ -81,10 +81,10 @@
             </div>
           </div>
           <div class="topbar-actions">
-            <button type="button" class="icon-button" data-download-config aria-label="Скачать файл настройки" title="Скачать файл настройки MCP" data-tooltip="Скачать файл настройки MCP">
+            <button type="button" class="icon-button" data-download-config data-icon="download" aria-label="Скачать файл настройки" title="Скачать файл настройки MCP" data-tooltip="Скачать файл настройки MCP">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
             </button>
-            <button type="button" class="ghost icon-button" data-toggle-theme aria-label="Переключить тему" title="Переключить тему" data-tooltip="Переключить тему">
+            <button type="button" class="ghost icon-button" data-toggle-theme data-icon="sun" aria-label="Переключить тему" title="Переключить тему" data-tooltip="Переключить тему">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M3 12h2M19 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/><circle cx="12" cy="12" r="4"/></svg>
             </button>
           </div>
@@ -96,7 +96,7 @@
               <p class="eyebrow">мастер запуска</p>
               <h2>Проверка контура</h2>
             </div>
-            <button type="button" class="icon-button" data-run-full-check aria-label="Проверить подключение" title="Проверить MCP-сервер, ключ доступа и состояние watcher" data-tooltip="Проверить MCP-сервер, ключ доступа и состояние watcher">
+            <button type="button" class="icon-button" data-run-full-check aria-label="Проверить подключение" data-icon="search-check" title="Проверить MCP-сервер, ключ доступа и состояние watcher" data-tooltip="Проверить MCP-сервер, ключ доступа и состояние watcher">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/><path d="m9 12 2 2 4-4"/></svg>
             </button>
           </div>
@@ -112,7 +112,7 @@
               <p class="eyebrow">стартовый контракт</p>
               <h2>Первый промт</h2>
             </div>
-            <button type="button" class="icon-button" data-copy-prompt aria-label="Копировать промт" title="Скопировать стартовый промт" data-tooltip="Скопировать стартовый промт">
+            <button type="button" class="icon-button" data-copy-prompt aria-label="Копировать промт" data-icon="copy" title="Скопировать стартовый промт" data-tooltip="Скопировать стартовый промт">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h10"/><path d="M8 12h10"/><path d="M8 17h6"/><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/></svg>
             </button>
           </div>
@@ -136,7 +136,7 @@
                 <button type="button" class="icon-button service-icon-button" data-service-action="stop" aria-label="Остановить watcher"></button>
                 <button type="button" class="icon-button service-icon-button" data-service-action="health" aria-label="Проверить подключение"></button>
               </div>
-              <button type="button" class="ghost icon-button" data-copy-service-logs aria-label="Копировать логи" title="Скопировать статус службы и последние логи watcher" data-tooltip="Скопировать статус службы и последние логи watcher">
+              <button type="button" class="ghost icon-button" data-copy-service-logs data-icon="copy" aria-label="Копировать логи" title="Скопировать статус службы и последние логи watcher" data-tooltip="Скопировать статус службы и последние логи watcher">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h10"/><path d="M8 12h10"/><path d="M8 17h6"/><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/></svg>
               </button>
             </div>
@@ -159,7 +159,7 @@
       <section class="bottom-console" data-bottom-console>
         <div>
           <strong>Логи</strong>
-          <button type="button" class="ghost icon-button" data-console-toggle aria-label="Скрыть логи" title="Скрыть логи" data-tooltip="Скрыть логи">
+          <button type="button" class="ghost icon-button" data-console-toggle data-icon="chevron-up" aria-label="Скрыть логи" title="Скрыть логи" data-tooltip="Скрыть логи">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
           </button>
         </div>

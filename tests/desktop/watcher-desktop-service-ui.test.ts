@@ -144,6 +144,23 @@ describe('watcher desktop service UI confirmation', () => {
     expect(text).not.toContain('○ 5/5 Финал: Собираем логи запуска и первопричину, если healthy не наступил');
   });
 
+  it('moves startup progress to the health rail when the service process is already active', () => {
+    const activeStatus = {
+      installed: true,
+      running: true,
+      health: 'degraded',
+      lastError: 'SSE reconnect waits for lease',
+    } as WatcherServiceStatus;
+    const lines = serviceActionProgressLines('start', 13_000, undefined, activeStatus);
+    const text = lines.join('\n');
+
+    expect(lines).toContain('Что происходит сейчас: Watcher уже запущен; ждём healthy, lease и первую синхронизацию.');
+    expect(lines).toContain('✓ 2/5 Затем: Проверяем launcher, XML и service runtime перед запуском');
+    expect(lines).toContain('✓ 3/5 Затем: Запускаем Windows-службу watcher');
+    expect(lines).toContain('● 4/5 Затем: Ждём healthy, lease и первую синхронизацию');
+    expect(text).not.toContain('● 2/5 Затем: Проверяем launcher, XML и service runtime перед запуском');
+  });
+
   it('requires a same-action second click for every mutating service action', () => {
     const actions = ['install', 'start', 'stop', 'restart', 'update'] as const;
 

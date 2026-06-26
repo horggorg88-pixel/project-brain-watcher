@@ -12,6 +12,9 @@
   --dropdown-panel: #fff;
   --inverse: #111;
   --inverse-ink: #fff;
+  --scrollbar-track: rgba(17, 17, 17, 0.045);
+  --scrollbar-thumb: rgba(17, 17, 17, 0.28);
+  --scrollbar-thumb-hover: rgba(17, 17, 17, 0.46);
   --mono: "Cascadia Mono", Consolas, monospace;
   --sans: "Segoe UI", Arial, sans-serif;
   background: var(--bg);
@@ -19,7 +22,35 @@
   font-family: var(--sans);
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  min-height: 42px;
+  border: 2px solid var(--scrollbar-track);
+  border-radius: 999px;
+  background: var(--scrollbar-thumb);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
 
 body {
   min-height: 100vh;
@@ -69,7 +100,8 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
   padding: 0;
 }
 
-.icon-button svg {
+.icon-button svg,
+button svg[data-icon-name] {
   width: 18px;
   height: 18px;
   fill: none;
@@ -137,6 +169,20 @@ pre {
   font-family: var(--mono);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.bottom-console pre::-webkit-scrollbar,
+.code-block::-webkit-scrollbar,
+.custom-select-menu::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+.bottom-console pre::-webkit-scrollbar-thumb,
+.code-block::-webkit-scrollbar-thumb,
+.custom-select-menu::-webkit-scrollbar-thumb {
+  border-width: 2px;
+  background: var(--scrollbar-thumb);
 }
 
 [hidden] { display: none !important; }

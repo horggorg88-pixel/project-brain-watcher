@@ -10,6 +10,9 @@ body[data-theme="dark"] {
   --dropdown-panel: #1b1b19;
   --inverse: #f4f4f0;
   --inverse-ink: #111;
+  --scrollbar-track: #1b1b19;
+  --scrollbar-thumb: #565650;
+  --scrollbar-thumb-hover: #707067;
   background: var(--bg);
   background-size: auto;
 }

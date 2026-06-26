@@ -47,6 +47,7 @@ import {
   type PendingServiceActionConfirmation,
 } from './renderer-service-ui.js';
 import { serviceCommandStatusLine } from './renderer-service-command-status.js';
+import { iconSvg, isDesktopIconName } from './renderer-icons.js';
 
 declare global {
   interface Window {
@@ -131,6 +132,7 @@ const SERVICE_AI_COMMAND_TEXT_LIMIT = 24_000;
 const SERVICE_AI_CONTEXT_TEXT_LIMIT = 120_000;
 const supportEnrollmentRetryMs = 2 * 60 * 1000;
 
+hydrateStaticIcons();
 void renderAppVersion();
 void refresh();
 window.setInterval(() => {
@@ -757,6 +759,13 @@ function setIconButton(button: HTMLButtonElement | null, icon: string, label: st
   button.dataset.tooltip = label;
 }
 
+function hydrateStaticIcons(): void {
+  document.querySelectorAll<HTMLElement>('[data-icon]').forEach(element => {
+    if (!isDesktopIconName(element.dataset.icon)) return;
+    element.innerHTML = iconSvg(element.dataset.icon);
+  });
+}
+
 function showTooltipFromTarget(target: EventTarget | null): void {
   if (!floatingTooltipEl || !(target instanceof Element)) return;
   const anchor = target.closest<HTMLElement>('[data-tooltip]');
@@ -800,19 +809,19 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function sunIcon(): string {
-  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M3 12h2M19 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/><circle cx="12" cy="12" r="4"/></svg>';
+  return iconSvg('sun');
 }
 
 function moonIcon(): string {
-  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+  return iconSvg('moon');
 }
 
 function chevronUpIcon(): string {
-  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>';
+  return iconSvg('chevron-up');
 }
 
 function chevronDownIcon(): string {
-  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+  return iconSvg('chevron-down');
 }
 
 async function openServiceLogs(): Promise<void> {
@@ -900,12 +909,39 @@ function writeLog(value: string): void {
 
 function startServiceActionProgress(action: WatcherServiceAction): () => void {
   const startedAt = Date.now();
+  let syncInFlight = false;
   const renderProgress = (): void => {
     setText(serviceOutputEl, serviceActionProgressLines(action, Date.now() - startedAt, undefined, currentServiceStatus).join('\n'));
   };
+  const syncServiceContour = async (): Promise<void> => {
+    if (syncInFlight) return;
+    syncInFlight = true;
+    try {
+      const check = await safeFullCheck();
+      const visibleCheck = withCodexGateProgress(check, codexGateVerificationProjectId);
+      currentServiceStatus = visibleCheck.service;
+      renderOverall(visibleCheck, overallStatusEl);
+      renderConnectionCause(visibleCheck, connectionCauseEl);
+      renderConnectionCheck(visibleCheck, checklistEl);
+      renderService(visibleCheck.service, serviceStatusEl, serviceSummaryEl);
+      setServiceActionState(serviceButtons, visibleCheck.service);
+      setServiceConfirmationHint(serviceButtons, pendingServiceAction);
+    } catch (error) {
+      console.warn('service progress sync failed', error);
+    } finally {
+      syncInFlight = false;
+    }
+  };
   writeLog(serviceActionProgressLines(action, 0, undefined, currentServiceStatus).join('\n'));
   const timer = window.setInterval(renderProgress, 1000);
-  return () => window.clearInterval(timer);
+  const syncTimer = window.setInterval(() => {
+    void syncServiceContour().then(renderProgress);
+  }, 2500);
+  void syncServiceContour().then(renderProgress);
+  return () => {
+    window.clearInterval(timer);
+    window.clearInterval(syncTimer);
+  };
 }
 
 async function serviceAiLogsText(): Promise<string> {

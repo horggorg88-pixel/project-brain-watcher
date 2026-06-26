@@ -381,10 +381,20 @@ describe('watcher desktop contract', () => {
     const html = readFileSync(join(appRoot, 'src', 'index.html'), 'utf-8');
     const rendererSource = readFileSync(join(appRoot, 'src', 'renderer.ts'), 'utf-8');
     const serviceUiSource = readFileSync(join(appRoot, 'src', 'renderer-service-ui.ts'), 'utf-8');
+    const iconSource = readFileSync(join(appRoot, 'src', 'renderer-icons.ts'), 'utf-8');
     const layoutCss = readFileSync(join(appRoot, 'src', 'styles', 'layout.css'), 'utf-8');
     const componentsCss = readFileSync(join(appRoot, 'src', 'styles', 'components.css'), 'utf-8');
+    const baseCss = readFileSync(join(appRoot, 'src', 'styles', 'base.css'), 'utf-8');
     const watcherSectionHtml = html.match(/<section class="content-section" data-section="watcher"[\s\S]*?<\/section>/)?.[0] ?? '';
 
+    expect(iconSource).toContain('export type DesktopIconName');
+    expect(iconSource).toContain('export function iconSvg');
+    expect(iconSource).toContain('export function isDesktopIconName');
+    expect(html).toContain('data-icon="folder-open"');
+    expect(html).toContain('data-icon="copy"');
+    expect(rendererSource).toContain('hydrateStaticIcons');
+    expect(rendererSource).toContain('iconSvg');
+    expect(serviceUiSource).toContain('iconSvg(serviceActionIconName(action))');
     expect(html).toContain('data-copy-service-logs');
     expect(html).toContain('data-console-toggle');
     expect(html).toContain('class="ghost icon-button" data-copy-service-logs');
@@ -437,6 +447,12 @@ describe('watcher desktop contract', () => {
     expect(layoutCss).toContain('.service-summary-badge');
     expect(layoutCss).toContain('grid-template-columns: minmax(150px, 0.7fr) minmax(0, 1.8fr);');
     expect(layoutCss).toContain('.service-status-output');
+    expect(baseCss).toContain('--scrollbar-track');
+    expect(baseCss).toContain('scrollbar-width: thin;');
+    expect(baseCss).toContain('::-webkit-scrollbar-thumb');
+    expect(baseCss).toContain('.bottom-console pre::-webkit-scrollbar-thumb');
+    expect(baseCss).toContain('.code-block::-webkit-scrollbar-thumb');
+    expect(baseCss).toContain('.custom-select-menu::-webkit-scrollbar-thumb');
     expect(componentsCss).toContain('cursor: default;');
     expect(componentsCss).toContain('pointer-events: none;');
     expect(componentsCss).toContain('border-left: 3px solid var(--line-strong);');

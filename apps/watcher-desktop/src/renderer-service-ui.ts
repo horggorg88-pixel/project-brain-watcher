@@ -1,5 +1,6 @@
 import type { WatcherPolicyDecision, WatcherServiceAction, WatcherServiceStatus } from './contracts.js';
 import { descriptorForCommand, watcherServiceCommandId } from './desktop-command-registry.js';
+import { iconSvg, type DesktopIconName } from './renderer-icons.js';
 
 const SERVICE_CONFIRMATION_TTL_MS = 15_000;
 type ServiceActionVariant = 'primary' | 'secondary' | 'danger';
@@ -109,11 +110,12 @@ export function serviceActionProgressLines(
   const descriptor = descriptorForCommand(watcherServiceCommandId(action));
   const route = descriptor.progressSteps.map(step => serviceActionStepLabel(action, step));
   const settledText = serviceActionSettledText(action, status);
+  const statusStep = serviceActionStatusStep(action, status, route.length);
   const safeActiveStepIndex = clampRouteIndex(
-    settledText ? route.length : activeStepIndex ?? estimatedRouteIndex(elapsedMs, descriptor.timeoutMs, route.length),
+    settledText ? route.length : statusStep?.index ?? activeStepIndex ?? estimatedRouteIndex(elapsedMs, descriptor.timeoutMs, route.length),
     route.length,
   );
-  const activeStep = settledText ?? route[safeActiveStepIndex] ?? 'ожидаем финальный результат команды';
+  const activeStep = settledText ?? statusStep?.text ?? route[safeActiveStepIndex] ?? 'ожидаем финальный результат команды';
   return [
     `Выполняем: ${actionLabel(action)}...`,
     `Команда: ${descriptor.id} · риск: ${riskLabel(descriptor.risk)} · timeout: ${formatTimeout(descriptor.timeoutMs)}`,
@@ -215,6 +217,29 @@ function serviceActionSettledText(action: WatcherServiceAction, status: WatcherS
   return null;
 }
 
+function serviceActionStatusStep(
+  action: WatcherServiceAction,
+  status: WatcherServiceStatus | null | undefined,
+  routeLength: number,
+): { readonly index: number; readonly text: string } | null {
+  if (!status || routeLength < 4) return null;
+  if ((action === 'start' || action === 'restart') && status.running) {
+    return {
+      index: 3,
+      text: action === 'restart'
+        ? 'Watcher уже перезапущен; ждём healthy, lease и первую синхронизацию'
+        : 'Watcher уже запущен; ждём healthy, lease и первую синхронизацию',
+    };
+  }
+  if (action === 'stop' && status.running) {
+    return { index: 2, text: 'Команда остановки отправлена; ждём остановку Windows-службы' };
+  }
+  if (action === 'install' && status.installed && !status.running) {
+    return { index: 3, text: 'Служба установлена; проверяем готовность watcher к healthy' };
+  }
+  return null;
+}
+
 function estimatedRouteIndex(elapsedMs: number, timeoutMs: number | null, routeLength: number): number {
   if (routeLength <= 1 || timeoutMs === null || timeoutMs <= 0 || elapsedMs <= 0) return 0;
   const ratio = Math.min(0.98, elapsedMs / timeoutMs);
@@ -248,14 +273,18 @@ function serviceActionTooltip(action: WatcherServiceAction): string {
 }
 
 function serviceActionIcon(action: WatcherServiceAction): string {
-  const icons = {
-    health: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/><path d="m9 12 2 2 4-4"/></svg>',
-    install: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>',
-    start: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7Z"/></svg>',
-    stop: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h12v12H6Z"/></svg>',
-    restart: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>',
-    check_update: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/><path d="M11 8v6"/><path d="M8 11h6"/></svg>',
-    update: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 16v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3"/><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/></svg>',
+  return iconSvg(serviceActionIconName(action));
+}
+
+function serviceActionIconName(action: WatcherServiceAction): DesktopIconName {
+  const icons: Record<WatcherServiceAction, DesktopIconName> = {
+    health: 'search-check',
+    install: 'download',
+    start: 'play',
+    stop: 'square',
+    restart: 'refresh-cw',
+    check_update: 'search-check',
+    update: 'upload-cloud',
   };
   return icons[action];
 }
