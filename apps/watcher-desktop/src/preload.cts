@@ -23,6 +23,9 @@ import type {
 } from './contracts.js';
 
 const api: WatcherDesktopApi = {
+  app: {
+    getVersion: () => ipcRenderer.invoke('app:get-version') as Promise<string>,
+  },
   access: {
     status: () => ipcRenderer.invoke('access:status') as Promise<DesktopAccessState>,
     login: (request: AccessLoginRequest) => (

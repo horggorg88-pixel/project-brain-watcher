@@ -10,10 +10,11 @@
     <header class="window-titlebar" data-window-titlebar>
       <div class="window-brand">
         <span class="window-logo" aria-hidden="true">M</span>
-        <div>
+        <div class="window-brand-copy">
           <strong>MCP-пульт</strong>
           <span>Project Brain Watcher</span>
         </div>
+        <span class="window-version" data-app-version>v...</span>
       </div>
       <div class="window-controls" aria-label="Управление окном">
         <button type="button" title="Свернуть" aria-label="Свернуть" data-window-control="minimize">-</button>
@@ -54,25 +55,32 @@
 
       <section class="workspace">
         <header class="topbar">
-          <div class="project-picker">
-            <div class="custom-select-field project-select-field" data-project-picker data-custom-select>
-              <span class="field-caption">Проект</span>
-              <select class="native-select-fallback" data-project-select tabindex="-1" aria-hidden="true"></select>
-              <button type="button" class="custom-select-trigger" data-custom-select-toggle data-project-select-button aria-haspopup="listbox" aria-expanded="false" title="Открыть список проектов" data-tooltip="Открыть список проектов">
-                <span data-custom-select-value>Проект не выбран</span>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-              </button>
-              <div class="custom-select-menu" data-custom-select-menu data-project-select-menu role="listbox" hidden></div>
+          <div class="project-dock">
+            <div class="project-picker">
+              <div class="custom-select-field project-select-field" data-project-picker data-custom-select>
+                <span class="field-caption">Проект</span>
+                <select class="native-select-fallback" data-project-select tabindex="-1" aria-hidden="true"></select>
+                <button type="button" class="custom-select-trigger" data-custom-select-toggle data-project-select-button aria-haspopup="listbox" aria-expanded="false" title="Открыть список проектов" data-tooltip="Открыть список проектов">
+                  <span data-custom-select-value>Проект не выбран</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div class="custom-select-menu" data-custom-select-menu data-project-select-menu role="listbox" hidden></div>
+              </div>
+              <div class="project-dock-actions" aria-label="Управление проектами">
+                <button type="button" class="ghost icon-button" data-select-root aria-label="Выбрать папку" title="Выбрать папку проекта" data-tooltip="Выбрать папку проекта">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+                <button type="button" class="ghost icon-button" data-remove-project aria-label="Убрать проект из пульта" title="Убрать проект из списка пульта" data-tooltip="Убрать выбранный проект из списка пульта. Папка на диске не удаляется.">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M7 6l1 14h8l1-14"/><path d="M10 10v6"/><path d="M14 10v6"/></svg>
+                </button>
+              </div>
             </div>
-            <button type="button" class="ghost icon-button" data-select-root aria-label="Выбрать папку" title="Выбрать папку проекта" data-tooltip="Выбрать папку проекта">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v2"/></svg>
-            </button>
-            <button type="button" class="ghost icon-button" data-remove-project aria-label="Убрать проект из пульта" title="Убрать проект из списка пульта" data-tooltip="Убрать выбранный проект из списка пульта. Папка на диске не удаляется.">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M7 6l1 14h8l1-14"/><path d="M10 10v6"/><path d="M14 10v6"/></svg>
-            </button>
+            <div class="project-status-strip">
+              <span class="overall-badge" data-overall-status>Проверяем...</span>
+              <span class="version-chip" data-app-version>v...</span>
+            </div>
           </div>
           <div class="topbar-actions">
-            <span class="overall-badge" data-overall-status>Проверяем...</span>
             <button type="button" class="icon-button" data-download-config aria-label="Скачать файл настройки" title="Скачать файл настройки MCP" data-tooltip="Скачать файл настройки MCP">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
             </button>
@@ -82,8 +90,8 @@
           </div>
         </header>
 
-        <section class="content-section" data-section="start">
-          <div class="section-head">
+        <section class="content-section launch-master" data-section="start">
+          <div class="section-head launch-head">
             <div>
               <p class="eyebrow">мастер запуска</p>
               <h2>Проверка контура</h2>
@@ -92,8 +100,10 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/><path d="m9 12 2 2 4-4"/></svg>
             </button>
           </div>
-          <div class="connection-cause" data-connection-cause>Проверяем причину...</div>
-          <div class="checklist" data-checklist></div>
+          <div class="launch-master-grid">
+            <div class="connection-cause launch-cause" data-connection-cause>Проверяем причину...</div>
+            <div class="checklist launch-route" data-checklist></div>
+          </div>
         </section>
 
         <section class="content-section" data-section="prompt" hidden>
@@ -134,7 +144,7 @@
           <pre class="code-block service-status-output" data-service-status>Проверяем службу...</pre>
         </section>
 
-        <section class="content-section" data-section="modes" hidden>
+        <section class="content-section mode-surface" data-section="modes" hidden>
           <div class="section-head">
             <div>
               <p class="eyebrow">режимы MCP</p>

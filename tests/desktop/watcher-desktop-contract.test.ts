@@ -47,6 +47,7 @@ describe('watcher desktop contract', () => {
     const rendererViewSource = readFileSync(join(appRoot, 'src', 'renderer-view.ts'), 'utf-8');
 
     expect(preloadSource).toContain("contextBridge.exposeInMainWorld('watcherDesktop'");
+    expect(preloadSource).toContain("ipcRenderer.invoke('app:get-version'");
     expect(preloadSource).toContain("ipcRenderer.invoke('access:login'");
     expect(preloadSource).toContain("ipcRenderer.invoke('access:logout'");
     expect(preloadSource).toContain("ipcRenderer.invoke('projects:select-root'");
@@ -61,11 +62,16 @@ describe('watcher desktop contract', () => {
     expect(preloadSource).not.toContain('ipcRenderer.on');
     expect(preloadSource).not.toContain('send: ipcRenderer.send');
     expect(mainSource).toContain("ipcMain.handle('access:logout'");
+    expect(mainSource).toContain("ipcMain.handle('app:get-version'");
+    expect(mainSource).toContain('resolveDesktopAppVersion()');
+    expect(mainSource).toContain("join(process.cwd(), 'package.json')");
     expect(mainSource).toContain("ipcMain.handle('window:minimize'");
     expect(mainSource).toContain("ipcMain.handle('window:toggle-maximize'");
     expect(mainSource).toContain("ipcMain.handle('window:close'");
     expect(mainSource).toContain("ipcMain.handle('service:log-chunk'");
     expect(contractsSource).not.toContain('readonly serverVerified?: boolean');
+    expect(contractsSource).toContain('readonly app:');
+    expect(contractsSource).toContain('getVersion(): Promise<string>');
     expect(contractsSource).toContain('logout(): Promise<DesktopAccessState>');
     expect(contractsSource).toContain('windowControls');
     expect(contractsSource).toContain('readonly group: string');
@@ -93,6 +99,7 @@ describe('watcher desktop contract', () => {
     expect(rendererSource).toContain("case 'download_config'");
     expect(rendererSource).toContain("case 'import_config'");
     expect(rendererSource).toContain('watcherDesktop.access.logout');
+    expect(rendererSource).toContain('watcherDesktop.app.getVersion');
     expect(rendererSource).not.toContain('window.confirm');
     expect(rendererViewSource).toContain('data-access-logout');
     expect(rendererViewSource).toContain('mode-group');
@@ -124,6 +131,8 @@ describe('watcher desktop contract', () => {
 
     expect(html).toContain('data-auth-form');
     expect(html).toContain('data-window-titlebar');
+    expect(html).toContain('data-app-version');
+    expect(html).toContain('class="window-version" data-app-version');
     expect(html).toContain('data-window-control="minimize"');
     expect(html).toContain('data-window-control="maximize"');
     expect(html).toContain('data-window-control="close"');
@@ -143,6 +152,9 @@ describe('watcher desktop contract', () => {
     expect(html).toContain('class="ghost icon-button" data-toggle-theme');
     expect(html).toContain('class="ghost icon-button" data-console-toggle');
     expect(html).toContain('data-project-picker data-custom-select');
+    expect(html).toContain('class="project-dock"');
+    expect(html).toContain('class="launch-master-grid"');
+    expect(html).toContain('class="content-section mode-surface"');
     expect(html).toContain('data-floating-tooltip');
     expect(html).toContain('data-project-select-button');
     expect(html).toContain('data-project-select-menu role="listbox"');
@@ -197,16 +209,21 @@ describe('watcher desktop contract', () => {
     expect(layoutCss).toContain('.project-picker > .icon-button');
     expect(layoutCss).toContain('.project-select-field');
     expect(layoutCss).not.toContain('.project-picker label::after');
-    expect(layoutCss).toContain('grid-template-columns: minmax(260px, 1fr) repeat(3, 42px);');
+    expect(layoutCss).toContain('.project-dock');
+    expect(layoutCss).toContain('grid-template-columns: minmax(320px, 1fr) auto;');
+    expect(layoutCss).toContain('.project-dock-actions');
+    expect(layoutCss).toContain('.launch-master-grid');
+    expect(layoutCss).toContain('.mode-surface');
     expect(layoutCss).toContain('.topbar-actions > [data-download-config]');
     expect(layoutCss).toContain('.topbar-actions > [data-toggle-theme]');
     expect(layoutCss).toContain('margin-bottom: 0;');
     expect(layoutCss).toContain('.topbar-actions > button');
     expect(layoutCss).toContain('.topbar-actions .overall-badge');
     expect(layoutCss).toContain('.window-titlebar');
+    expect(layoutCss).toContain('backdrop-filter: blur(18px);');
     expect(layoutCss).toContain('-webkit-app-region: drag;');
     expect(layoutCss).toContain('-webkit-app-region: no-drag;');
-    expect(layoutCss).toContain('align-items: end;');
+    expect(layoutCss).toContain('animation: gasDrift');
     expect(componentsCss).toContain('.custom-select-trigger');
     expect(componentsCss).toContain('.custom-select-menu');
     expect(componentsCss).toContain('.custom-select-option[data-selected="true"]');
@@ -215,8 +232,10 @@ describe('watcher desktop contract', () => {
     expect(componentsCss).toContain('.floating-tooltip[data-visible="true"]');
     expect(componentsCss).toContain('width: 100%;');
     expect(componentsCss).toContain('.window-logo');
+    expect(componentsCss).toContain('.window-version');
+    expect(componentsCss).toContain('.version-chip');
     expect(componentsCss).toContain('.command-list button');
-    expect(componentsCss).toContain('min-width: 180px;');
+    expect(componentsCss).toContain('min-width: 0;');
     expect(componentsCss).toContain('.command-list button[hidden]');
     expect(componentsCss).toContain('display: inline-flex;');
     expect(componentsCss).toContain('flex-wrap: nowrap;');

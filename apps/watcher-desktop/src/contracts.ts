@@ -405,6 +405,9 @@ export interface DesktopModeSummary {
 }
 
 export interface WatcherDesktopApi {
+  readonly app: {
+    getVersion(): Promise<string>;
+  };
   readonly access: {
     status(): Promise<DesktopAccessState>;
     login(request: AccessLoginRequest): Promise<DesktopAccessState>;

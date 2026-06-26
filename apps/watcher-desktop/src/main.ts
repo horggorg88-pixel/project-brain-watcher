@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Tray, Menu, ipcMain, dialog, clipboard } from 'electron';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type {
   AccessLoginRequest,
   DesktopConfigSaveResult,
@@ -143,6 +144,7 @@ function showMainWindow(): void {
 }
 
 function registerIpcHandlers(): void {
+  ipcMain.handle('app:get-version', () => resolveDesktopAppVersion());
   ipcMain.handle('access:status', () => readAccessState(corePaths()));
   ipcMain.handle('access:login', (_event, request: AccessLoginRequest) => loginAccess(corePaths(), request));
   ipcMain.handle('access:logout', () => logoutAccess(corePaths()));
@@ -233,6 +235,33 @@ function registerIpcHandlers(): void {
   ipcMain.handle('window:close', event => {
     BrowserWindow.fromWebContents(event.sender)?.hide();
   });
+}
+
+function resolveDesktopAppVersion(): string {
+  const packagePaths = [
+    join(app.getAppPath(), 'package.json'),
+    join(process.cwd(), 'package.json'),
+  ];
+  for (const packagePath of packagePaths) {
+    if (!existsSync(packagePath)) continue;
+    try {
+      const parsed = JSON.parse(readFileSync(packagePath, 'utf-8')) as unknown;
+      if (isPackageVersion(parsed)) return parsed.version;
+    } catch (error) {
+      console.warn(`Desktop version package read failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  return app.getVersion();
+}
+
+function isPackageVersion(value: unknown): value is { readonly version: string } {
+  return (
+    typeof value === 'object'
+    && value !== null
+    && 'version' in value
+    && typeof value.version === 'string'
+    && value.version.length > 0
+  );
 }
 
 function corePaths(): DesktopCorePaths {

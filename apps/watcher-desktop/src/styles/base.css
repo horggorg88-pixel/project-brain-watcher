@@ -30,6 +30,7 @@ body {
     linear-gradient(180deg, rgba(17, 17, 17, 0.035) 1px, transparent 1px),
     var(--bg);
   background-size: 36px 36px;
+  overflow-x: hidden;
 }
 
 body,

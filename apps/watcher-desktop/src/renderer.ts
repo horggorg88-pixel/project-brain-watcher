@@ -109,6 +109,7 @@ const promptEl = document.querySelector<HTMLElement>('[data-start-prompt]');
 const modesEl = document.querySelector<HTMLElement>('[data-modes]');
 const windowTitlebarEl = document.querySelector<HTMLElement>('[data-window-titlebar]');
 const floatingTooltipEl = document.querySelector<HTMLElement>('[data-floating-tooltip]');
+const appVersionEls = document.querySelectorAll<HTMLElement>('[data-app-version]');
 
 let accessState: DesktopAccessState | null = null;
 let uiState: DesktopUiState = defaultUiState();
@@ -130,6 +131,7 @@ const SERVICE_AI_COMMAND_TEXT_LIMIT = 24_000;
 const SERVICE_AI_CONTEXT_TEXT_LIMIT = 120_000;
 const supportEnrollmentRetryMs = 2 * 60 * 1000;
 
+void renderAppVersion();
 void refresh();
 window.setInterval(() => {
   if (accessState?.signedIn) void refresh();
@@ -483,6 +485,17 @@ async function refreshInternal(): Promise<void> {
   renderCurrentPackage();
   renderModes(currentModes, modesEl, activeModeId);
   scheduleAutomaticCodexGateVerification(check);
+}
+
+async function renderAppVersion(): Promise<void> {
+  try {
+    const version = await window.watcherDesktop.app.getVersion();
+    appVersionEls.forEach(element => setText(element, `v${version}`));
+  } catch (error) {
+    const message = errorMessage(error);
+    appVersionEls.forEach(element => setText(element, 'v?.?.?'));
+    writeLog(`Версия пульта недоступна: ${message}`);
+  }
 }
 
 function scheduleAutomaticCodexGateVerification(check: DesktopConnectionCheck): void {
