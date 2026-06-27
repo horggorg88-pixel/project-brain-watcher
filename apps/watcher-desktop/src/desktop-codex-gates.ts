@@ -1834,7 +1834,8 @@ function writeProjectEvidence(
 function statusFromEvidence(evidence: DesktopCodexGateEvidence, checkedAt: string): DesktopCodexGateStatus {
   const ready = hasBaseVerification(evidence, checkedAt)
     && hasCurrentPassed(evidence.verification.hookPersistence, checkedAt)
-    && hasCurrentPassed(evidence.verification.runtimeContext, checkedAt);
+    && hasCurrentPassed(evidence.verification.runtimeContext, checkedAt)
+    && !blockingQualityRailFailure(evidence, checkedAt);
   return {
     ready,
     message: ready ? readyMessage(evidence, checkedAt) : blockerMessage(evidence, checkedAt),
@@ -1903,9 +1904,12 @@ function codexGateStepStatus(stepId: string, status: DesktopCodexGateStatus): De
       : 'failed';
   }
   if (stepId === 'quality_gates') {
+    if (blockingQualityRailFailure(evidence, status.checkedAt)) return 'failed';
     const smoke = evidence.verification.smoke;
     if (smoke?.available === false) return 'skipped';
-    return hasCurrentPassed(smoke, status.checkedAt) ? 'passed' : 'failed';
+    if (smoke) return hasCurrentPassed(smoke, status.checkedAt) ? 'passed' : 'failed';
+    if (currentPassedQualityRail(evidence, status.checkedAt)) return 'passed';
+    return 'skipped';
   }
   if (stepId === 'runtime_context') {
     return hasCurrentPassed(evidence.verification.hookPersistence, status.checkedAt)
@@ -1920,7 +1924,13 @@ function codexGateStepDetail(stepId: string, status: DesktopCodexGateStatus): st
   const evidence = status.evidence;
   if (stepId === 'preflight') return evidence.verification.codexTrust?.detail ?? evidence.verification.codexRuntime?.detail ?? status.message;
   if (stepId === 'hooks') return evidence.commandRuns.codexHooks?.detail ?? status.message;
-  if (stepId === 'quality_gates') return evidence.verification.smoke?.detail ?? 'smoke evidence не найден';
+  if (stepId === 'quality_gates') {
+    return blockingQualityRailFailure(evidence, status.checkedAt)?.detail
+      ?? evidence.verification.smoke?.detail
+      ?? currentPassedQualityRail(evidence, status.checkedAt)?.detail
+      ?? unavailableQualityRail(evidence)?.detail
+      ?? 'Evidence внутренних quality rails ещё не найдено.';
+  }
   if (stepId === 'runtime_context') {
     return evidence.verification.runtimeContext?.detail
       ?? evidence.verification.hookPersistence?.detail
@@ -1957,6 +1967,8 @@ function blockerMessage(evidence: DesktopCodexGateEvidence, checkedAt: string): 
   if (!hasCurrentPassed(evidence.verification.codexRuntime, checkedAt)) return 'Codex CLI ещё не проверен.';
   if (!hasCurrentPassed(evidence.commandRuns.codexHooks, checkedAt)) return 'Persistent-verifier plugin ещё не установлен или не прошёл проверку.';
   if (!hasCurrentPassed(evidence.verification.rollback, checkedAt)) return 'Rollback-команда Codex gates не подтверждена.';
+  const qualityRailFailure = blockingQualityRailFailure(evidence, checkedAt);
+  if (qualityRailFailure) return qualityRailFailure.detail;
   if (evidence.verification.hookPersistence?.available === true && evidence.verification.hookPersistence.passed === false) {
     return evidence.verification.hookPersistence.detail;
   }
@@ -1987,6 +1999,30 @@ function hasBaseVerification(evidence: DesktopCodexGateEvidence, checkedAt: stri
     && hasCurrentPassed(evidence.verification.codexRuntime, checkedAt)
     && hasCurrentPassed(evidence.commandRuns.codexHooks, checkedAt)
     && hasCurrentPassed(evidence.verification.rollback, checkedAt);
+}
+
+function blockingQualityRailFailure(
+  evidence: DesktopCodexGateEvidence,
+  checkedAt: string,
+): DesktopCodexGateRunEvidence | undefined {
+  return QUALITY_GATE_RAILS
+    .map(rail => evidence.commandRuns[rail])
+    .find(run => run?.available === true && run.passed === false && !isStale(run, checkedAt));
+}
+
+function currentPassedQualityRail(
+  evidence: DesktopCodexGateEvidence,
+  checkedAt: string,
+): DesktopCodexGateRunEvidence | undefined {
+  return QUALITY_GATE_RAILS
+    .map(rail => evidence.commandRuns[rail])
+    .find(run => hasCurrentPassed(run, checkedAt));
+}
+
+function unavailableQualityRail(evidence: DesktopCodexGateEvidence): DesktopCodexGateRunEvidence | undefined {
+  return QUALITY_GATE_RAILS
+    .map(rail => evidence.commandRuns[rail])
+    .find(run => run?.available === false);
 }
 
 function hasCurrentPassed(

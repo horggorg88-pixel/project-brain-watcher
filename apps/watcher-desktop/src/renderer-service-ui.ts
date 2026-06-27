@@ -163,36 +163,35 @@ export function serviceActionTimeoutLog(action: WatcherServiceAction, timeoutMs 
 const ACTION_STEP_LABELS: Record<WatcherServiceAction, ProgressStepLabels> = {
   health: {
     preflight: 'Проверяем выбранный проект, bearer и MCP-доступ',
-    repair: 'Сверяем launcher, XML и service runtime без ремонта',
-    command: 'Запрашиваем состояние Windows-службы watcher',
-    health: 'Сравниваем service status, lease и последнюю синхронизацию',
+    service_status: 'Запрашиваем состояние Windows-службы watcher',
+    logs: 'Читаем последние watcher/service логи',
     diagnostics: 'Собираем последние логи и понятную причину статуса',
   },
   install: {
     preflight: 'Проверяем выбранный проект, bearer и MCP-доступ',
-    repair: 'Готовим launcher, XML, WinSW wrapper и локальный service runtime',
-    command: 'Устанавливаем или обновляем Windows-службу watcher',
+    runtime_download: 'Скачиваем локальный watcher runtime из release package',
+    runtime_install: 'Ставим локальный watcher runtime в .brain/service',
+    service_install: 'Устанавливаем или обновляем Windows-службу watcher',
+    launcher_verify: 'Проверяем launcher, XML и WinSW wrapper',
+    service_start: 'Запускаем Windows-службу watcher после установки',
     health: 'Проверяем, что служба может перейти в healthy',
-    diagnostics: 'Собираем логи установки и первопричину, если служба не стартовала',
   },
   start: {
     preflight: 'Проверяем выбранный проект, bearer и MCP-доступ',
-    repair: 'Проверяем launcher, XML и service runtime перед запуском',
-    command: 'Запускаем Windows-службу watcher',
+    service_start: 'Запускаем Windows-службу watcher',
     health: 'Ждём healthy, lease и первую синхронизацию',
     diagnostics: 'Собираем логи запуска и первопричину, если healthy не наступил',
   },
   stop: {
     preflight: 'Проверяем выбранный проект и текущий профиль службы',
-    repair: 'Сверяем service metadata перед остановкой',
-    command: 'Останавливаем Windows-службу watcher',
-    health: 'Проверяем, что служба действительно остановлена',
+    service_stop: 'Останавливаем Windows-службу watcher',
+    status_verify: 'Проверяем, что служба действительно остановлена',
     diagnostics: 'Собираем логи остановки и итоговый статус',
   },
   restart: {
     preflight: 'Проверяем выбранный проект, bearer и MCP-доступ',
-    repair: 'Проверяем launcher, XML и service runtime перед перезапуском',
-    command: 'Перезапускаем Windows-службу watcher',
+    service_stop: 'Останавливаем текущий процесс Windows-службы watcher',
+    service_start: 'Запускаем Windows-службу watcher заново',
     health: 'Ждём healthy, lease и первую синхронизацию после перезапуска',
     diagnostics: 'Собираем логи перезапуска и первопричину, если healthy не наступил',
   },
@@ -204,9 +203,11 @@ const ACTION_STEP_LABELS: Record<WatcherServiceAction, ProgressStepLabels> = {
   update: {
     preflight: 'Проверяем текущую версию, профиль проекта и доступ к release',
     download: 'Скачиваем desktop installer и проверяем checksum',
+    verify: 'Проверяем подпись, размер и целостность скачанного release',
+    install: 'Запускаем установку desktop update',
     runtime_install: 'Ставим локальный watcher runtime из release package',
     restart: 'Перезапускаем Windows-службу на новой версии',
-    diagnostics: 'Собираем версии, логи установки и итоговый статус службы',
+    health: 'Сверяем версии, healthy и итоговый статус службы',
   },
 };
 
@@ -254,7 +255,7 @@ function serviceActionStatusStep(
   if (!status || routeLength < 4) return null;
   if ((action === 'start' || action === 'restart') && status.running) {
     return {
-      index: 3,
+      index: action === 'restart' ? 3 : 2,
       text: action === 'restart'
         ? 'Watcher уже перезапущен; ждём healthy, lease и первую синхронизацию'
         : 'Watcher уже запущен; ждём healthy, lease и первую синхронизацию',
@@ -264,7 +265,7 @@ function serviceActionStatusStep(
     return { index: 2, text: 'Команда остановки отправлена; ждём остановку Windows-службы' };
   }
   if (action === 'install' && status.installed && !status.running) {
-    return { index: 3, text: 'Служба установлена; проверяем готовность watcher к healthy' };
+    return { index: 5, text: 'Служба установлена; проверяем готовность watcher к healthy' };
   }
   return null;
 }

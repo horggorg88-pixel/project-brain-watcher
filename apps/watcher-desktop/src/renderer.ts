@@ -431,14 +431,55 @@ function runServiceActionWithUiTimeout(request: WatcherServiceActionRequest): Pr
   const actionPromise = window.watcherDesktop.service.run(request);
   if (timeoutMs === null) return actionPromise;
   return new Promise<WatcherServiceActionResult>((resolve, reject) => {
+    let timedOut = false;
     const timeoutHandle = window.setTimeout(() => {
-      reject(new Error(serviceActionTimeoutLog(request.action, timeoutMs)));
+      timedOut = true;
+      reject(new Error(serviceActionTimeoutWithLateCompletionLog(request.action, timeoutMs)));
+      queuePostServiceActionRefresh(request.action);
     }, timeoutMs);
 
     actionPromise
-      .then(resolve, reject)
+      .then(result => {
+        if (timedOut) {
+          writeLog(lateServiceActionCompletionLog(request.action, result));
+          queuePostServiceActionRefresh(request.action);
+          return;
+        }
+        resolve(result);
+      }, error => {
+        if (timedOut) {
+          writeLog(lateServiceActionFailureLog(request.action, error));
+          queuePostServiceActionRefresh(request.action);
+          return;
+        }
+        reject(error);
+      })
       .finally(() => window.clearTimeout(timeoutHandle));
   });
+}
+
+function serviceActionTimeoutWithLateCompletionLog(action: WatcherServiceAction, timeoutMs: number): string {
+  return [
+    serviceActionTimeoutLog(action, timeoutMs),
+    'Пульт не отменил команду в службе.',
+    'Если команда завершится позже, пульт покажет финальную квитанцию и обновит статус.',
+  ].join('\n');
+}
+
+function lateServiceActionCompletionLog(action: WatcherServiceAction, result: WatcherServiceActionResult): string {
+  return [
+    `Позднее завершение после UI timeout: ${actionLabel(action)}`,
+    'Финальная квитанция команды получена после локального ожидания.',
+    serviceActionLog(result),
+  ].join('\n');
+}
+
+function lateServiceActionFailureLog(action: WatcherServiceAction, error: Error | string | number | boolean | null | undefined): string {
+  return [
+    `Поздняя ошибка после UI timeout: ${actionLabel(action)}`,
+    'Финальный ответ команды пришёл после локального ожидания.',
+    errorMessage(error),
+  ].join('\n');
 }
 
 function queuePostServiceActionRefresh(action: WatcherServiceAction): void {

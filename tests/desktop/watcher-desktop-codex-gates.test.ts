@@ -945,6 +945,76 @@ describe('watcher desktop codex gates', () => {
       command: 'codex plugin add persistent-verifier@claude-migrated-home',
     });
   });
+
+  it('blocks ready and marks quality_gates failed when an available internal quality rail failed', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    const checkedAt = new Date().toISOString();
+    mkdirSync(join(root, '.codex'), { recursive: true });
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    writeFileSync(join(root, '.codex', 'quality-gate-runs.json'), JSON.stringify({
+      schemaVersion: 1,
+      projectId: 'demo-project',
+      commandRuns: {
+        codexHooks: passedRun('Codex persistent-verifier plugin установлен.', 'desktop-codex-gates', 'codex plugin add persistent-verifier@claude-migrated-home', checkedAt),
+        typecheck: failedRun('Typecheck failed from native qualitygate hook.', 'quality-gate-runner', 'npm run typecheck', checkedAt),
+      },
+      verification: readyVerification(checkedAt),
+    }), 'utf-8');
+
+    const result = readDesktopCodexGateEvidence(paths, 'demo-project');
+    const qualityStep = result.receipt?.steps.find(step => step.id === 'quality_gates');
+
+    expect(result.ready).toBe(false);
+    expect(result.message).toBe('Typecheck failed from native qualitygate hook.');
+    expect(result.receipt?.status).toBe('failed');
+    expect(qualityStep).toMatchObject({
+      id: 'quality_gates',
+      status: 'failed',
+    });
+    expect(qualityStep?.detail).toBe('Typecheck failed from native qualitygate hook.');
+  });
+
+  it('does not block ready when an internal quality rail is unavailable without run evidence', () => {
+    const paths = tempPaths();
+    const root = join(paths.homePath, 'demo-project');
+    const checkedAt = new Date().toISOString();
+    mkdirSync(join(root, '.codex'), { recursive: true });
+    saveProfile(paths, {
+      id: 'demo-project',
+      name: 'Demo Project',
+      root,
+      indexId: 'idx-demo-project',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    });
+    writeFileSync(join(root, '.codex', 'quality-gate-runs.json'), JSON.stringify({
+      schemaVersion: 1,
+      projectId: 'demo-project',
+      commandRuns: {
+        codexHooks: passedRun('Codex persistent-verifier plugin установлен.', 'desktop-codex-gates', 'codex plugin add persistent-verifier@claude-migrated-home', checkedAt),
+        typecheck: unavailableRun('Typecheck script is unavailable.', 'quality-gate-runner', 'npm run typecheck', checkedAt),
+      },
+      verification: readyVerification(checkedAt),
+    }), 'utf-8');
+
+    const result = readDesktopCodexGateEvidence(paths, 'demo-project');
+    const qualityStep = result.receipt?.steps.find(step => step.id === 'quality_gates');
+
+    expect(result.ready).toBe(true);
+    expect(result.receipt?.status).toBe('passed');
+    expect(qualityStep).toMatchObject({
+      id: 'quality_gates',
+      status: 'skipped',
+    });
+  });
 });
 
 function tempPaths(): DesktopCorePaths {
@@ -980,6 +1050,56 @@ function passedRun(
     source,
     command,
     exitCode: 0,
+  };
+}
+
+function failedRun(
+  detail: string,
+  source: string,
+  command: string,
+  checkedAt = '2026-06-15T10:00:00.000Z',
+): DesktopCodexGateRunEvidence {
+  return {
+    available: true,
+    passed: false,
+    detail,
+    checkedAt,
+    staleAfterMs: 600000,
+    source,
+    command,
+    exitCode: 1,
+  };
+}
+
+function unavailableRun(
+  detail: string,
+  source: string,
+  command: string,
+  checkedAt = '2026-06-15T10:00:00.000Z',
+): DesktopCodexGateRunEvidence {
+  return {
+    available: false,
+    detail,
+    checkedAt,
+    staleAfterMs: 600000,
+    source,
+    command,
+  };
+}
+
+function readyVerification(checkedAt: string): {
+  readonly codexTrust: DesktopCodexGateRunEvidence;
+  readonly codexRuntime: DesktopCodexGateRunEvidence;
+  readonly hookPersistence: DesktopCodexGateRunEvidence;
+  readonly runtimeContext: DesktopCodexGateRunEvidence;
+  readonly rollback: DesktopCodexGateRunEvidence;
+} {
+  return {
+    codexTrust: passedRun('Codex project trust подтверждён.', 'desktop-codex-gates', 'read ~/.codex/config.toml projects trust', checkedAt),
+    codexRuntime: passedRun('Codex CLI проверен.', 'desktop-codex-gates', 'codex --version', checkedAt),
+    hookPersistence: passedRun('Codex SessionStart hook loaded persistent-verifier.', 'persistent-verifier', 'codex features list', checkedAt),
+    runtimeContext: passedRun('Codex Runtime Context proof recorded by native UserPromptSubmit hook.', 'project-brain-runtime-context', 'project-brain runtime context proof', checkedAt),
+    rollback: passedRun('Rollback-команда доступна.', 'desktop-codex-gates', 'codex plugin remove persistent-verifier@claude-migrated-home', checkedAt),
   };
 }
 

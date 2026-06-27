@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -37,6 +37,34 @@ describe('watcher desktop command ledger', () => {
     appendDesktopCommandReceipt(paths, { ...receiptFixture(), receiptId: 'dcr_new' }, '2026-06-26T10:01:00.000Z');
 
     expect(readDesktopCommandReceipts(paths, 1).map(entry => entry.receipt.receiptId)).toEqual(['dcr_new']);
+  });
+
+  it('skips malformed lines and partial receipt entries', () => {
+    const paths = tempPaths();
+    mkdirSync(paths.userDataPath, { recursive: true });
+    const validReceipt = { ...receiptFixture(), receiptId: 'dcr_valid' };
+    const partialReceipt = {
+      version: 'desktop-command-receipt/v1',
+      receiptId: 'dcr_partial',
+      commandId: 'watcher.start',
+      status: 'passed',
+    };
+
+    writeFileSync(
+      desktopCommandLedgerPath(paths),
+      [
+        '{not json',
+        JSON.stringify({ recordedAt: '2026-06-26T10:01:00.000Z', receipt: partialReceipt }),
+        JSON.stringify({ recordedAt: '2026-06-26T10:02:00.000Z', receipt: validReceipt }),
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const entries = readDesktopCommandReceipts(paths);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].recordedAt).toBe('2026-06-26T10:02:00.000Z');
+    expect(entries[0].receipt.receiptId).toBe('dcr_valid');
   });
 });
 

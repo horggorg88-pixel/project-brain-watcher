@@ -130,12 +130,14 @@ describe('watcher desktop service UI confirmation', () => {
   it('marks completed, running and waiting stages when an operation has an active route step', () => {
     const lines = serviceActionProgressLines('update', 29_000, 2);
 
-    expect(lines).toContain('Текущий этап: Ставим локальный watcher runtime из release package');
-    expect(lines).toContain('✓ 1/5 Сначала: Проверяем текущую версию, профиль проекта и доступ к release');
-    expect(lines).toContain('✓ 2/5 Затем: Скачиваем desktop installer и проверяем checksum');
-    expect(lines).toContain('● 3/5 Затем: Ставим локальный watcher runtime из release package');
-    expect(lines).toContain('○ 4/5 Затем: Перезапускаем Windows-службу на новой версии');
-    expect(lines).toContain('○ 5/5 Финал: Собираем версии, логи установки и итоговый статус службы');
+    expect(lines).toContain('Текущий этап: Проверяем подпись, размер и целостность скачанного release');
+    expect(lines).toContain('✓ 1/7 Сначала: Проверяем текущую версию, профиль проекта и доступ к release');
+    expect(lines).toContain('✓ 2/7 Затем: Скачиваем desktop installer и проверяем checksum');
+    expect(lines).toContain('● 3/7 Затем: Проверяем подпись, размер и целостность скачанного release');
+    expect(lines).toContain('○ 4/7 Затем: Запускаем установку desktop update');
+    expect(lines).toContain('○ 5/7 Затем: Ставим локальный watcher runtime из release package');
+    expect(lines).toContain('○ 6/7 Затем: Перезапускаем Windows-службу на новой версии');
+    expect(lines).toContain('○ 7/7 Финал: Сверяем версии, healthy и итоговый статус службы');
   });
 
   it('estimates the active route step from elapsed time when no explicit step is available', () => {
@@ -167,9 +169,9 @@ describe('watcher desktop service UI confirmation', () => {
 
     expect(lines).toContain('Что происходит сейчас: Watcher уже работает; визуал и логи синхронизированы.');
     expect(lines).toContain('Текущий этап: Watcher уже работает; визуал и логи синхронизированы');
-    expect(lines).toContain('✓ 5/5 Финал: Собираем логи запуска и первопричину, если healthy не наступил');
-    expect(text).not.toContain('● 2/5 Затем: Проверяем launcher, XML и service runtime перед запуском');
-    expect(text).not.toContain('○ 5/5 Финал: Собираем логи запуска и первопричину, если healthy не наступил');
+    expect(lines).toContain('✓ 4/4 Финал: Собираем логи запуска и первопричину, если healthy не наступил');
+    expect(text).not.toContain('● 2/4 Затем: Запускаем Windows-службу watcher');
+    expect(text).not.toContain('○ 4/4 Финал: Собираем логи запуска и первопричину, если healthy не наступил');
   });
 
   it('moves startup progress to the health rail when the service process is already active', () => {
@@ -183,10 +185,10 @@ describe('watcher desktop service UI confirmation', () => {
     const text = lines.join('\n');
 
     expect(lines).toContain('Что происходит сейчас: Watcher уже запущен; ждём healthy, lease и первую синхронизацию.');
-    expect(lines).toContain('✓ 2/5 Затем: Проверяем launcher, XML и service runtime перед запуском');
-    expect(lines).toContain('✓ 3/5 Затем: Запускаем Windows-службу watcher');
-    expect(lines).toContain('● 4/5 Затем: Ждём healthy, lease и первую синхронизацию');
-    expect(text).not.toContain('● 2/5 Затем: Проверяем launcher, XML и service runtime перед запуском');
+    expect(lines).toContain('✓ 2/4 Затем: Запускаем Windows-службу watcher');
+    expect(lines).toContain('● 3/4 Затем: Ждём healthy, lease и первую синхронизацию');
+    expect(lines).toContain('○ 4/4 Финал: Собираем логи запуска и первопричину, если healthy не наступил');
+    expect(text).not.toContain('● 2/4 Затем: Запускаем Windows-службу watcher');
   });
 
   it('requires a same-action second click for every mutating service action', () => {
@@ -238,5 +240,20 @@ describe('watcher desktop service action lifecycle', () => {
     expect(block).toContain('if (cancelled) return;');
     expect(block).toContain('if (syncInFlight || cancelled) return;');
     expect(block).toContain('cancelled = true;');
+  });
+
+  it('keeps late service action final logs visible after the UI timeout', () => {
+    const block = rendererSourceBlock(
+      'function runServiceActionWithUiTimeout',
+      'function queuePostServiceActionRefresh',
+    );
+
+    expect(block).toContain('let timedOut = false;');
+    expect(block).toContain('timedOut = true;');
+    expect(block).toContain('Пульт не отменил команду в службе.');
+    expect(block).toContain('writeLog(lateServiceActionCompletionLog(request.action, result));');
+    expect(block).toContain('writeLog(lateServiceActionFailureLog(request.action, error));');
+    expect(block).toContain('queuePostServiceActionRefresh(request.action);');
+    expect(block).not.toContain('.then(resolve, reject)');
   });
 });

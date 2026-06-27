@@ -24,7 +24,34 @@ export const SUPPORT_COMMAND_IDS: Record<SupportAgentAction, DesktopCommandId> =
   mesh_status: 'support.mesh_status',
 };
 
-const DEFAULT_SERVICE_STEPS = ['preflight', 'repair', 'command', 'health', 'diagnostics'] as const;
+const SERVICE_HEALTH_STEPS = ['preflight', 'service_status', 'logs', 'diagnostics'] as const;
+const SERVICE_INSTALL_STEPS = [
+  'preflight',
+  'runtime_download',
+  'runtime_install',
+  'service_install',
+  'launcher_verify',
+  'service_start',
+  'health',
+] as const;
+const SERVICE_START_STEPS = ['preflight', 'service_start', 'health', 'diagnostics'] as const;
+const SERVICE_STOP_STEPS = ['preflight', 'service_stop', 'status_verify', 'diagnostics'] as const;
+const SERVICE_RESTART_STEPS = [
+  'preflight',
+  'service_stop',
+  'service_start',
+  'health',
+  'diagnostics',
+] as const;
+const UPDATE_STEPS = [
+  'preflight',
+  'download',
+  'verify',
+  'install',
+  'runtime_install',
+  'restart',
+  'health',
+] as const;
 const REMOTE_STEPS = ['claim', 'progress', 'execute', 'complete'] as const;
 
 type SupportDescriptorSeed = readonly [
@@ -56,7 +83,7 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     destructive: false,
     timeoutMs: 30_000,
     requiredEvidence: ['service.status', 'watcher.logs'],
-    progressSteps: DEFAULT_SERVICE_STEPS,
+    progressSteps: SERVICE_HEALTH_STEPS,
   },
   {
     id: 'watcher.install',
@@ -67,7 +94,7 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     destructive: true,
     timeoutMs: 180_000,
     requiredEvidence: ['service.metadata', 'launcher.ps1', 'winsw.wrapper.log'],
-    progressSteps: DEFAULT_SERVICE_STEPS,
+    progressSteps: SERVICE_INSTALL_STEPS,
   },
   {
     id: 'watcher.start',
@@ -78,7 +105,7 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     destructive: false,
     timeoutMs: 60_000,
     requiredEvidence: ['service.status', 'watcher.health', 'watcher.logs'],
-    progressSteps: DEFAULT_SERVICE_STEPS,
+    progressSteps: SERVICE_START_STEPS,
   },
   {
     id: 'watcher.stop',
@@ -89,7 +116,7 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     destructive: true,
     timeoutMs: 60_000,
     requiredEvidence: ['service.status', 'winsw.wrapper.log'],
-    progressSteps: DEFAULT_SERVICE_STEPS,
+    progressSteps: SERVICE_STOP_STEPS,
   },
   {
     id: 'watcher.restart',
@@ -100,7 +127,7 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     destructive: true,
     timeoutMs: 60_000,
     requiredEvidence: ['service.status', 'watcher.health', 'watcher.logs'],
-    progressSteps: DEFAULT_SERVICE_STEPS,
+    progressSteps: SERVICE_RESTART_STEPS,
   },
   {
     id: 'watcher.check_update',
@@ -122,7 +149,7 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     destructive: true,
     timeoutMs: 600_000,
     requiredEvidence: ['desktop.version', 'watcher.version', 'runtime-install.log', 'service.status'],
-    progressSteps: ['preflight', 'download', 'runtime_install', 'restart', 'diagnostics'],
+    progressSteps: UPDATE_STEPS,
   },
   {
     id: 'codex.verify_gates',
