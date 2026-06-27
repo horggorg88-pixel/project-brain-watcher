@@ -1,5 +1,6 @@
 import type {
   DesktopAccessState,
+  DesktopCheckNode,
   DesktopCodexGateRunEvidence,
   DesktopCodexGateStatus,
   DesktopConfigPackage,
@@ -13,6 +14,8 @@ import type {
   WatcherServiceStatus,
 } from './contracts.js';
 import { iconSvg } from './renderer-icons.js';
+
+const CORE_CONNECTION_NODE_IDS = new Set(['project', 'config', 'key', 'server', 'watcher']);
 
 export interface ShellRenderTargets {
   readonly accountEl: HTMLElement | null;
@@ -103,8 +106,8 @@ export function withCodexGateProgress(
     : node);
   return {
     ...check,
-    overall: check.overall === 'ready' ? 'action_required' : check.overall,
-    message: 'Проверяем Codex Gates.',
+    overall: check.overall,
+    message: check.overall === 'ready' ? check.message : 'Проверяем Codex Gates.',
     nodes,
   };
 }
@@ -256,7 +259,7 @@ function checkStatusLabel(status: string): string {
 
 export function renderConnectionCause(check: DesktopConnectionCheck, element: HTMLElement | null): void {
   if (!element) return;
-  const blocker = check.nodes.find(node => node.status !== 'active');
+  const blocker = connectionBlocker(check);
   element.dataset.status = check.overall;
   setText(element, blocker ? `Причина: ${blocker.label}: ${blocker.detail}` : 'Причина: контур MCP готов');
 }
@@ -472,9 +475,14 @@ function serviceSummaryStatus(status: WatcherServiceStatus): DesktopConnectionCh
 
 function overallSummary(check: DesktopConnectionCheck): string {
   if (check.overall === 'ready') return 'Подключение готово';
-  const blocker = check.nodes.find(node => node.status !== 'active');
+  const blocker = connectionBlocker(check);
   const reason = blocker?.label ?? 'причина';
   return check.overall === 'error' ? `Проверка остановлена: ${reason}` : `Нужен шаг: ${reason}`;
+}
+
+function connectionBlocker(check: DesktopConnectionCheck): DesktopCheckNode | null {
+  if (check.overall === 'ready') return null;
+  return check.nodes.find(node => CORE_CONNECTION_NODE_IDS.has(node.id) && node.status !== 'active') ?? null;
 }
 
 function serviceNextStep(status: WatcherServiceStatus): string {

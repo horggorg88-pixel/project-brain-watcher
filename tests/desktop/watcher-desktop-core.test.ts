@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loginAccess, logoutAccess, readAccessState } from '../../apps/watcher-desktop/src/desktop-access.js';
 import { resolveDesktopAppAssetPaths } from '../../apps/watcher-desktop/src/desktop-app-paths.js';
 import { buildDesktopConfigPackage } from '../../apps/watcher-desktop/src/desktop-config-package.js';
-import { buildDesktopConnectionCheck } from '../../apps/watcher-desktop/src/desktop-connection-check.js';
+import { buildDesktopConnectionCheck, resolveCoreConnectionOverall } from '../../apps/watcher-desktop/src/desktop-connection-check.js';
 import { importProjectConfig } from '../../apps/watcher-desktop/src/desktop-config-import.js';
 import { discoverMcpConfig } from '../../apps/watcher-desktop/src/desktop-config-discovery.js';
 import { listDesktopModeSummaries } from '../../apps/watcher-desktop/src/desktop-mode-summary.js';
@@ -27,7 +27,7 @@ import { parseWindowsServiceConfigOutput, parseWindowsServiceOutput, readService
 import { readDesktopUiState, saveDesktopUiState } from '../../apps/watcher-desktop/src/desktop-ui-state.js';
 import { defaultProfile, serviceName } from '../../apps/watcher-desktop/src/desktop-profile-store.js';
 import { formatCodexGateDiagnostics, formatSupportEnrollmentLog, withCodexGateProgress } from '../../apps/watcher-desktop/src/renderer-view.js';
-import type { DesktopCodexGateRunEvidence, DesktopCodexGateStatus, DesktopConnectionCheck, ManagedDeviceStatus, SavedProjectProfile, WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
+import type { DesktopCheckNode, DesktopCodexGateRunEvidence, DesktopCodexGateStatus, DesktopConnectionCheck, ManagedDeviceStatus, SavedProjectProfile, WatcherServiceStatus } from '../../apps/watcher-desktop/src/contracts.js';
 
 const tempDirs: string[] = [];
 const VALID_TEST_BEARER = 'valid_test_bearer_12345678901234567890';
@@ -1529,6 +1529,20 @@ describe('watcher desktop core', () => {
     expect(check.overall).toBe('action_required');
   });
 
+  it('keeps MCP core readiness independent from optional Codex gates', () => {
+    const nodes: readonly DesktopCheckNode[] = [
+      { id: 'project', label: 'Проект', status: 'active', detail: 'repo', action: 'none', actionLabel: null },
+      { id: 'config', label: 'Файл настройки', status: 'active', detail: 'Файл настройки принят', action: 'none', actionLabel: null },
+      { id: 'key', label: 'Ключ доступа', status: 'active', detail: 'Ключ сохранён локально', action: 'none', actionLabel: null },
+      { id: 'server', label: 'MCP-сервер', status: 'active', detail: 'Сервер подтвердил доступ', action: 'none', actionLabel: null },
+      { id: 'codexTrust', label: 'Codex Trust', status: 'waiting', detail: 'Codex project trust ещё не подтверждён.', action: 'none', actionLabel: null },
+      { id: 'codexGates', label: 'Codex Gates', status: 'waiting', detail: 'Runtime hooks ждут подтверждения Codex Trust.', action: 'none', actionLabel: null },
+      { id: 'watcher', label: 'Watcher', status: 'active', detail: 'Watcher работает', action: 'none', actionLabel: null },
+    ];
+
+    expect(resolveCoreConnectionOverall(nodes)).toBe('ready');
+  });
+
   it('does not mark watcher service ready when only the runtime lock and service files exist', async () => {
     const paths = tempPaths();
     const root = join(paths.homePath, 'repo');
@@ -1761,6 +1775,38 @@ describe('watcher desktop core', () => {
     });
     expect(node?.detail).not.toContain('упал');
     expect(visible.codexGates.message).toContain('упал');
+  });
+
+  it('does not downgrade a ready MCP core while Codex gate verification is running', () => {
+    const check = {
+      overall: 'ready',
+      message: 'Подключение готово',
+      projectId: 'client-project',
+      checkedAt: new Date().toISOString(),
+      nodes: [
+        { id: 'project', label: 'Проект', status: 'active', detail: 'repo', action: 'none', actionLabel: null },
+        { id: 'config', label: 'Файл настройки', status: 'active', detail: 'Файл настройки принят', action: 'none', actionLabel: null },
+        { id: 'key', label: 'Ключ доступа', status: 'active', detail: 'Ключ сохранён локально', action: 'none', actionLabel: null },
+        { id: 'server', label: 'MCP-сервер', status: 'active', detail: 'Сервер подтвердил доступ', action: 'none', actionLabel: null },
+        { id: 'codexTrust', label: 'Codex Trust', status: 'waiting', detail: 'Codex project trust ещё не подтверждён.', action: 'none', actionLabel: null },
+        { id: 'codexGates', label: 'Codex Gates', status: 'waiting', detail: 'Runtime hooks ждут подтверждения Codex Trust.', action: 'none', actionLabel: null },
+        { id: 'watcher', label: 'Watcher', status: 'active', detail: 'Watcher работает', action: 'none', actionLabel: null },
+      ],
+      codexGates: {
+        ready: false,
+        message: 'Codex project trust ещё не подтверждён.',
+        checkedAt: new Date().toISOString(),
+        evidence: { commandRuns: {}, verification: {} },
+      },
+      service: statusFixture({ projectId: 'client-project', health: 'healthy', installed: true, readOnly: false, running: true }),
+      diagnostics: { ready: true, summary: 'готово', findings: [] },
+    } satisfies DesktopConnectionCheck;
+
+    const visible = withCodexGateProgress(check, 'client-project');
+
+    expect(visible.overall).toBe('ready');
+    expect(visible.message).toBe('Подключение готово');
+    expect(visible.nodes.find(item => item.id === 'codexGates')?.status).toBe('waiting');
   });
 
   it('formats Codex gate diagnostics with every command evidence row', () => {

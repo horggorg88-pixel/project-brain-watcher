@@ -19,6 +19,8 @@ import {
 } from './desktop-service-secret.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
+const CORE_CONNECTION_NODE_IDS = new Set(['project', 'config', 'key', 'server', 'watcher']);
+
 export async function buildDesktopConnectionCheck(
   paths: DesktopCorePaths,
   projectId: string,
@@ -54,6 +56,12 @@ export async function buildDesktopConnectionCheck(
     service,
     diagnostics,
   };
+}
+
+export function resolveCoreConnectionOverall(nodes: readonly DesktopCheckNode[]): DesktopConnectionCheck['overall'] {
+  const inactive = coreConnectionNodes(nodes).filter(item => item.status !== 'active');
+  if (inactive.some(item => item.id === 'project' || item.id === 'config')) return 'error';
+  return inactive.length ? 'action_required' : 'ready';
 }
 
 function buildNodes(input: {
@@ -241,17 +249,19 @@ function node(
 }
 
 function resolveOverall(nodes: readonly DesktopCheckNode[]): DesktopConnectionCheck['overall'] {
-  const inactive = nodes.filter(item => item.status !== 'active');
-  if (inactive.some(item => item.id === 'project' || item.id === 'config')) return 'error';
-  return inactive.length ? 'action_required' : 'ready';
+  return resolveCoreConnectionOverall(nodes);
 }
 
 function statusMessage(overall: DesktopConnectionCheck['overall'], nodes: readonly DesktopCheckNode[]): string {
   if (overall === 'ready') return 'Подключение готово';
-  const blocker = nodes.find(item => item.status !== 'active');
+  const blocker = coreConnectionNodes(nodes).find(item => item.status !== 'active');
   const reason = blocker ? `${blocker.label}: ${blocker.detail}` : 'причина не определена';
   if (overall === 'error') return `Проверка остановлена. Причина: ${reason}`;
   return `Остался шаг подключения. Причина: ${reason}`;
+}
+
+function coreConnectionNodes(nodes: readonly DesktopCheckNode[]): readonly DesktopCheckNode[] {
+  return nodes.filter(item => CORE_CONNECTION_NODE_IDS.has(item.id));
 }
 
 function serviceDetail(service: WatcherServiceStatus): string {
