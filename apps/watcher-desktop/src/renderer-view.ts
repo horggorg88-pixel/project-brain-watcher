@@ -17,6 +17,10 @@ import { iconSvg } from './renderer-icons.js';
 
 const CORE_CONNECTION_NODE_IDS = new Set(['project', 'config', 'key', 'server', 'watcher']);
 
+export function connectionServerVerified(check: DesktopConnectionCheck | null): boolean {
+  return check?.nodes.some(node => node.id === 'server' && node.status === 'active') === true;
+}
+
 export interface ShellRenderTargets {
   readonly accountEl: HTMLElement | null;
   readonly appShellEl: HTMLElement | null;

@@ -24,6 +24,7 @@ import type {
 } from './contracts.js';
 import {
   applyUiState,
+  connectionServerVerified,
   errorMessage,
   fallbackStatus as fallbackServiceStatus,
   formatAccessGateDiagnostics,
@@ -121,6 +122,7 @@ let currentProjects: readonly SavedProjectProfile[] = [];
 let currentModes: readonly DesktopModeSummary[] = [];
 let activeModeId: string | null = null;
 let currentPackage: DesktopConfigPackage | null = null;
+let currentConnectionCheck: DesktopConnectionCheck | null = null;
 let currentServiceStatus: WatcherServiceStatus | null = null;
 let pendingServiceAction: PendingServiceActionConfirmation | null = null;
 let automaticCodexGateRunning = false;
@@ -523,6 +525,7 @@ async function refreshInternal(): Promise<void> {
   currentModes = modes;
   activeModeId = resolveActiveModeId(currentModes, activeModeId);
   const visibleCheck = withCodexGateProgress(check, codexGateVerificationProjectId);
+  currentConnectionCheck = visibleCheck;
   renderOverall(visibleCheck, overallStatusEl);
   renderConnectionCause(visibleCheck, connectionCauseEl);
   renderConnectionCheck(visibleCheck, checklistEl);
@@ -880,7 +883,7 @@ function renderCurrentPackage(): void {
     currentPackage,
     { configFileEl: null, configJsonEl: null, configStatusEl: null, keyPreviewEl: null, promptEl },
     uiState.keyVisible,
-    accessState?.serverVerified === true,
+    connectionServerVerified(currentConnectionCheck),
   );
 }
 
@@ -968,6 +971,7 @@ function startServiceActionProgress(action: WatcherServiceAction): () => void {
       const check = await safeFullCheck();
       if (cancelled) return;
       const visibleCheck = withCodexGateProgress(check, codexGateVerificationProjectId);
+      currentConnectionCheck = visibleCheck;
       currentServiceStatus = visibleCheck.service;
       renderOverall(visibleCheck, overallStatusEl);
       renderConnectionCause(visibleCheck, connectionCauseEl);
