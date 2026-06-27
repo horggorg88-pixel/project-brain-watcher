@@ -74,8 +74,29 @@ body[data-theme="dark"] .custom-select-option[data-selected="true"]:focus-visibl
 }
 
 body[data-theme="dark"] .bottom-console {
-  background: #050505;
-  color: #f4f4f0;
+  --scrollbar-track: rgba(17, 17, 17, 0.08);
+  --scrollbar-thumb: rgba(17, 17, 17, 0.34);
+  --scrollbar-thumb-hover: rgba(17, 17, 17, 0.52);
+  --scrollbar-thumb-active: rgba(17, 17, 17, 0.68);
+  background: #f4f4f0;
+  color: #111;
+}
+
+body[data-theme="dark"] .bottom-console > div {
+  border-bottom-color: rgba(17, 17, 17, 0.16);
+}
+
+body[data-theme="dark"] .bottom-console pre {
+  color: #111;
+}
+
+body[data-theme="dark"] .bottom-console .ghost {
+  border-color: rgba(17, 17, 17, 0.28);
+  color: #111;
+}
+
+body[data-theme="dark"] .bottom-console .ghost:hover {
+  background: rgba(17, 17, 17, 0.08);
 }
 
 body[data-theme="dark"] .window-titlebar {

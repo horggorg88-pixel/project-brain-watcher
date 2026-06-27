@@ -309,7 +309,7 @@ windowTitlebarEl?.addEventListener('click', event => {
 });
 
 runFullCheckButton?.addEventListener('click', () => {
-  void refresh();
+  void runFullCheckFromUi().catch(error => writeLog(errorMessage(error)));
 });
 
 checklistEl?.addEventListener('click', event => {
@@ -369,6 +369,22 @@ async function handleCheckAction(value: string | undefined): Promise<void> {
     case 'open_logs':
       await openServiceLogs();
       return;
+  }
+}
+
+async function runFullCheckFromUi(): Promise<void> {
+  if (runFullCheckButton) runFullCheckButton.disabled = true;
+  writeLog([
+    'Выполняем: Проверить контур MCP...',
+    `Проект: ${currentProjectId() || 'не выбран'}`,
+    'Что проверяем: проект, MCP config, барьер-ключ, MCP-сервер, watcher и необязательные Codex gates.',
+    'Лог обновится после ответа проверки.',
+  ].join('\n'));
+  try {
+    await refresh();
+    writeLog(connectionCheckLog(currentConnectionCheck));
+  } finally {
+    if (runFullCheckButton) runFullCheckButton.disabled = false;
   }
 }
 
@@ -954,6 +970,35 @@ async function copyText(value: string): Promise<void> {
 function writeLog(value: string): void {
   setText(serviceOutputEl, value);
   if (!uiState.consoleOpen) void saveUiState({ ...uiState, consoleOpen: true }).then(() => renderUiState());
+}
+
+function connectionCheckLog(check: DesktopConnectionCheck | null): string {
+  if (!check) return 'Проверка контура не вернула данных. Повторите проверку или откройте диагностику службы.';
+  const lines = [
+    'Проверка контура MCP завершена',
+    `Проект: ${check.projectId ?? currentProjectId() ?? 'не определён'}`,
+    `Статус: ${overallLogLabel(check.overall)}`,
+    `Сообщение: ${check.message}`,
+    `Проверено: ${check.checkedAt}`,
+    '',
+    'Маршрут проверки:',
+    ...check.nodes.map(node => `${checkNodeLogLabel(node.status)} ${node.label}: ${node.detail}`),
+  ];
+  const serviceText = serviceStatusEl?.textContent?.trim();
+  if (serviceText) lines.push('', 'Статус watcher:', serviceText);
+  return lines.join('\n');
+}
+
+function overallLogLabel(value: DesktopConnectionCheck['overall']): string {
+  if (value === 'ready') return 'готов';
+  if (value === 'error') return 'ошибка';
+  return 'нужно действие';
+}
+
+function checkNodeLogLabel(value: DesktopConnectionCheck['nodes'][number]['status']): string {
+  if (value === 'active') return '[готово]';
+  if (value === 'waiting') return '[ожидает]';
+  return '[нет]';
 }
 
 function startServiceActionProgress(action: WatcherServiceAction): () => void {
