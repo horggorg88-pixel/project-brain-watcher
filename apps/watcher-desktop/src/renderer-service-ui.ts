@@ -1,4 +1,5 @@
 import type { WatcherPolicyDecision, WatcherServiceAction, WatcherServiceStatus } from './contracts.js';
+import { buildDesktopCommandRouteSnapshot } from './desktop-command-route.js';
 import { descriptorForCommand, watcherServiceCommandId } from './desktop-command-registry.js';
 import { iconSvg, type DesktopIconName } from './renderer-icons.js';
 
@@ -124,25 +125,28 @@ export function serviceActionProgressLines(
   status?: WatcherServiceStatus | null,
 ): readonly string[] {
   const descriptor = descriptorForCommand(watcherServiceCommandId(action));
-  const route = descriptor.progressSteps.map(step => serviceActionStepLabel(action, step));
   const settledText = serviceActionSettledText(action, status);
-  const statusStep = serviceActionStatusStep(action, status, route.length);
-  const safeActiveStepIndex = clampRouteIndex(
-    settledText ? route.length : statusStep?.index ?? activeStepIndex ?? estimatedRouteIndex(elapsedMs, descriptor.timeoutMs, route.length),
-    route.length,
-  );
-  const activeStep = settledText ?? statusStep?.text ?? route[safeActiveStepIndex] ?? 'ожидаем финальный результат команды';
+  const statusStep = serviceActionStatusStep(action, status, descriptor.progressSteps.length);
+  const route = buildDesktopCommandRouteSnapshot({
+    descriptor,
+    elapsedMs,
+    activeStepIndex: statusStep?.index ?? activeStepIndex,
+    settledText,
+    currentText: statusStep?.text ?? null,
+    stepLabels: ACTION_STEP_LABELS[action],
+    finalLog: serviceActionFinalLog(action),
+  });
   return [
     `Выполняем: ${actionLabel(action)}...`,
-    `Команда: ${descriptor.id} · риск: ${riskLabel(descriptor.risk)} · timeout: ${formatTimeout(descriptor.timeoutMs)}`,
-    `Что происходит сейчас: ${activeStep}.`,
-    `Текущий этап: ${activeStep}`,
-    `Таймер: ${formatElapsed(elapsedMs)} · если команда зависнет, пульт остановит ожидание по timeout.`,
-    `Какие данные проверяем: ${descriptor.requiredEvidence.join(', ')}`,
-    `Финальный лог покажет: ${serviceActionFinalLog(action)}.`,
+    `Команда: ${descriptor.id} · риск: ${riskLabel(descriptor.risk)} · timeout: ${route.timeoutText}`,
+    `Что происходит сейчас: ${route.currentText}.`,
+    `Текущий этап: ${route.currentText}`,
+    `Таймер: ${route.elapsedText} · если команда зависнет, пульт остановит ожидание по timeout.`,
+    `Какие данные проверяем: ${route.evidenceText}`,
+    `Финальный лог покажет: ${route.finalLog}.`,
     'Маршрут команды (полная трасса со статусами):',
-    ...route.map((label, index) => (
-      `${routeStatusMarker(index, safeActiveStepIndex)} ${index + 1}/${route.length} ${routeStageLabel(index, route.length)}: ${label}`
+    ...route.stages.map(stage => (
+      `${stage.marker} ${stage.index + 1}/${stage.total} ${stage.ordinal}: ${stage.label}`
     )),
   ];
 }
@@ -211,28 +215,6 @@ const ACTION_STEP_LABELS: Record<WatcherServiceAction, ProgressStepLabels> = {
   },
 };
 
-function serviceActionStepLabel(action: WatcherServiceAction, step: string): string {
-  return ACTION_STEP_LABELS[action][step] ?? step;
-}
-
-function routeStageLabel(index: number, total: number): string {
-  if (index === 0) return 'Сначала';
-  if (index === total - 1) return 'Финал';
-  return 'Затем';
-}
-
-function routeStatusMarker(index: number, activeStepIndex: number): string {
-  if (index < activeStepIndex) return '✓';
-  if (index === activeStepIndex) return '●';
-  return '○';
-}
-
-function clampRouteIndex(value: number, routeLength: number): number {
-  if (routeLength <= 0) return 0;
-  if (!Number.isFinite(value)) return 0;
-  return Math.min(Math.max(0, Math.trunc(value)), routeLength);
-}
-
 function serviceActionSettledText(action: WatcherServiceAction, status: WatcherServiceStatus | null | undefined): string | null {
   if (!status) return null;
   if (action === 'start' && status.running && status.health === 'healthy') {
@@ -268,12 +250,6 @@ function serviceActionStatusStep(
     return { index: 5, text: 'Служба установлена; проверяем готовность watcher к healthy' };
   }
   return null;
-}
-
-function estimatedRouteIndex(elapsedMs: number, timeoutMs: number | null, routeLength: number): number {
-  if (routeLength <= 1 || timeoutMs === null || timeoutMs <= 0 || elapsedMs <= 0) return 0;
-  const ratio = Math.min(0.98, elapsedMs / timeoutMs);
-  return Math.floor(ratio * routeLength);
 }
 
 function serviceActionFinalLog(action: WatcherServiceAction): string {
