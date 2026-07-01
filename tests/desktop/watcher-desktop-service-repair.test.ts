@@ -172,7 +172,7 @@ describe('watcher desktop service repair', () => {
       'C:\\Program Files\\nodejs\\npx.cmd',
       [
         '--yes',
-        'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.120/project-brain-watcher-1.4.120.tgz',
+        'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.121/project-brain-watcher-1.4.121.tgz',
         'service',
         'install',
       ],
@@ -185,7 +185,7 @@ describe('watcher desktop service repair', () => {
         '/d',
         '/s',
         '/c',
-        '""C:\\Program Files\\nodejs\\npx.cmd" "--yes" "https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.120/project-brain-watcher-1.4.120.tgz" "service" "install""',
+        '""C:\\Program Files\\nodejs\\npx.cmd" "--yes" "https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.121/project-brain-watcher-1.4.121.tgz" "service" "install""',
       ],
       windowsVerbatimArguments: true,
     });

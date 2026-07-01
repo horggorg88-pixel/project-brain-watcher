@@ -410,6 +410,9 @@ describe('watcher desktop contract', () => {
     expect(watcherSectionHtml.indexOf('data-service-summary')).toBeLessThan(watcherSectionHtml.indexOf('data-service-action="install"'));
     expect(watcherSectionHtml.indexOf('data-service-action="health"')).toBeLessThan(watcherSectionHtml.indexOf('data-copy-service-logs'));
     expect(rendererSource).toContain('copyServiceLogsButton');
+    expect(rendererSource).toContain('WATCHER_COMMAND_PATH_QUOTING');
+    expect(rendererSource).toContain('Windows разрезал путь команды на C:\\\\Program');
+    expect(rendererSource).toContain('Обнови пульт до версии с .cmd quoting fix');
     expect(serviceUiSource).toContain('serviceActionTooltip');
     expect(serviceUiSource).toContain('serviceActionIcon');
     expect(serviceUiSource).toContain('button.innerHTML = serviceActionIcon(action)');

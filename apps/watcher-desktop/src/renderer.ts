@@ -1258,6 +1258,14 @@ function classifyDesktopAiDiagnostics(text: string, status: WatcherServiceStatus
     impact: 'Windows service is not installed, so wrapper/out/err logs may be absent.',
     nextAction: 'Обнови пульт до версии с node+npx-cli fallback и повтори «Установить службу» или «Починить службу».',
   });
+  if (/"?C:\\Program"?\s+.*(?:not recognized|не\s+является|��|�)/i.test(text)) diagnostics.push({
+    code: 'WATCHER_COMMAND_PATH_QUOTING',
+    severity: 'error' as const,
+    message: 'Windows разрезал путь команды на C:\\Program.',
+    cause: 'A .cmd or executable path with spaces was passed to cmd.exe without the required Windows quoting contract.',
+    impact: 'Service install/repair exits before WinSW can create useful wrapper logs.',
+    nextAction: 'Обнови пульт до версии с .cmd quoting fix и повтори «Установить службу» или «Починить службу».',
+  });
   if (/launcher_uses_npx_runner|npx(?:\.cmd)?|github:horggorg88-pixel\/project-brain-watcher#v/i.test(text)) diagnostics.push({
     code: 'WATCHER_LEGACY_NPX_LAUNCHER',
     severity: 'warn' as const,
