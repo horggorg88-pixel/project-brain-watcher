@@ -2,7 +2,8 @@ import type {
   DesktopCommandDescriptor,
   DesktopCommandId,
 } from './desktop-command-contracts.js';
-import type { SupportAgentAction, WatcherServiceAction } from './contracts.js';
+import type { DesktopCheckAction, SupportAgentAction, WatcherServiceAction } from './contracts.js';
+import { DESKTOP_COMMAND_PROGRESS_TEXT } from './desktop-command-progress-text.js';
 
 export const WATCHER_SERVICE_COMMAND_IDS: Record<WatcherServiceAction, DesktopCommandId> = {
   health: 'watcher.health',
@@ -22,6 +23,33 @@ export const SUPPORT_COMMAND_IDS: Record<SupportAgentAction, DesktopCommandId> =
   verify_codex_gates: 'support.verify_codex_gates',
   refresh_mcp_config: 'support.refresh_mcp_config',
   mesh_status: 'support.mesh_status',
+};
+
+export const DESKTOP_CHECK_ACTION_COMMAND_IDS: Readonly<Partial<Record<DesktopCheckAction, DesktopCommandId>>> = {
+  install_service: 'watcher.install',
+  start_service: 'watcher.start',
+  verify_codex_gates: 'codex.verify_gates',
+  verify: 'diagnostics.collect',
+};
+
+export const DESKTOP_COMMAND_GLOBAL_ACTION_IDS: Readonly<Record<DesktopCommandId, string>> = {
+  'watcher.health': 'desktop:watcher.health',
+  'watcher.install': 'desktop:watcher.install',
+  'watcher.start': 'desktop:watcher.start',
+  'watcher.stop': 'desktop:watcher.stop',
+  'watcher.restart': 'desktop:watcher.restart',
+  'watcher.check_update': 'desktop:watcher.check_update',
+  'watcher.update': 'desktop:watcher.update',
+  'codex.verify_gates': 'desktop:codex.verify_gates',
+  'mcp.refresh_config': 'desktop:mcp.refresh_config',
+  'diagnostics.collect': 'desktop:diagnostics.collect',
+  'support.collect_diagnostics': 'desktop:support.collect_diagnostics',
+  'support.repair_watcher_service': 'desktop:support.repair_watcher_service',
+  'support.restart_watcher': 'desktop:support.restart_watcher',
+  'support.update_watcher': 'desktop:support.update_watcher',
+  'support.verify_codex_gates': 'desktop:support.verify_codex_gates',
+  'support.refresh_mcp_config': 'desktop:support.refresh_mcp_config',
+  'support.mesh_status': 'desktop:support.mesh_status',
 };
 
 const SERVICE_HEALTH_STEPS = ['preflight', 'service_status', 'logs', 'diagnostics'] as const;
@@ -74,7 +102,7 @@ const SUPPORT_DESCRIPTOR_SEEDS: readonly SupportDescriptorSeed[] = [
 ];
 
 export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = [
-  {
+  desktopDescriptor({
     id: 'watcher.health',
     label: 'Проверить службу watcher',
     category: 'watcher_service',
@@ -84,8 +112,8 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     timeoutMs: 30_000,
     requiredEvidence: ['service.status', 'watcher.logs'],
     progressSteps: SERVICE_HEALTH_STEPS,
-  },
-  {
+  }),
+  desktopDescriptor({
     id: 'watcher.install',
     label: 'Починить или установить watcher-службу',
     category: 'watcher_service',
@@ -95,19 +123,19 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     timeoutMs: 180_000,
     requiredEvidence: ['service.metadata', 'launcher.ps1', 'winsw.wrapper.log'],
     progressSteps: SERVICE_INSTALL_STEPS,
-  },
-  {
+  }),
+  desktopDescriptor({
     id: 'watcher.start',
     label: 'Запустить watcher-службу',
     category: 'watcher_service',
     surface: 'electron',
     risk: 'medium',
-    destructive: false,
+    destructive: true,
     timeoutMs: 60_000,
     requiredEvidence: ['service.status', 'watcher.health', 'watcher.logs'],
     progressSteps: SERVICE_START_STEPS,
-  },
-  {
+  }),
+  desktopDescriptor({
     id: 'watcher.stop',
     label: 'Остановить watcher-службу',
     category: 'watcher_service',
@@ -117,8 +145,8 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     timeoutMs: 60_000,
     requiredEvidence: ['service.status', 'winsw.wrapper.log'],
     progressSteps: SERVICE_STOP_STEPS,
-  },
-  {
+  }),
+  desktopDescriptor({
     id: 'watcher.restart',
     label: 'Перезапустить watcher-службу',
     category: 'watcher_service',
@@ -128,8 +156,8 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     timeoutMs: 60_000,
     requiredEvidence: ['service.status', 'watcher.health', 'watcher.logs'],
     progressSteps: SERVICE_RESTART_STEPS,
-  },
-  {
+  }),
+  desktopDescriptor({
     id: 'watcher.check_update',
     label: 'Проверить обновление пульта и watcher',
     category: 'updater',
@@ -139,8 +167,8 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     timeoutMs: 10_000,
     requiredEvidence: ['desktop.version', 'watcher.version', 'github.release'],
     progressSteps: ['preflight', 'github_release', 'compare_versions'],
-  },
-  {
+  }),
+  desktopDescriptor({
     id: 'watcher.update',
     label: 'Обновить пульт и watcher',
     category: 'updater',
@@ -150,8 +178,8 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     timeoutMs: 600_000,
     requiredEvidence: ['desktop.version', 'watcher.version', 'runtime-install.log', 'service.status'],
     progressSteps: UPDATE_STEPS,
-  },
-  {
+  }),
+  desktopDescriptor({
     id: 'codex.verify_gates',
     label: 'Проверить Codex gates',
     category: 'codex_gates',
@@ -161,8 +189,8 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     timeoutMs: 180_000,
     requiredEvidence: ['codex.version', 'codex.hooks', 'qualitygate.evidence', 'runtime-context.evidence'],
     progressSteps: ['preflight', 'hooks', 'quality_gates', 'runtime_context', 'diagnostics'],
-  },
-  {
+  }),
+  desktopDescriptor({
     id: 'mcp.refresh_config',
     label: 'Обновить MCP-конфиг',
     category: 'mcp_config',
@@ -172,8 +200,8 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     timeoutMs: 90_000,
     requiredEvidence: ['mcp.config', 'project.profile', 'server.access'],
     progressSteps: ['preflight', 'write_config', 'verify_access', 'diagnostics'],
-  },
-  {
+  }),
+  desktopDescriptor({
     id: 'diagnostics.collect',
     label: 'Собрать диагностику',
     category: 'diagnostics',
@@ -183,7 +211,7 @@ export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = 
     timeoutMs: 30_000,
     requiredEvidence: ['service.status', 'logs.transport', 'policy.gates'],
     progressSteps: ['preflight', 'collect', 'redact', 'diagnostics'],
-  },
+  }),
   ...supportCommandDescriptors(),
 ];
 
@@ -199,6 +227,10 @@ export function supportCommandId(action: SupportAgentAction): DesktopCommandId {
   return SUPPORT_COMMAND_IDS[action];
 }
 
+export function desktopCheckActionCommandId(action: DesktopCheckAction): DesktopCommandId | null {
+  return DESKTOP_CHECK_ACTION_COMMAND_IDS[action] ?? null;
+}
+
 export function descriptorForCommand(commandId: DesktopCommandId): DesktopCommandDescriptor {
   const descriptor = DESKTOP_COMMAND_DESCRIPTOR_MAP.get(commandId);
   if (!descriptor) throw new Error(`Unknown desktop command descriptor: ${commandId}`);
@@ -210,7 +242,7 @@ export function allDesktopCommandDescriptors(): readonly DesktopCommandDescripto
 }
 
 function supportCommandDescriptors(): readonly DesktopCommandDescriptor[] {
-  return SUPPORT_DESCRIPTOR_SEEDS.map(([id, label, risk, destructive, timeoutMs, requiredEvidence]) => ({
+  return SUPPORT_DESCRIPTOR_SEEDS.map(([id, label, risk, destructive, timeoutMs, requiredEvidence]) => desktopDescriptor({
     id,
     label,
     category: 'remote_support',
@@ -221,4 +253,14 @@ function supportCommandDescriptors(): readonly DesktopCommandDescriptor[] {
     requiredEvidence,
     progressSteps: REMOTE_STEPS,
   }));
+}
+
+type DesktopCommandDescriptorSeed = Omit<DesktopCommandDescriptor, 'globalActionId' | 'progressText'>;
+
+function desktopDescriptor(seed: DesktopCommandDescriptorSeed): DesktopCommandDescriptor {
+  return {
+    ...seed,
+    globalActionId: DESKTOP_COMMAND_GLOBAL_ACTION_IDS[seed.id],
+    progressText: DESKTOP_COMMAND_PROGRESS_TEXT[seed.id],
+  };
 }

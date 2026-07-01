@@ -69,6 +69,36 @@ describe("watcher desktop support device", () => {
     expect(state).not.toContain("pb_account_bearer");
   });
 
+  it("uses a canonical support identity that does not depend on user data path", async () => {
+    const firstPaths = tempPaths();
+    const secondPaths = tempPaths();
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        bodies.push(
+          JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
+        );
+        return jsonResponse({
+          ok: true,
+          device: { deviceId: `dev_${bodies.length}`, meshUrl: null },
+          deviceToken: DEVICE_TOKEN,
+        });
+      }),
+    );
+
+    await enrollManagedDevice(firstPaths, account(), "mcp-project");
+    await enrollManagedDevice(secondPaths, account(), "mcp-project");
+
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].projectId).toBe("mcp-project");
+    expect(bodies[1].projectId).toBe("mcp-project");
+    expect(bodies[0].installId).toBe(bodies[1].installId);
+    expect(String(bodies[0].installId)).toContain("project:mcp-project");
+    expect(String(bodies[0].installId)).not.toContain(firstPaths.userDataPath);
+    expect(String(bodies[1].installId)).not.toContain(secondPaths.userDataPath);
+  });
+
   it("claims and completes diagnostics jobs with the managed device token", async () => {
     const paths = tempPaths();
     const requests: string[] = [];

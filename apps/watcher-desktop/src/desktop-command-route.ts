@@ -12,7 +12,7 @@ export interface DesktopCommandRouteSnapshotInput {
   readonly activeStepIndex?: number;
   readonly settledText?: string | null;
   readonly currentText?: string | null;
-  readonly finalLog: string;
+  readonly finalLog?: string;
 }
 
 export interface DesktopCommandRouteStage {
@@ -45,7 +45,7 @@ export function buildDesktopCommandRouteSnapshot(
     : resolveActiveRouteIndex(input, route);
   const stages = route.map((id, index) => buildRouteStage({
     id,
-    label: input.stepLabels?.[id] ?? id,
+    label: input.stepLabels?.[id] ?? input.descriptor.progressText.labels[id] ?? id,
     index,
     total: route.length,
     activeIndex,
@@ -60,7 +60,7 @@ export function buildDesktopCommandRouteSnapshot(
     elapsedText: formatElapsed(input.elapsedMs),
     timeoutText: formatTimeout(input.descriptor.timeoutMs),
     evidenceText: input.descriptor.requiredEvidence.join(', '),
-    finalLog: input.finalLog,
+    finalLog: input.finalLog ?? input.descriptor.progressText.finalLog,
     stages,
   };
 }

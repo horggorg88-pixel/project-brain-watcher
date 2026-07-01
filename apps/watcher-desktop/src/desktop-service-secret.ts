@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SavedProjectProfile, SecretAclHealth } from './contracts.js';
 import {
+  buildRedactedSecretFingerprint,
   readRestrictedSecretFile,
   readRestrictedSecretHealth,
   writeRestrictedSecretFile,
@@ -9,10 +10,45 @@ import {
 
 export interface DesktopServiceSecretState {
   readonly configured: boolean;
-  readonly tokenFilePath: string | null;
+  readonly tokenFileFingerprint: string | null;
   readonly tokenEnv: string;
+  readonly expectedFingerprint: string | null;
   readonly actualFingerprint: string | null;
+  readonly matchesExpected: boolean | null;
+  readonly rotationRequired: boolean;
   readonly acl: SecretAclHealth;
+}
+
+export interface DesktopServiceSecretLeaseOwner {
+  readonly projectId?: string | null;
+  readonly instanceId?: string | null;
+  readonly leaseId?: string | null;
+  readonly hostname?: string | null;
+  readonly root?: string | null;
+  readonly server?: string | null;
+}
+
+export interface DesktopServiceSecretLeaseReceipt {
+  readonly version: 'watcher-secret-lease-receipt/v1';
+  readonly tokenEnv: string;
+  readonly tokenFileFingerprint: string | null;
+  readonly secret: {
+    readonly configured: boolean;
+    readonly expectedFingerprint: string | null;
+    readonly actualFingerprint: string | null;
+    readonly matchesExpected: boolean | null;
+    readonly rotationRequired: boolean;
+    readonly aclRestricted: boolean;
+    readonly aclReason: string | null;
+  };
+  readonly leaseOwner: {
+    readonly projectFingerprint: string | null;
+    readonly instanceFingerprint: string | null;
+    readonly leaseFingerprint: string | null;
+    readonly hostFingerprint: string | null;
+    readonly rootFingerprint: string | null;
+    readonly serverFingerprint: string | null;
+  };
 }
 
 export function serviceTokenFilePath(profile: SavedProjectProfile): string {
@@ -22,7 +58,7 @@ export function serviceTokenFilePath(profile: SavedProjectProfile): string {
 export function stageDesktopServiceSecret(profile: SavedProjectProfile, token: string): DesktopServiceSecretState {
   const tokenFilePath = serviceTokenFilePath(profile);
   writeRestrictedSecretFile(tokenFilePath, token);
-  return readDesktopServiceSecretState(profile);
+  return readDesktopServiceSecretState(profile, token);
 }
 
 export function readDesktopServiceSecret(profile: SavedProjectProfile): string | null {
@@ -56,13 +92,19 @@ export function syncDesktopServiceSecretFromProjectMcp(profile: SavedProjectProf
   return stageDesktopServiceSecret(profile, token);
 }
 
-export function readDesktopServiceSecretState(profile: SavedProjectProfile | null): DesktopServiceSecretState {
+export function readDesktopServiceSecretState(
+  profile: SavedProjectProfile | null,
+  expectedToken?: string | null,
+): DesktopServiceSecretState {
   if (!profile) {
     return {
       configured: false,
-      tokenFilePath: null,
+      tokenFileFingerprint: null,
       tokenEnv: 'MCP_BEARER_TOKEN',
+      expectedFingerprint: expectedToken ? buildRedactedSecretFingerprint(expectedToken) : null,
       actualFingerprint: null,
+      matchesExpected: expectedToken ? false : null,
+      rotationRequired: expectedToken ? true : false,
       acl: {
         restricted: false,
         reason: 'profile_missing',
@@ -71,16 +113,48 @@ export function readDesktopServiceSecretState(profile: SavedProjectProfile | nul
     };
   }
   const tokenFilePath = serviceTokenFilePath(profile);
-  const health = readRestrictedSecretHealth(tokenFilePath);
+  const health = readRestrictedSecretHealth(tokenFilePath, expectedToken);
   const secret = readDesktopServiceSecret(profile);
   const concreteSecret = isConcreteBearerToken(secret);
   const concreteEnv = isConcreteBearerToken(process.env[profile.tokenEnv]);
   return {
     configured: concreteSecret || (health.configured && concreteEnv),
-    tokenFilePath,
+    tokenFileFingerprint: health.tokenFileFingerprint,
     tokenEnv: profile.tokenEnv,
+    expectedFingerprint: health.expectedFingerprint,
     actualFingerprint: health.actualFingerprint,
+    matchesExpected: health.matchesExpected,
+    rotationRequired: health.rotationRequired,
     acl: health.acl,
+  };
+}
+
+export function buildDesktopServiceSecretLeaseReceipt(input: {
+  readonly profile: SavedProjectProfile | null;
+  readonly state: DesktopServiceSecretState;
+  readonly leaseOwner?: DesktopServiceSecretLeaseOwner | null;
+}): DesktopServiceSecretLeaseReceipt {
+  return {
+    version: 'watcher-secret-lease-receipt/v1',
+    tokenEnv: input.state.tokenEnv,
+    tokenFileFingerprint: input.state.tokenFileFingerprint,
+    secret: {
+      configured: input.state.configured,
+      expectedFingerprint: input.state.expectedFingerprint,
+      actualFingerprint: input.state.actualFingerprint,
+      matchesExpected: input.state.matchesExpected,
+      rotationRequired: input.state.rotationRequired,
+      aclRestricted: input.state.acl.restricted,
+      aclReason: input.state.acl.reason,
+    },
+    leaseOwner: {
+      projectFingerprint: fingerprintOrNull(input.leaseOwner?.projectId ?? input.profile?.id),
+      instanceFingerprint: fingerprintOrNull(input.leaseOwner?.instanceId),
+      leaseFingerprint: fingerprintOrNull(input.leaseOwner?.leaseId),
+      hostFingerprint: fingerprintOrNull(input.leaseOwner?.hostname),
+      rootFingerprint: fingerprintOrNull(input.leaseOwner?.root ?? input.profile?.root),
+      serverFingerprint: fingerprintOrNull(input.leaseOwner?.server ?? input.profile?.serverUrl),
+    },
   };
 }
 
@@ -131,4 +205,9 @@ function textValue(value: unknown): string | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function fingerprintOrNull(value: string | null | undefined): string | null {
+  const normalized = value?.trim();
+  return normalized ? buildRedactedSecretFingerprint(normalized) : null;
 }

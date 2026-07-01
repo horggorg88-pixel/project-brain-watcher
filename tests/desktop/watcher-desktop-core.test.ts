@@ -272,7 +272,8 @@ describe('watcher desktop core', () => {
     expect(saved.serverUrl).toBe('http://149.33.14.250');
     expect(saved.consoleUrl).toBe('http://149.33.14.250:3020');
     expect(readDesktopServiceSecret(saved)).toBe(VALID_TEST_BEARER);
-    expect(pack.configJson).toContain(`Bearer ${VALID_TEST_BEARER}`);
+    expect(pack.configJson).toContain('Bearer ${MCP_BEARER_TOKEN}');
+    expect(pack.configJson).not.toContain(VALID_TEST_BEARER);
     expect(brainMcp.mcpServers?.['project-brain']?.headers?.Authorization).toBe(`Bearer ${VALID_TEST_BEARER}`);
   });
 
@@ -422,7 +423,8 @@ describe('watcher desktop core', () => {
     expect(state.serverVerified).toBe(true);
     expect(readDesktopServiceSecret(profile)).toBe(VALID_TEST_BEARER);
     expect(pack.tokenAvailable).toBe(true);
-    expect(pack.configJson).toContain(`Bearer ${VALID_TEST_BEARER}`);
+    expect(pack.configJson).toContain('Bearer ${MCP_BEARER_TOKEN}');
+    expect(pack.configJson).not.toContain(VALID_TEST_BEARER);
     expect(brainMcp.mcpServers?.['project-brain']?.headers?.Authorization).toBe(`Bearer ${VALID_TEST_BEARER}`);
   });
 
@@ -1205,12 +1207,14 @@ describe('watcher desktop core', () => {
   it('imports a web handoff config without persisting raw bearer values', () => {
     const paths = tempPaths();
     const source = join(paths.homePath, 'mcp-monorepo-mcp-config.json');
+    const root = join(paths.homePath, 'repo');
     mkdirSync(paths.homePath, { recursive: true });
+    mkdirSync(root, { recursive: true });
     writeFileSync(source, JSON.stringify({
       schema_version: 1,
       project_id: 'mcp-monorepo',
       endpoint: 'http://149.33.14.250/mcp/p/mcp-monorepo',
-      local_path: 'C:\\Users\\New\\Desktop\\MCP',
+      local_path: root,
       token_env: 'MCP_BEARER_TOKEN',
       mcpServers: {
         'project-brain': {
@@ -1227,14 +1231,43 @@ describe('watcher desktop core', () => {
     expect(result.profile.id).toBe('mcp-monorepo');
     expect(result.profile.serverUrl).toBe('http://149.33.14.250');
     expect(result.tokenDetected).toBe(true);
+    expect(result.secretStaged).toBe(false);
+    expect(result.warnings).toContain('Bearer-токен обнаружен, но не импортирован без явного согласия.');
+    expect(readDesktopServiceSecret(result.profile)).toBeNull();
+    const secretState = readDesktopServiceSecretState(result.profile);
+    expect(secretState.configured).toBe(false);
+    expect(secretState.actualFingerprint).toBeNull();
+    expect(JSON.stringify(readProfiles(paths))).not.toContain(VALID_TEST_BEARER);
+  });
+
+  it('imports a project bearer only when the handoff file gives explicit consent', () => {
+    const paths = tempPaths();
+    const source = join(paths.homePath, 'mcp-consent-config.json');
+    const root = join(paths.homePath, 'repo');
+    mkdirSync(paths.homePath, { recursive: true });
+    mkdirSync(root, { recursive: true });
+    writeFileSync(source, JSON.stringify({
+      schema_version: 1,
+      secret_import_consent: true,
+      project_id: 'mcp-monorepo',
+      endpoint: 'http://149.33.14.250/mcp/p/mcp-monorepo',
+      local_path: root,
+      token_env: 'MCP_BEARER_TOKEN',
+      mcpServers: {
+        'project-brain': {
+          url: 'http://149.33.14.250/mcp/p/mcp-monorepo',
+          headers: { Authorization: `Bearer ${VALID_TEST_BEARER}` },
+        },
+      },
+    }), 'utf-8');
+
+    const result = importProjectConfig(paths, source);
+
+    expect(result.profile).not.toBeNull();
+    if (!result.profile) throw new Error('project profile missing');
+    expect(result.tokenDetected).toBe(true);
     expect(result.secretStaged).toBe(true);
     expect(readDesktopServiceSecret(result.profile)).toBe(VALID_TEST_BEARER);
-    const secretState = readDesktopServiceSecretState(result.profile);
-    expect(secretState.configured).toBe(true);
-    expect(secretState.actualFingerprint).toMatch(new RegExp(`^sha256:[a-f0-9]{12}:len=${VALID_TEST_BEARER.length}$`));
-    expect(secretState.actualFingerprint).not.toContain(VALID_TEST_BEARER);
-    expect(secretState.acl.restricted).toBe(true);
-    expect(JSON.stringify(readProfiles(paths))).not.toContain(VALID_TEST_BEARER);
   });
 
   it('does not stage placeholder bearer values from web handoff config', () => {
@@ -1243,6 +1276,7 @@ describe('watcher desktop core', () => {
     mkdirSync(paths.homePath, { recursive: true });
     writeFileSync(source, JSON.stringify({
       project_id: 'mcp-monorepo',
+      secret_import_consent: true,
       endpoint: 'http://149.33.14.250/mcp/p/mcp-monorepo',
       local_path: join(paths.homePath, 'repo'),
       token_env: 'MCP_BEARER_TOKEN',
@@ -1306,7 +1340,9 @@ describe('watcher desktop core', () => {
     expect(saved.serverUrl).toBe('http://149.33.14.250');
     expect(saved.tokenEnv).toBe('MCP_BEARER_TOKEN');
     expect(pack.tokenAvailable).toBe(true);
-    expect(pack.configJson).toContain(`Bearer ${VALID_TEST_BEARER}`);
+    expect(pack.tokenValue).toBeNull();
+    expect(pack.configJson).toContain('Bearer ${MCP_BEARER_TOKEN}');
+    expect(pack.configJson).not.toContain(VALID_TEST_BEARER);
     expect(pack.configJson).toContain('"url": "http://149.33.14.250/mcp/p/project-alpha"');
   });
 
@@ -1332,6 +1368,7 @@ describe('watcher desktop core', () => {
     mkdirSync(paths.homePath, { recursive: true });
     writeFileSync(source, JSON.stringify({
       project_id: 'mcp-monorepo',
+      secret_import_consent: true,
       endpoint: 'http://149.33.14.250/mcp/p/mcp-monorepo',
       local_path: join(paths.homePath, 'repo'),
       token_env: 'MCP_BEARER_TOKEN',
@@ -1349,8 +1386,9 @@ describe('watcher desktop core', () => {
 
     expect(pack.fileName).toBe('mcp-monorepo-mcp-config.json');
     expect(pack.tokenAvailable).toBe(true);
-    expect(pack.tokenValue).toBe(VALID_TEST_BEARER);
-    expect(pack.configJson).toContain(`Bearer ${VALID_TEST_BEARER}`);
+    expect(pack.tokenValue).toBeNull();
+    expect(pack.configJson).toContain('Bearer ${MCP_BEARER_TOKEN}');
+    expect(pack.configJson).not.toContain(VALID_TEST_BEARER);
     expect(pack.prompt).toContain('BRAIN ON — Brain MCP bootstrap');
     expect(pack.prompt).toContain(`Текущий local_path из MCP-файла: ${join(paths.homePath, 'repo')}`);
     expect(pack.prompt).toContain('brain_status(project_id="mcp-monorepo"');
@@ -1364,6 +1402,42 @@ describe('watcher desktop core', () => {
     expect(pack.prompt).toContain('idol / идол');
     expect(pack.prompt).toContain('IDOL не внешняя шкала');
     expect(pack.prompt).not.toContain(VALID_TEST_BEARER);
+  });
+
+  it('builds a downloadable package from access handoff without staging a service secret', () => {
+    const paths = tempPaths();
+    const source = join(paths.homePath, 'personal-access.json');
+    const root = join(paths.homePath, 'repo');
+    mkdirSync(root, { recursive: true });
+    mkdirSync(paths.homePath, { recursive: true });
+    writeFileSync(source, JSON.stringify({
+      kind: 'project-brain-access',
+      server_url: 'http://149.33.14.250',
+      token_env: 'MCP_BEARER_TOKEN',
+      mcpServers: {
+        'project-brain': {
+          url: 'http://149.33.14.250/mcp/p/mcp-monorepo',
+          headers: { Authorization: `Bearer ${VALID_TEST_BEARER}` },
+        },
+      },
+    }), 'utf-8');
+    importProjectConfig(paths, source);
+    const profile = saveProfile(paths, {
+      id: 'mcp-monorepo',
+      name: 'MCP Monorepo',
+      root,
+      indexId: 'idx-mcp-monorepo',
+      serverUrl: 'http://149.33.14.250',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    }, { stageLocalSecrets: false });
+
+    const pack = buildDesktopConfigPackage(paths, 'mcp-monorepo');
+
+    expect(pack.tokenAvailable).toBe(true);
+    expect(pack.tokenValue).toBeNull();
+    expect(pack.configJson).toContain('Bearer ${MCP_BEARER_TOKEN}');
+    expect(pack.configJson).not.toContain(VALID_TEST_BEARER);
+    expect(readDesktopServiceSecret(profile)).toBeNull();
   });
 
   it('builds a new project package from base server and stages project .brain files', () => {
@@ -1386,6 +1460,8 @@ describe('watcher desktop core', () => {
 
     expect(pack.fileName).toBe('hyinahitest-mcp-config.json');
     expect(pack.configJson).toContain('"url": "http://149.33.14.250/mcp/p/hyinahitest"');
+    expect(pack.configJson).toContain('Bearer ${MCP_BEARER_TOKEN}');
+    expect(pack.configJson).not.toContain(VALID_ENV_BEARER);
     expect(pack.configJson).not.toContain('/mcp/p/mcp-monorepo');
     expect(pack.prompt).toContain('MCP endpoint: http://149.33.14.250/mcp/p/hyinahitest');
     expect(pack.prompt).toContain(`brain_status(project_id="hyinahitest", local_path="${root}")`);
@@ -1873,7 +1949,7 @@ describe('watcher desktop core', () => {
     expect(log).toContain('Project smoke');
     expect(log).toContain('failed');
     expect(log).not.toContain(PLACEHOLDER_BEARER);
-    expect(log).toContain('Bearer pb_[REDACTED]');
+    expect(log).toContain('Bearer [REDACTED]');
   });
 
   it('formats pending Codex hook diagnostics as actionable waiting states', () => {
@@ -2075,6 +2151,7 @@ describe('watcher desktop core', () => {
     mkdirSync(paths.homePath, { recursive: true });
     writeFileSync(source, JSON.stringify({
       project_id: 'denied-project',
+      secret_import_consent: true,
       endpoint: 'http://149.33.14.250/mcp/p/denied-project',
       local_path: join(paths.homePath, 'repo'),
       token_env: 'MCP_BEARER_TOKEN',
@@ -2382,6 +2459,7 @@ describe('watcher desktop core', () => {
     mkdirSync(paths.homePath, { recursive: true });
     writeFileSync(source, JSON.stringify({
       project_id: 'mcp-monorepo',
+      secret_import_consent: true,
       endpoint: 'http://149.33.14.250/mcp/p/mcp-monorepo',
       local_path: join(paths.homePath, 'repo'),
       token_env: 'MCP_BEARER_TOKEN',
@@ -2495,8 +2573,9 @@ describe('watcher desktop core', () => {
     const pack = buildDesktopConfigPackage(paths, 'mcp-monorepo');
 
     expect(pack.tokenAvailable).toBe(true);
-    expect(pack.tokenValue).toBe(VALID_ENV_BEARER);
-    expect(pack.configJson).toContain(`Bearer ${VALID_ENV_BEARER}`);
+    expect(pack.tokenValue).toBeNull();
+    expect(pack.configJson).toContain('Bearer ${MCP_BEARER_TOKEN}');
+    expect(pack.configJson).not.toContain(VALID_ENV_BEARER);
     expect(pack.configJson).not.toContain(PLACEHOLDER_BEARER);
   });
 
@@ -2519,8 +2598,9 @@ describe('watcher desktop core', () => {
     const pack = buildDesktopConfigPackage(paths, 'mcp-monorepo');
 
     expect(pack.tokenAvailable).toBe(true);
-    expect(pack.tokenValue).toBe(STALE_LOCAL_BEARER);
-    expect(pack.configJson).toContain(`Bearer ${STALE_LOCAL_BEARER}`);
+    expect(pack.tokenValue).toBeNull();
+    expect(pack.configJson).toContain('Bearer ${MCP_BEARER_TOKEN}');
+    expect(pack.configJson).not.toContain(STALE_LOCAL_BEARER);
     expect(pack.configJson).not.toContain(VALID_ENV_BEARER);
   });
 
@@ -2530,6 +2610,7 @@ describe('watcher desktop core', () => {
     mkdirSync(paths.homePath, { recursive: true });
     writeFileSync(source, JSON.stringify({
       project_id: 'mcp-monorepo',
+      secret_import_consent: true,
       endpoint: 'http://149.33.14.250/mcp/p/mcp-monorepo',
       local_path: join(paths.homePath, 'repo'),
       token_env: 'MCP_BEARER_TOKEN',
@@ -2560,6 +2641,7 @@ describe('watcher desktop core', () => {
     mkdirSync(paths.homePath, { recursive: true });
     writeFileSync(source, JSON.stringify({
       project_id: 'mcp-monorepo',
+      secret_import_consent: true,
       endpoint: 'http://149.33.14.250/mcp/p/mcp-monorepo',
       local_path: join(paths.homePath, 'repo'),
       token_env: 'MCP_BEARER_TOKEN',

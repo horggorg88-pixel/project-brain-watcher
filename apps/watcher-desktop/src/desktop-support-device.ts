@@ -112,7 +112,7 @@ export async function enrollManagedDevice(
         Authorization: `Bearer ${account.bearerToken}`,
       },
       body: JSON.stringify(
-        buildEnrollmentPayload(paths, projectId, account.meshBaseUrl),
+        buildEnrollmentPayload(projectId, account.meshBaseUrl),
       ),
     });
   } catch (error) {
@@ -369,12 +369,11 @@ function supportStateMatchesProject(
 }
 
 function buildEnrollmentPayload(
-  paths: DesktopCorePaths,
   projectId: string | undefined,
   meshBaseUrl: string | null,
 ): Record<string, string> {
   const host = hostname() || "unknown-host";
-  const installId = `${userInfo().username}@${host}:${paths.userDataPath}`;
+  const installId = canonicalSupportInstallId(projectId, host);
   return {
     label: projectId ? `${projectId} · ${host}` : host,
     ...(projectId ? { projectId } : {}),
@@ -387,6 +386,24 @@ function buildEnrollmentPayload(
       ? `${meshBaseUrl.replace(/\/$/, "")}/device/${encodeURIComponent(host)}`
       : "",
   };
+}
+
+function canonicalSupportInstallId(
+  projectId: string | undefined,
+  host: string,
+): string {
+  const user = stableIdentityPart(userInfo().username, "unknown-user");
+  const machine = stableIdentityPart(host, "unknown-host");
+  const project = stableIdentityPart(projectId, "no-project");
+  return `${user}@${machine}:project:${project}`;
+}
+
+function stableIdentityPart(
+  value: string | undefined,
+  fallback: string,
+): string {
+  const normalized = value?.trim().toLowerCase();
+  return normalized && normalized.length > 0 ? normalized : fallback;
 }
 
 function saveSupportDeviceState(

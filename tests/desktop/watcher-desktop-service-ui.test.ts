@@ -116,7 +116,7 @@ describe('watcher desktop service UI confirmation', () => {
     const lines = serviceActionProgressLines('check_update', 1_000);
     const text = lines.join('\n');
 
-    expect(lines).toContain('Выполняем: Проверить обновления...');
+    expect(lines).toContain('Выполняем: Проверить обновление пульта и watcher...');
     expect(lines).toContain('Команда: watcher.check_update · риск: низкий · timeout: 0:10');
     expect(lines).toContain('Текущий этап: Проверяем текущую версию пульта и watcher');
     expect(lines).toContain('Маршрут команды (полная трасса со статусами):');
@@ -255,5 +255,15 @@ describe('watcher desktop service action lifecycle', () => {
     expect(block).toContain('writeLog(lateServiceActionFailureLog(request.action, error));');
     expect(block).toContain('queuePostServiceActionRefresh(request.action);');
     expect(block).not.toContain('.then(resolve, reject)');
+  });
+
+  it('renders the final service progress from normalized command receipt steps', () => {
+    const block = rendererSourceBlock(
+      'function serviceActionLog',
+      'function serviceLogSummary',
+    );
+
+    expect(block).toContain('formatServiceProgress(result.receipt, result.progress)');
+    expect(block).not.toContain('formatServiceProgress(result.progress)');
   });
 });

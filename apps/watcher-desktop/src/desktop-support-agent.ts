@@ -162,7 +162,7 @@ function supportReceiptSteps(
   const descriptor = descriptorForCommand(supportCommandId(action));
   return descriptor.progressSteps.map((id, index) => ({
     id,
-    label: id,
+    label: descriptor.progressText.labels[id] ?? id,
     status: supportStepStatus(status, index),
     detail: index === descriptor.progressSteps.length - 1 ? message : supportStepDetail(id),
   }));

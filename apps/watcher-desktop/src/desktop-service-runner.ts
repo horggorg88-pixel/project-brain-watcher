@@ -13,6 +13,7 @@ import type {
   WatcherServicePrimaryCause,
   WatcherServiceStatus,
 } from './contracts.js';
+import { descriptorForCommand, watcherServiceCommandId } from './desktop-command-registry.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { applyMcpConfigToProfile, type DesktopCorePaths } from './desktop-profile-store.js';
 import { readDesktopEnvServiceToken, readDesktopServiceToken, stageDesktopServiceSecret, type DesktopServiceSecretState } from './desktop-service-secret.js';
@@ -923,8 +924,7 @@ function defaultNpxExecutable(): string {
 }
 
 function actionLabel(action: WatcherServiceActionRequest['action']): string {
-  const labels = { health: 'Проверить', install: 'Установить службу', start: 'Запустить', stop: 'Остановить', restart: 'Перезапустить', check_update: 'Проверить обновления', update: 'Обновить пульт и watcher' };
-  return labels[action];
+  return descriptorForCommand(watcherServiceCommandId(action)).label;
 }
 
 function compactOutput(value: string): string {

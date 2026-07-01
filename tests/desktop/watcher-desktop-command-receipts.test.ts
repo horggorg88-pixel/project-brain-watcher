@@ -91,7 +91,14 @@ describe('watcher desktop command receipts', () => {
     expect(receipt.ackState).toBe('local_committed');
     expect(receipt.logCursor).toBe('err:cursor-err-tail');
     expect(receipt.diagnostic?.code).toBe('COMMAND_TIMEOUT');
-    expect(receipt.steps.map(step => step.id)).toEqual(['preflight', 'command']);
+    expect(receipt.steps.map(step => step.id)).toEqual(descriptorForCommand('watcher.start').progressSteps);
+    expect(receipt.steps.map(step => step.label)).toEqual([
+      'Проверяем выбранный проект, bearer и MCP-доступ',
+      'Запускаем Windows-службу watcher',
+      'Ждём healthy, lease и первую синхронизацию',
+      'Собираем логи запуска и первопричину, если healthy не наступил',
+    ]);
+    expect(receipt.steps.find(step => step.id === 'service_start')?.status).toBe('failed');
     expect(receipt.receiptId).toMatch(/^dcr_[a-f0-9]{20}$/);
     expect(receipt.runId).toMatch(/^dcrun_[a-f0-9]{18}$/);
   });

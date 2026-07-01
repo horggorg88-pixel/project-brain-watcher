@@ -13,6 +13,7 @@ import type {
   SavedProjectProfile,
   WatcherServiceStatus,
 } from './contracts.js';
+import { redactDesktopLogText } from './desktop-log-redaction.js';
 import { iconSvg } from './renderer-icons.js';
 
 const CORE_CONNECTION_NODE_IDS = new Set(['project', 'config', 'key', 'server', 'watcher']);
@@ -131,10 +132,10 @@ export function formatAccessGateDiagnostics(state: DesktopAccessState): string {
     `Сообщение: ${state.message}`,
     'Gates:',
     ...state.gates.map((gate, index) => (
-      `${index + 1}. ${gate.decision}/${gate.risk}: ${gate.reasons.map(redactLogValue).join('; ')}`
+      `${index + 1}. ${gate.decision}/${gate.risk}: ${gate.reasons.map(redactDesktopLogText).join('; ')}`
     )),
   ];
-  return lines.map(redactLogValue).join('\n');
+  return lines.map(redactDesktopLogText).join('\n');
 }
 
 export function formatSupportEnrollmentLog(
@@ -158,7 +159,7 @@ export function formatSupportEnrollmentLog(
   } else {
     lines.push('next: запускаю автоматическую регистрацию support-device');
   }
-  return lines.map(redactLogValue).join('\n');
+  return lines.map(redactDesktopLogText).join('\n');
 }
 
 export function formatCodexGateDiagnostics(status: DesktopCodexGateStatus, projectId: string): string {
@@ -171,32 +172,34 @@ export function formatCodexGateDiagnostics(status: DesktopCodexGateStatus, proje
     'Проверки:',
     ...codexEvidenceRows(status).map(formatCodexEvidenceRow),
   ];
-  return lines.map(redactLogValue).join('\n');
+  return lines.map(redactDesktopLogText).join('\n');
 }
 
 function codexEvidenceRows(status: DesktopCodexGateStatus): readonly {
   readonly id: string;
   readonly label: string;
   readonly evidence: DesktopCodexGateRunEvidence | undefined;
+  readonly referenceCheckedAt: string;
 }[] {
   const commandRuns = status.evidence.commandRuns;
   const verification = status.evidence.verification;
+  const referenceCheckedAt = status.checkedAt;
   return [
-    { id: 'codexTrust', label: 'Codex project trust', evidence: verification.codexTrust },
-    { id: 'codexRuntime', label: 'Codex CLI', evidence: verification.codexRuntime },
-    { id: 'codexHooks', label: 'Persistent verifier hooks', evidence: commandRuns.codexHooks },
-    { id: 'typecheck', label: 'Quality typecheck', evidence: commandRuns.typecheck },
-    { id: 'lint', label: 'Quality lint', evidence: commandRuns.lint },
-    { id: 'test', label: 'Quality test', evidence: commandRuns.test },
-    { id: 'build', label: 'Quality build', evidence: commandRuns.build },
-    { id: 'check', label: 'Quality check', evidence: commandRuns.check },
-    { id: 'verify', label: 'Quality verify', evidence: commandRuns.verify },
-    { id: 'desktopBootstrap', label: 'Desktop bootstrap', evidence: verification.desktopBootstrap },
-    { id: 'managedHooks', label: 'Managed hooks', evidence: verification.managedHooks },
-    { id: 'smoke', label: 'Project smoke', evidence: verification.smoke },
-    { id: 'rollback', label: 'Rollback command', evidence: verification.rollback },
-    { id: 'hookPersistence', label: 'Native SessionStart', evidence: verification.hookPersistence },
-    { id: 'runtimeContext', label: 'Runtime Context', evidence: verification.runtimeContext },
+    { id: 'codexTrust', label: 'Codex project trust', evidence: verification.codexTrust, referenceCheckedAt },
+    { id: 'codexRuntime', label: 'Codex CLI', evidence: verification.codexRuntime, referenceCheckedAt },
+    { id: 'codexHooks', label: 'Persistent verifier hooks', evidence: commandRuns.codexHooks, referenceCheckedAt },
+    { id: 'typecheck', label: 'Quality typecheck', evidence: commandRuns.typecheck, referenceCheckedAt },
+    { id: 'lint', label: 'Quality lint', evidence: commandRuns.lint, referenceCheckedAt },
+    { id: 'test', label: 'Quality test', evidence: commandRuns.test, referenceCheckedAt },
+    { id: 'build', label: 'Quality build', evidence: commandRuns.build, referenceCheckedAt },
+    { id: 'check', label: 'Quality check', evidence: commandRuns.check, referenceCheckedAt },
+    { id: 'verify', label: 'Quality verify', evidence: commandRuns.verify, referenceCheckedAt },
+    { id: 'desktopBootstrap', label: 'Desktop bootstrap', evidence: verification.desktopBootstrap, referenceCheckedAt },
+    { id: 'managedHooks', label: 'Managed hooks', evidence: verification.managedHooks, referenceCheckedAt },
+    { id: 'smoke', label: 'Project smoke', evidence: verification.smoke, referenceCheckedAt },
+    { id: 'rollback', label: 'Rollback command', evidence: verification.rollback, referenceCheckedAt },
+    { id: 'hookPersistence', label: 'Native SessionStart', evidence: verification.hookPersistence, referenceCheckedAt },
+    { id: 'runtimeContext', label: 'Runtime Context', evidence: verification.runtimeContext, referenceCheckedAt },
   ];
 }
 
@@ -204,9 +207,10 @@ function formatCodexEvidenceRow(row: {
   readonly id: string;
   readonly label: string;
   readonly evidence: DesktopCodexGateRunEvidence | undefined;
+  readonly referenceCheckedAt: string;
 }): string {
   if (!row.evidence) return formatMissingCodexEvidenceRow(row);
-  const state = codexEvidenceState(row.id, row.evidence);
+  const state = codexEvidenceState(row.id, row.evidence, row.referenceCheckedAt);
   const exitCode = row.evidence.exitCode === undefined ? 'нет данных' : String(row.evidence.exitCode);
   const checkedAt = row.evidence.checkedAt ?? 'нет данных';
   return [
@@ -228,11 +232,20 @@ function formatMissingCodexEvidenceRow(row: {
   return `- ${row.label} (${row.id}): нет evidence`;
 }
 
-function codexEvidenceState(id: string, evidence: DesktopCodexGateRunEvidence): string {
+function codexEvidenceState(id: string, evidence: DesktopCodexGateRunEvidence, referenceCheckedAt: string): string {
+  if (codexEvidenceIsStale(evidence, referenceCheckedAt)) return 'stale';
   if (evidence.available === false) return id === 'smoke' ? 'not_configured' : 'unavailable';
   if (evidence.passed === true) return 'passed';
   if (evidence.passed === false) return 'failed';
   return 'unknown';
+}
+
+function codexEvidenceIsStale(evidence: DesktopCodexGateRunEvidence, referenceCheckedAt: string): boolean {
+  if (evidence.checkedAt === undefined || evidence.staleAfterMs === undefined) return false;
+  const evidenceTime = Date.parse(evidence.checkedAt);
+  const referenceTime = Date.parse(referenceCheckedAt);
+  if (!Number.isFinite(evidenceTime) || !Number.isFinite(referenceTime)) return true;
+  return referenceTime - evidenceTime > evidence.staleAfterMs;
 }
 
 function missingCodexEvidenceDetail(id: string): string | null {
@@ -443,7 +456,7 @@ function renderAccount(state: DesktopAccessState, element: HTMLElement | null): 
 
 function keyText(pack: DesktopConfigPackage, visible: boolean): string {
   if (!pack.tokenAvailable) return pack.tokenPreview;
-  return visible ? `Полный ключ показан временно: ${pack.tokenValue ?? pack.tokenPreview}` : `Ключ скрыт: ${pack.tokenPreview}`;
+  return visible ? `Ключ не выводится в пульт: ${pack.tokenPreview}` : `Ключ скрыт: ${pack.tokenPreview}`;
 }
 
 function healthLabel(value: WatcherServiceStatus['health']): string {
@@ -540,15 +553,4 @@ function userFacingError(message: string): string {
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
-}
-
-function redactLogValue(value: string): string {
-  return value
-    .replace(/\bBearer\s+(?:sk-[A-Za-z0-9._-]+|[A-Za-z0-9._~+/=-]{16,})/gi, 'Bearer [REDACTED]')
-    .replace(/\bpb_[A-Za-z0-9_-]{8,}\b/g, 'pb_[REDACTED]')
-    .replace(/\bsk-[A-Za-z0-9._-]{8,}/g, 'sk-[REDACTED]')
-    .replace(
-      /\b((?:MCP_BEARER_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY|TOKEN|SECRET|PASSWORD|KEY)\s*[:=]\s*)(["']?)[^\s"',;]+/gi,
-      '$1$2[REDACTED]',
-    );
 }

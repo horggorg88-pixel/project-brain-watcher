@@ -372,7 +372,7 @@ describe('watcher desktop service repair', () => {
     const lines = serviceActionProgressLines('start', 65_000);
     const text = lines.join('\n');
 
-    expect(lines[0]).toBe('Выполняем: Запустить watcher...');
+    expect(lines[0]).toBe('Выполняем: Запустить watcher-службу...');
     expect(text).toContain('Команда: watcher.start');
     expect(text).toContain('Таймер: 1:05');
     expect(text).toContain('Какие данные проверяем: service.status, watcher.health, watcher.logs');

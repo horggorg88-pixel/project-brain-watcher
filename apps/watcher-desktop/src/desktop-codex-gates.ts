@@ -17,6 +17,7 @@ import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { applyMcpConfigToProfile, type DesktopCorePaths } from './desktop-profile-store.js';
 import { resolveServiceProfile } from './desktop-service-status.js';
 import { QUALITY_GATE_HOOK_SCRIPT } from './desktop-codex-quality-gate-script.js';
+import { redactDesktopLogText } from './desktop-log-redaction.js';
 
 export interface DesktopCodexCommandRequest {
   readonly command: string;
@@ -1883,7 +1884,7 @@ function codexGateReceiptSteps(status: DesktopCodexGateStatus): readonly Desktop
   const descriptor = descriptorForCommand('codex.verify_gates');
   return descriptor.progressSteps.map(id => ({
     id,
-    label: id,
+    label: descriptor.progressText.labels[id] ?? id,
     status: codexGateStepStatus(id, status),
     detail: codexGateStepDetail(id, status),
   }));
@@ -2108,10 +2109,39 @@ function sanitizeOptional(value: string | undefined): string | undefined {
 
 function formatFailureOutput(value: string): string {
   const sanitized = sanitize(stripAnsi(value)).trim();
-  if (sanitized.length <= FAILURE_OUTPUT_HEAD_CHARS + FAILURE_OUTPUT_TAIL_CHARS) return sanitized;
-  const head = sanitized.slice(0, FAILURE_OUTPUT_HEAD_CHARS).trimEnd();
-  const tail = sanitized.slice(-FAILURE_OUTPUT_TAIL_CHARS).trimStart();
+  const summary = formatFailureSummary(sanitized);
+  const body = formatFailureBody(sanitized);
+  return summary ? `${summary}\n${body}` : body;
+}
+
+function formatFailureBody(value: string): string {
+  if (value.length <= FAILURE_OUTPUT_HEAD_CHARS + FAILURE_OUTPUT_TAIL_CHARS) return value;
+  const head = value.slice(0, FAILURE_OUTPUT_HEAD_CHARS).trimEnd();
+  const tail = value.slice(-FAILURE_OUTPUT_TAIL_CHARS).trimStart();
   return `${head}\n... output truncated: showing failure tail ...\n${tail}`;
+}
+
+function formatFailureSummary(value: string): string | null {
+  const lines = value
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => line.length > 0);
+  const failedTest = lines.find(line => /^(FAIL|❯|×)\s/.test(line));
+  const assertionIndex = lines.findIndex(line => /^(AssertionError|Error|Expected|Received):/.test(line));
+  const assertion = assertionIndex >= 0
+    ? lines.slice(assertionIndex, assertionIndex + 4).filter(isAssertionSummaryLine).join(' | ')
+    : undefined;
+
+  if (!failedTest && !assertion) return null;
+  return [
+    'Failure summary:',
+    failedTest ? `- first_failed_test: ${failedTest}` : null,
+    assertion ? `- assertion: ${assertion}` : null,
+  ].filter((line): line is string => line !== null).join('\n');
+}
+
+function isAssertionSummaryLine(line: string): boolean {
+  return /^(AssertionError|Error|Expected|Received):/.test(line);
 }
 
 function stripAnsi(value: string): string {
@@ -2119,10 +2149,7 @@ function stripAnsi(value: string): string {
 }
 
 function sanitize(value: string): string {
-  return value
-    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [redacted]')
-    .replace(/pb_[A-Za-z0-9_-]+/g, '[redacted]')
-    .replace(/\b(?:TOKEN|SECRET|PASSWORD|KEY)=\S+/gi, match => `${match.split('=', 1)[0]}=[redacted]`);
+  return redactDesktopLogText(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

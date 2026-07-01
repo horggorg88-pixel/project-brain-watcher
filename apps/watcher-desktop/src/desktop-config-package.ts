@@ -18,7 +18,7 @@ export function buildDesktopConfigPackage(
   options: { readonly bootstrap?: boolean } = {},
 ): DesktopConfigPackage {
   const profile = resolveProfile(paths, projectId);
-  const token = resolvePackageToken(paths, profile);
+  const token = resolvePackageToken(paths, profile, options.bootstrap === true);
   const brainPaths = projectBrainFilePaths(profile);
   if (options.bootstrap) {
     if (!token) throw new Error(`Bearer для ${profile.tokenEnv} не найден. Войдите в пульт заново, затем скачайте пакет подключения.`);
@@ -28,6 +28,7 @@ export function buildDesktopConfigPackage(
   const endpoint = buildProjectMcpEndpoint(profile.serverUrl, profile.id);
   const consoleUrl = (profile.consoleUrl ?? '').trim();
   const prompt = buildStartPrompt(profile, endpoint);
+  const exportBearer = bearerPlaceholder(profile.tokenEnv);
   const payload = {
     ...(consoleUrl ? { console_url: consoleUrl } : {}),
     mcpServers: {
@@ -35,7 +36,7 @@ export function buildDesktopConfigPackage(
         type: 'http',
         url: endpoint,
         headers: {
-          Authorization: token ? `Bearer ${token}` : `Bearer ${profile.tokenEnv}`,
+          Authorization: `Bearer ${exportBearer}`,
         },
       },
     },
@@ -44,6 +45,11 @@ export function buildDesktopConfigPackage(
       localPath: profile.root,
       indexId: profile.indexId,
       tokenEnv: profile.tokenEnv,
+      secretMaterial: {
+        bearer: exportBearer,
+        storage: 'local-service-secret',
+        exportPolicy: 'placeholder-only',
+      },
       ...(consoleUrl ? { consoleUrl } : {}),
       startPrompt: prompt,
     },
@@ -58,9 +64,9 @@ export function buildDesktopConfigPackage(
     prompt,
     tokenEnv: profile.tokenEnv,
     tokenAvailable: Boolean(token),
-    tokenPreview: token ? maskToken(token) : `${profile.tokenEnv} не найден`,
-    tokenValue: token,
-    secretPath: secret.tokenFilePath,
+    tokenPreview: token ? `${profile.tokenEnv} готов (secret-файл)` : `${profile.tokenEnv} не найден`,
+    tokenValue: null,
+    secretFingerprint: secret.tokenFileFingerprint,
   };
 }
 
@@ -108,18 +114,22 @@ function buildStartPrompt(profile: SavedProjectProfile, endpoint: string): strin
   ].join('\n');
 }
 
-function maskToken(token: string): string {
-  if (token.length <= 10) return '********';
-  return `${token.slice(0, 4)}...${token.slice(-4)}`;
+function bearerPlaceholder(tokenEnv: string): string {
+  return `\${${tokenEnv}}`;
 }
 
 export function readableProjectName(root: string): string {
   return basename(root.trim()) || 'MCP project';
 }
 
-function resolvePackageToken(paths: DesktopCorePaths, profile: SavedProjectProfile): string | null {
+function resolvePackageToken(
+  paths: DesktopCorePaths,
+  profile: SavedProjectProfile,
+  stageLocalSecrets: boolean,
+): string | null {
   const serviceToken = readDesktopServiceToken(profile);
   if (serviceToken) return serviceToken;
+  if (!stageLocalSecrets) return readDesktopAccessHandoffToken(paths);
   syncDesktopServiceSecretFromProjectMcp(profile);
   const packageToken = readDesktopServiceToken(profile);
   if (packageToken) return packageToken;

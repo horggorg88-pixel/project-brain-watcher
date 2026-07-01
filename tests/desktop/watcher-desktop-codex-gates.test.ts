@@ -573,7 +573,7 @@ describe('watcher desktop codex gates', () => {
     expect(result.message).toContain('native SessionStart');
     expect(result.message).not.toContain('Smoke gate Codex упал');
     expect(result.evidence.verification.smoke?.detail).toContain('tests/runtime-start/app-version.test.ts');
-    expect(result.evidence.verification.smoke?.detail).toContain('TOKEN=[redacted]');
+    expect(result.evidence.verification.smoke?.detail).toContain('TOKEN=[REDACTED]');
     expect(result.evidence.verification.smoke?.detail).not.toContain('pb_secret_value');
   });
 
@@ -598,7 +598,7 @@ describe('watcher desktop codex gates', () => {
       '> vitest run',
       '',
       'RUN v4.1.8 C:/Users/salim/go/src/LBS_Bonus',
-      ...Array.from({ length: 18 }, (_, index) => `✓ tests/rebrand-inventory-validator.test.js (${index + 1})`),
+      ...Array.from({ length: 80 }, (_, index) => `✓ tests/rebrand-inventory-validator.test.js (${index + 1})`),
     ].join('\n');
     const failureTail = [
       'FAIL tests/sql-admin-remaining-endpoint-retirement-contract.test.js',
@@ -606,10 +606,14 @@ describe('watcher desktop codex gates', () => {
       'Expected: 410',
       'Received: 200',
     ].join('\n');
+    const postFailureNoise = Array.from(
+      { length: 120 },
+      (_, index) => `late post-failure log ${index + 1}: worker cleanup and coverage accounting completed`,
+    ).join('\n');
     const result = await verifyDesktopCodexGates(paths, 'demo-project', {
       runner: async request => {
         const command = [request.command, ...request.args].join(' ');
-        if (command === 'npm test') return { exitCode: 1, output: `${greenHeader}\n${failureTail}` };
+        if (command === 'npm test') return { exitCode: 1, output: `${greenHeader}\n${failureTail}\n${postFailureNoise}` };
         return { exitCode: 0, output: 'ok' };
       },
       now: () => new Date('2026-06-15T10:00:00.000Z'),
@@ -618,8 +622,13 @@ describe('watcher desktop codex gates', () => {
     expect(result.ready).toBe(false);
     expect(result.message).toContain('native SessionStart');
     expect(result.message).not.toContain('Smoke gate Codex упал');
+    expect(result.evidence.verification.smoke?.detail).toContain('Failure summary:');
+    expect(result.evidence.verification.smoke?.detail).toContain('- first_failed_test: FAIL tests/sql-admin-remaining-endpoint-retirement-contract.test.js');
+    expect(result.evidence.verification.smoke?.detail).toContain('- assertion: AssertionError: expected retired endpoint to return 410 | Expected: 410 | Received: 200');
+    expect(result.evidence.verification.smoke?.detail).toContain('... output truncated: showing failure tail ...');
     expect(result.evidence.verification.smoke?.detail).toContain('FAIL tests/sql-admin-remaining-endpoint-retirement-contract.test.js');
     expect(result.evidence.verification.smoke?.detail).toContain('Received: 200');
+    expect(result.evidence.verification.smoke?.detail).toContain('late post-failure log 120');
   });
 
   it('reads native hook persistence evidence written by Codex hooks', () => {

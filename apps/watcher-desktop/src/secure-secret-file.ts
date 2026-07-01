@@ -1,13 +1,16 @@
 import { createHash } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { SecretAclHealth } from './contracts.js';
 
 export interface RestrictedSecretHealth {
   readonly configured: boolean;
-  readonly tokenFilePath: string;
+  readonly tokenFileFingerprint: string;
+  readonly expectedFingerprint: string | null;
   readonly actualFingerprint: string | null;
+  readonly matchesExpected: boolean | null;
+  readonly rotationRequired: boolean;
   readonly acl: SecretAclHealth;
 }
 
@@ -24,12 +27,18 @@ export function readRestrictedSecretFile(path: string): string | null {
   return token.length > 0 ? token : null;
 }
 
-export function readRestrictedSecretHealth(tokenFilePath: string): RestrictedSecretHealth {
+export function readRestrictedSecretHealth(tokenFilePath: string, expectedToken?: string | null): RestrictedSecretHealth {
+  const expectedFingerprint = expectedToken
+    ? buildRedactedSecretFingerprint(expectedToken)
+    : null;
   if (!existsSync(tokenFilePath)) {
     return {
       configured: false,
-      tokenFilePath,
+      tokenFileFingerprint: buildRedactedSecretFingerprint(tokenFilePath),
+      expectedFingerprint,
       actualFingerprint: null,
+      matchesExpected: expectedFingerprint ? false : null,
+      rotationRequired: expectedFingerprint !== null,
       acl: {
         restricted: false,
         reason: 'secret_file_missing',
@@ -39,10 +48,17 @@ export function readRestrictedSecretHealth(tokenFilePath: string): RestrictedSec
   }
   const token = readRestrictedSecretFile(tokenFilePath);
   const acl = restrictSecretAcl(tokenFilePath);
+  const actualFingerprint = token ? buildRedactedSecretFingerprint(token) : null;
+  const matchesExpected = expectedFingerprint && actualFingerprint
+    ? expectedFingerprint === actualFingerprint
+    : expectedFingerprint ? false : null;
   return {
     configured: token !== null,
-    tokenFilePath,
-    actualFingerprint: token ? buildRedactedSecretFingerprint(token) : null,
+    tokenFileFingerprint: buildRedactedSecretFingerprint(tokenFilePath),
+    expectedFingerprint,
+    actualFingerprint,
+    matchesExpected,
+    rotationRequired: matchesExpected === false,
     acl: {
       restricted: acl,
       reason: acl ? null : 'acl_restriction_failed',
@@ -58,7 +74,13 @@ export function buildRedactedSecretFingerprint(token: string): string {
 }
 
 function restrictSecretAcl(path: string): boolean {
-  if (process.platform !== 'win32') return true;
+  if (process.platform !== 'win32') {
+    try {
+      return (statSync(path).mode & 0o077) === 0;
+    } catch {
+      return false;
+    }
+  }
   const userGrant = `${process.env.USERDOMAIN ?? '.'}\\${process.env.USERNAME ?? ''}:F`;
   const grants = ['*S-1-5-18:R', '*S-1-5-32-544:F', userGrant].filter(grant => !grant.endsWith('\\:F'));
   const result = spawnSync('icacls.exe', [path, '/inheritance:r', '/grant:r', ...grants], {

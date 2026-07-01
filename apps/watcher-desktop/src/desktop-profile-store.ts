@@ -26,7 +26,11 @@ export function hasStoredProfiles(paths: DesktopCorePaths): boolean {
   return existsSync(profilesPath(paths));
 }
 
-export function saveProfile(paths: DesktopCorePaths, project: ProjectDraft): SavedProjectProfile {
+export function saveProfile(
+  paths: DesktopCorePaths,
+  project: ProjectDraft,
+  options: { readonly stageLocalSecrets?: boolean } = {},
+): SavedProjectProfile {
   const handoff = readDesktopAccessHandoff(paths);
   const serverUrl = project.serverUrl.trim() || handoff?.serverUrl || '';
   const consoleUrl = project.consoleUrl?.trim() || handoff?.consoleUrl || '';
@@ -41,8 +45,10 @@ export function saveProfile(paths: DesktopCorePaths, project: ProjectDraft): Sav
   const saved = { ...normalized, createdAt: new Date().toISOString() };
   mkdirSync(paths.userDataPath, { recursive: true });
   writeFileSync(profilesPath(paths), JSON.stringify([...profiles, saved], null, 2), 'utf-8');
-  stageDesktopAccessHandoffForProfile(paths, saved);
-  stageProjectBrainFiles(saved, { bearerToken: readDesktopServiceToken(saved) });
+  if (options.stageLocalSecrets ?? true) {
+    stageDesktopAccessHandoffForProfile(paths, saved);
+    stageProjectBrainFiles(saved, { bearerToken: readDesktopServiceToken(saved) });
+  }
   return saved;
 }
 

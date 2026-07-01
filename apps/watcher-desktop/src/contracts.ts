@@ -7,6 +7,7 @@ export type {
   DesktopCommandId,
   DesktopCommandProgressStep,
   DesktopCommandProgressStepStatus,
+  DesktopCommandProgressText,
   DesktopCommandReceipt,
   DesktopCommandRisk,
   DesktopCommandStatus,
@@ -371,7 +372,7 @@ export interface DesktopConfigPackage {
   readonly tokenAvailable: boolean;
   readonly tokenPreview: string;
   readonly tokenValue: string | null;
-  readonly secretPath: string | null;
+  readonly secretFingerprint: string | null;
 }
 
 export interface DesktopConfigSaveResult {

@@ -48,6 +48,7 @@ export type DesktopCommandProgressStepStatus = 'pending' | 'running' | 'passed' 
 export interface DesktopCommandDescriptor {
   readonly id: DesktopCommandId;
   readonly label: string;
+  readonly globalActionId: string;
   readonly category: DesktopCommandCategory;
   readonly surface: DesktopCommandSurface;
   readonly risk: DesktopCommandRisk;
@@ -55,6 +56,12 @@ export interface DesktopCommandDescriptor {
   readonly timeoutMs: number | null;
   readonly requiredEvidence: readonly string[];
   readonly progressSteps: readonly string[];
+  readonly progressText: DesktopCommandProgressText;
+}
+
+export interface DesktopCommandProgressText {
+  readonly labels: Readonly<Record<string, string>>;
+  readonly finalLog: string;
 }
 
 export interface DesktopCommandProgressStep {

@@ -14,7 +14,9 @@ interface HandoffFile {
   readonly server_url?: unknown;
   readonly console_url?: unknown;
   readonly token_env?: unknown;
+  readonly secret_import_consent?: unknown;
   readonly mcpServers?: unknown;
+  readonly projectBrain?: unknown;
 }
 
 export function importProjectConfig(paths: DesktopCorePaths, sourcePath: string): ProjectImportResult {
@@ -40,12 +42,15 @@ export function importProjectConfig(paths: DesktopCorePaths, sourcePath: string)
     };
   }
   const project = toProjectDraft(parsed);
-  const profile = saveProfile(paths, project);
-  const secretStaged = bearerToken ? stageDesktopServiceSecret(profile, bearerToken).configured : false;
+  const secretImportConsent = readSecretImportConsent(parsed);
+  const profile = saveProfile(paths, project, { stageLocalSecrets: secretImportConsent });
+  const secretStaged = bearerToken && secretImportConsent
+    ? stageDesktopServiceSecret(profile, bearerToken).configured
+    : false;
   return {
     profile,
     sourcePath,
-    warnings: importWarnings(parsed, secretStaged),
+    warnings: importWarnings(parsed, secretStaged, secretImportConsent),
     tokenDetected: bearerToken !== null,
     secretStaged,
     accessConfigImported: false,
@@ -83,15 +88,24 @@ function parseHandoffFile(value: unknown): HandoffFile {
   return value;
 }
 
-function importWarnings(file: HandoffFile, secretStaged: boolean): string[] {
+function importWarnings(file: HandoffFile, secretStaged: boolean, secretImportConsent: boolean): string[] {
   const warnings: string[] = [];
   if (readBearerToken(file)) {
-    warnings.push(secretStaged
+    warnings.push(!secretImportConsent
+      ? 'Bearer-токен обнаружен, но не импортирован без явного согласия.'
+      : secretStaged
       ? 'Bearer-токен перенесён в локальный secret-файл службы и не сохранён в профиле.'
       : 'Bearer-токен обнаружен в файле, но secret-файл службы не создан.');
   }
   if (!readString(file.token_env)) warnings.push('Имя переменной окружения не найдено, используется MCP_BEARER_TOKEN.');
   return warnings;
+}
+
+function readSecretImportConsent(file: HandoffFile): boolean {
+  if (file.secret_import_consent === true) return true;
+  const projectBrain = file.projectBrain;
+  if (!isRecord(projectBrain)) return false;
+  return projectBrain.secret_import_consent === true;
 }
 
 function readServerUrl(value: unknown): string | null {

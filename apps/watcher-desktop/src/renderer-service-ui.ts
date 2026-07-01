@@ -32,8 +32,6 @@ interface ServiceActionPresentation {
   readonly visible: boolean;
 }
 
-type ProgressStepLabels = Partial<Record<string, string>>;
-
 export function isServiceAction(value: string | undefined): value is WatcherServiceAction {
   return value === 'health' || value === 'install' || value === 'start' || value === 'stop' || value === 'restart' || value === 'check_update' || value === 'update';
 }
@@ -114,8 +112,7 @@ export function resolveServiceActionConfirmation(
 }
 
 export function actionLabel(action: WatcherServiceAction): string {
-  const labels = { health: 'Проверить подключение', install: 'Установить службу', start: 'Запустить watcher', stop: 'Остановить watcher', restart: 'Перезапустить watcher', check_update: 'Проверить обновления', update: 'Обновить пульт и watcher' };
-  return labels[action];
+  return descriptorForCommand(watcherServiceCommandId(action)).label;
 }
 
 export function serviceActionProgressLines(
@@ -133,8 +130,6 @@ export function serviceActionProgressLines(
     activeStepIndex: statusStep?.index ?? activeStepIndex,
     settledText,
     currentText: statusStep?.text ?? null,
-    stepLabels: ACTION_STEP_LABELS[action],
-    finalLog: serviceActionFinalLog(action),
   });
   return [
     `Выполняем: ${actionLabel(action)}...`,
@@ -163,57 +158,6 @@ export function serviceActionTimeoutLog(action: WatcherServiceAction, timeoutMs 
     `Что проверить: ${serviceActionTimeoutHint(action)}`,
   ].join('\n');
 }
-
-const ACTION_STEP_LABELS: Record<WatcherServiceAction, ProgressStepLabels> = {
-  health: {
-    preflight: 'Проверяем выбранный проект, bearer и MCP-доступ',
-    service_status: 'Запрашиваем состояние Windows-службы watcher',
-    logs: 'Читаем последние watcher/service логи',
-    diagnostics: 'Собираем последние логи и понятную причину статуса',
-  },
-  install: {
-    preflight: 'Проверяем выбранный проект, bearer и MCP-доступ',
-    runtime_download: 'Скачиваем локальный watcher runtime из release package',
-    runtime_install: 'Ставим локальный watcher runtime в .brain/service',
-    service_install: 'Устанавливаем или обновляем Windows-службу watcher',
-    launcher_verify: 'Проверяем launcher, XML и WinSW wrapper',
-    service_start: 'Запускаем Windows-службу watcher после установки',
-    health: 'Проверяем, что служба может перейти в healthy',
-  },
-  start: {
-    preflight: 'Проверяем выбранный проект, bearer и MCP-доступ',
-    service_start: 'Запускаем Windows-службу watcher',
-    health: 'Ждём healthy, lease и первую синхронизацию',
-    diagnostics: 'Собираем логи запуска и первопричину, если healthy не наступил',
-  },
-  stop: {
-    preflight: 'Проверяем выбранный проект и текущий профиль службы',
-    service_stop: 'Останавливаем Windows-службу watcher',
-    status_verify: 'Проверяем, что служба действительно остановлена',
-    diagnostics: 'Собираем логи остановки и итоговый статус',
-  },
-  restart: {
-    preflight: 'Проверяем выбранный проект, bearer и MCP-доступ',
-    service_stop: 'Останавливаем текущий процесс Windows-службы watcher',
-    service_start: 'Запускаем Windows-службу watcher заново',
-    health: 'Ждём healthy, lease и первую синхронизацию после перезапуска',
-    diagnostics: 'Собираем логи перезапуска и первопричину, если healthy не наступил',
-  },
-  check_update: {
-    preflight: 'Проверяем текущую версию пульта и watcher',
-    github_release: 'Запрашиваем последний GitHub release',
-    compare_versions: 'Сравниваем версии и формируем решение об обновлении',
-  },
-  update: {
-    preflight: 'Проверяем текущую версию, профиль проекта и доступ к release',
-    download: 'Скачиваем desktop installer и проверяем checksum',
-    verify: 'Проверяем подпись, размер и целостность скачанного release',
-    install: 'Запускаем установку desktop update',
-    runtime_install: 'Ставим локальный watcher runtime из release package',
-    restart: 'Перезапускаем Windows-службу на новой версии',
-    health: 'Сверяем версии, healthy и итоговый статус службы',
-  },
-};
 
 function serviceActionSettledText(action: WatcherServiceAction, status: WatcherServiceStatus | null | undefined): string | null {
   if (!status) return null;
@@ -250,19 +194,6 @@ function serviceActionStatusStep(
     return { index: 5, text: 'Служба установлена; проверяем готовность watcher к healthy' };
   }
   return null;
-}
-
-function serviceActionFinalLog(action: WatcherServiceAction): string {
-  const labels = {
-    health: 'доступ к MCP-серверу, состояние службы и последние логи',
-    install: 'что установлено, где лежит launcher/XML и почему служба готова или не готова',
-    start: 'запущена ли служба, получен ли lease и прошла ли первая синхронизация',
-    stop: 'остановлена ли служба и какой код вернул WinSW',
-    restart: 'перезапустилась ли служба и вернулась ли она в healthy',
-    check_update: 'есть ли новая версия, какая версия локально и какая доступна в GitHub release',
-    update: 'что скачано, что установлено и какой статус службы после обновления',
-  };
-  return labels[action];
 }
 
 function serviceActionTimeoutHint(action: WatcherServiceAction): string {

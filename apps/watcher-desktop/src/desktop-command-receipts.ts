@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type {
   DesktopCommandDiagnostic,
+  DesktopCommandDescriptor,
   DesktopCommandId,
   DesktopCommandProgressStep,
   DesktopCommandReceipt,
@@ -35,6 +36,24 @@ export interface DesktopCommandReceiptInput {
   readonly diagnostic?: DesktopCommandDiagnostic | null;
   readonly steps?: readonly DesktopCommandProgressStep[];
 }
+
+const SERVICE_PROGRESS_STEP_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  service_status: ['command', 'health'],
+  logs: ['diagnostics'],
+  runtime_download: ['repair'],
+  runtime_install: ['repair'],
+  service_install: ['command'],
+  launcher_verify: ['repair'],
+  service_start: ['command'],
+  service_stop: ['command'],
+  status_verify: ['command'],
+  github_release: ['command'],
+  compare_versions: ['diagnostics', 'command'],
+  download: ['command'],
+  verify: ['command'],
+  install: ['command'],
+  restart: ['command'],
+};
 
 export function attachServiceCommandReceipt(
   action: WatcherServiceAction,
@@ -71,12 +90,7 @@ export function buildDesktopCommandReceipt(input: DesktopCommandReceiptInput): D
   const updatedAt = input.updatedAt ?? new Date().toISOString();
   const startedAt = input.startedAt ?? updatedAt;
   const diagnostic = input.diagnostic ?? null;
-  const steps = input.steps ?? descriptor.progressSteps.map(id => ({
-    id,
-    label: id,
-    status: 'pending',
-    detail: 'step не запускался',
-  }));
+  const steps = input.steps ?? defaultCommandSteps(descriptor);
   const elapsedMs = input.elapsedMs ?? null;
   const runId = commandRunId(input.commandId, input.projectId, startedAt, elapsedMs);
   const receiptBase = {
@@ -158,22 +172,40 @@ function serviceCommandSteps(
   commandId: DesktopCommandId,
   progress: WatcherServiceActionProgress | undefined,
 ): readonly DesktopCommandProgressStep[] {
-  if (progress) return progress.steps.map(serviceStepToCommandStep);
-  return descriptorForCommand(commandId).progressSteps.map(id => ({
+  const descriptor = descriptorForCommand(commandId);
+  if (!progress) return defaultCommandSteps(descriptor);
+  return descriptor.progressSteps.map(id => {
+    const source = findProgressStep(id, progress.steps);
+    return {
+      id,
+      label: descriptor.progressText.labels[id] ?? source?.label ?? id,
+      status: source?.status ?? 'pending',
+      detail: source?.detail ?? 'step не запускался',
+    };
+  });
+}
+
+function defaultCommandSteps(descriptor: DesktopCommandDescriptor): readonly DesktopCommandProgressStep[] {
+  return descriptor.progressSteps.map(id => ({
     id,
-    label: id,
+    label: descriptor.progressText.labels[id] ?? id,
     status: 'pending',
     detail: 'step не запускался',
   }));
 }
 
-function serviceStepToCommandStep(step: WatcherServiceActionProgressStep): DesktopCommandProgressStep {
-  return {
-    id: step.id,
-    label: step.label,
-    status: step.status,
-    detail: step.detail,
-  };
+function findProgressStep(
+  descriptorStepId: string,
+  steps: readonly WatcherServiceActionProgressStep[],
+): WatcherServiceActionProgressStep | null {
+  const directStep = steps.find(step => step.id === descriptorStepId);
+  if (directStep) return directStep;
+  const aliases = SERVICE_PROGRESS_STEP_ALIASES[descriptorStepId] ?? [];
+  for (const alias of aliases) {
+    const aliasedStep = steps.find(step => step.id === alias);
+    if (aliasedStep) return aliasedStep;
+  }
+  return null;
 }
 
 function serviceLogCursor(logs: WatcherServiceLogTail | null): string | null {

@@ -17,6 +17,7 @@ import {
   serviceName,
   type DesktopCorePaths,
 } from './desktop-profile-store.js';
+import { redactDesktopLogText } from './desktop-log-redaction.js';
 
 const WATCHER_LOCK_TTL_MS = 90_000;
 const SERVICE_LOG_TAIL_BYTES = 16_384;
@@ -172,7 +173,7 @@ export function readServiceLogChunk(
     const end = safeUtf8ChunkEnd(path, cursor.offset, stat.size);
     if (end <= cursor.offset && cursor.offset < stat.size) return null;
     const body = readBytes(path, cursor.offset, end - cursor.offset);
-    const text = redactServiceLogText(
+    const text = redactDesktopLogText(
       trimPartialLeadingLogLine(stripAnsi(body.toString('utf8')), cursor.offset),
     );
     return {
@@ -343,7 +344,7 @@ function readTail(path: string): string {
     const size = statSync(path).size;
     const offset = Math.max(0, size - SERVICE_LOG_TAIL_BYTES);
     const tail = readBytes(path, offset, size - offset).toString('utf8');
-    return lastLines(redactServiceLogText(stripAnsi(trimPartialLeadingLogLine(tail, offset))), SERVICE_LOG_TAIL_LINES);
+    return lastLines(redactDesktopLogText(stripAnsi(trimPartialLeadingLogLine(tail, offset))), SERVICE_LOG_TAIL_LINES);
   } catch (error) {
     return `Лог недоступен: ${errorMessage(error)}`;
   }
@@ -468,18 +469,6 @@ function stripAnsi(value: string): string {
     .replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '')
     .replace(/\u001B[@-Z\\-_]/g, '')
     .replace(/\r/g, '');
-}
-
-function redactServiceLogText(value: string): string {
-  return value
-    .replace(/Authorization:\s*Bearer\s+[^\s"'}]+/gi, 'Authorization: Bearer [REDACTED]')
-    .replace(/\bBearer\s+(?:sk-[A-Za-z0-9._-]+|pb_[A-Za-z0-9._-]+|[A-Za-z0-9._~+/=-]{16,})/gi, 'Bearer [REDACTED]')
-    .replace(
-      /\b((?:MCP_BEARER_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY|TOKEN|API_KEY|PASSWORD|SECRET)\s*[=:]\s*)(["']?)[^\s,"'};]+/gi,
-      '$1$2[REDACTED]',
-    )
-    .replace(/\bsk-[A-Za-z0-9._-]{8,}/g, 'sk-[REDACTED]')
-    .replace(/pb_[A-Za-z0-9._-]{8,}/g, 'pb_[REDACTED]');
 }
 
 function serviceLogHeadHash(path: string, stat: Stats): string {

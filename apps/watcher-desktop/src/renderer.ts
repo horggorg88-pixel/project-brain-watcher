@@ -50,6 +50,13 @@ import {
 } from './renderer-service-ui.js';
 import { serviceCommandStatusLine } from './renderer-service-command-status.js';
 import { iconSvg, isDesktopIconName } from './renderer-icons.js';
+import {
+  redactDesktopServiceStatus,
+  redactDesktopLogText,
+  redactDesktopLogTextWithReceipt,
+} from './desktop-log-redaction.js';
+import { buildDesktopCommandRouteSnapshot } from './desktop-command-route.js';
+import { desktopCheckActionCommandId, descriptorForCommand } from './desktop-command-registry.js';
 
 const POST_SERVICE_ACTION_REFRESH_TIMEOUT_MS = 2_000;
 
@@ -348,14 +355,14 @@ async function handleCheckAction(value: string | undefined): Promise<void> {
       await runServiceActionFromUi('start', true);
       return;
     case 'verify':
-      writeLog('Проверяем MCP-сервер, ключ доступа и watcher...');
+      writeLog(checkActionRouteStartLog(action));
       await refresh();
       writeLog('Проверка завершена. Результат обновлён в обзорном чеклисте.');
       return;
     case 'verify_codex_gates': {
       const projectId = currentProjectId();
       codexGateVerificationProjectId = projectId;
-      writeLog('Проверяем Codex CLI, persistent-verifier, Runtime Context hooks, smoke и rollback...');
+      writeLog(checkActionRouteStartLog(action));
       await refresh();
       try {
         const result = await window.watcherDesktop.codexGates.verify(projectId);
@@ -370,6 +377,27 @@ async function handleCheckAction(value: string | undefined): Promise<void> {
       await openServiceLogs();
       return;
   }
+}
+
+function checkActionRouteStartLog(action: DesktopCheckAction): string {
+  const commandId = desktopCheckActionCommandId(action);
+  if (!commandId) return 'Выполняем действие пульта...';
+  const descriptor = descriptorForCommand(commandId);
+  const route = buildDesktopCommandRouteSnapshot({ descriptor, elapsedMs: 0 });
+  return [
+    `Выполняем: ${descriptor.label}...`,
+    `Команда: ${descriptor.id} · глобальный рельс: ${descriptor.globalActionId} · риск: ${commandRiskLabel(descriptor.risk)} · timeout: ${route.timeoutText}`,
+    `Что происходит сейчас: ${route.currentText}.`,
+    `Какие данные проверяем: ${route.evidenceText}`,
+    `Финальный лог покажет: ${route.finalLog}.`,
+    'Маршрут команды (полная трасса со статусами):',
+    ...route.stages.map(stage => `${stage.marker} ${stage.index + 1}/${stage.total} ${stage.ordinal}: ${stage.label}`),
+  ].join('\n');
+}
+
+function commandRiskLabel(risk: 'low' | 'medium' | 'high'): string {
+  const labels = { low: 'низкий', medium: 'средний', high: 'высокий' };
+  return labels[risk];
 }
 
 async function runFullCheckFromUi(): Promise<void> {
@@ -1009,7 +1037,7 @@ async function copyText(value: string): Promise<void> {
 }
 
 function writeLog(value: string): void {
-  setText(serviceOutputEl, value);
+  setText(serviceOutputEl, redactDesktopLogText(value));
   if (!uiState.consoleOpen) void saveUiState({ ...uiState, consoleOpen: true }).then(() => renderUiState());
 }
 
@@ -1085,47 +1113,53 @@ function startServiceActionProgress(action: WatcherServiceAction): () => void {
 }
 
 async function serviceAiLogsText(): Promise<string> {
+  const aiStatus = redactDesktopServiceStatus(currentServiceStatus);
   const statusText = serviceStatusEl?.textContent?.trim() ?? '';
   const commandText = tailText(
     serviceOutputEl?.textContent?.trim() ?? '',
     SERVICE_AI_COMMAND_TEXT_LIMIT,
     '[TRUNCATED_COMMAND_OUTPUT_FOR_AI_COPY]',
   );
-  const expandedLogsText = await serviceAiExpandedLogsText(currentServiceStatus);
+  const expandedLogsText = await serviceAiExpandedLogsText(aiStatus);
   const rawText = [statusText, commandText, expandedLogsText].filter(Boolean).join('\n\n');
-  const redactedText = redactAiLogText(rawText);
+  const redaction = redactDesktopLogTextWithReceipt(rawText, 'ai');
+  const redactedText = redaction.text;
   const safeText = tailText(
     redactedText,
     SERVICE_AI_CONTEXT_TEXT_LIMIT,
     '[TRUNCATED_BY_AI_CONTEXT_LIMIT]',
   );
-  const diagnostics = classifyDesktopAiDiagnostics(safeText, currentServiceStatus);
+  const diagnostics = classifyDesktopAiDiagnostics(safeText, aiStatus);
   const nextActions = diagnostics.map(item => item.nextAction);
-  const requiredNext = desktopRequiredNext(nextActions, currentServiceStatus);
-  const railMap = desktopRailMap(currentServiceStatus, diagnostics, expandedLogsText, requiredNext);
+  const requiredNext = desktopRequiredNext(nextActions, aiStatus);
+  const railMap = desktopRailMap(aiStatus, diagnostics, expandedLogsText, requiredNext);
   return JSON.stringify({
     schemaVersion: 'watcher-ai-context/v1',
     generatedAt: new Date().toISOString(),
-    project: currentServiceStatus?.projectId ?? currentProjectId(),
-    root: currentServiceStatus?.root ?? selectedProject()?.root ?? null,
-    summary: diagnostics[0]?.message ?? serviceSummaryForAi(currentServiceStatus),
+    project: aiStatus?.projectId ?? currentProjectId(),
+    root: aiStatus?.root ?? selectedProject()?.root ?? null,
+    summary: diagnostics[0]?.message ?? serviceSummaryForAi(aiStatus),
     diagnostics,
-    evidence_refs: serviceEvidenceRefs(currentServiceStatus),
+    evidence_refs: serviceEvidenceRefs(aiStatus),
     next_actions: nextActions,
     required_next: requiredNext,
     rail_map: railMap,
-    expanded_log_chunks: expandedLogsText ? redactAiLogText(expandedLogsText) : null,
-    machine_snapshot: currentServiceStatus ? {
-      installed: currentServiceStatus.installed,
-      running: currentServiceStatus.running,
-      health: currentServiceStatus.health,
-      pid: currentServiceStatus.pid,
-      lastSyncAt: currentServiceStatus.lastSyncAt,
-      lastError: currentServiceStatus.lastError,
+    expanded_log_chunks: expandedLogsText ? redactDesktopLogText(expandedLogsText) : null,
+    machine_snapshot: aiStatus ? {
+      installed: aiStatus.installed,
+      running: aiStatus.running,
+      health: aiStatus.health,
+      pid: aiStatus.pid,
+      lastSyncAt: aiStatus.lastSyncAt,
+      lastError: aiStatus.lastError,
     } : null,
-    log_transport: currentServiceStatus?.logs?.transport ?? null,
+    log_transport: aiStatus?.logs?.transport ?? null,
     rawTail: safeText,
-    redacted: redactedText !== rawText,
+    redacted: redaction.redacted,
+    redaction: {
+      profile: redaction.profile,
+      replacement_count: redaction.replacementCount,
+    },
     truncated: safeText !== redactedText,
   }, null, 2);
 }
@@ -1317,23 +1351,12 @@ function serviceEvidenceRefs(status: WatcherServiceStatus | null): readonly { re
   ];
 }
 
-function redactAiLogText(value: string): string {
-  return value
-    .replace(/\bBearer\s+(?:sk-[A-Za-z0-9._-]+|[A-Za-z0-9._~+/=-]{16,})/gi, 'Bearer [REDACTED]')
-    .replace(/\bpb_[A-Za-z0-9_-]{10,}\b/g, 'pb_[REDACTED]')
-    .replace(/\bsk-[A-Za-z0-9._-]{8,}/g, 'sk-[REDACTED]')
-    .replace(
-      /\b((?:MCP_BEARER_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY|TOKEN|SECRET|PASSWORD|KEY)\s*[:=]\s*)(["']?)[^\s"',;]+/gi,
-      '$1$2[REDACTED]',
-    );
-}
-
 function serviceActionLog(result: WatcherServiceActionResult): string {
   const output = result.output.trim() || 'Команда завершилась без вывода';
   const commandStatus = result.commandStatus ? serviceCommandStatusLine(result.commandStatus) : null;
   const receipt = formatCommandReceipt(result.receipt);
   const primaryCause = formatServicePrimaryCause(result.primaryCause ?? result.progress?.primaryCause ?? null);
-  const progress = formatServiceProgress(result.progress);
+  const progress = formatServiceProgress(result.receipt, result.progress);
   const lines = [
     `${decisionLabel(result.policy.decision)}: код=${result.exitCode ?? 'нет'}`,
     `Проект: ${result.status.projectId ?? currentProjectId()}`,
@@ -1375,7 +1398,17 @@ function formatServicePrimaryCause(cause: WatcherServicePrimaryCause | null): st
   ].join('\n');
 }
 
-function formatServiceProgress(progress: WatcherServiceActionProgress | undefined): string | null {
+function formatServiceProgress(
+  receipt: DesktopCommandReceipt | undefined,
+  progress: WatcherServiceActionProgress | undefined,
+): string | null {
+  if (receipt) {
+    return [
+      'Прогресс операции:',
+      `Итог: ${progress?.summary ?? commandReceiptSummary(receipt)}`,
+      ...receipt.steps.map(step => `${progressStatusLabel(step.status)} ${step.label}: ${step.detail}`),
+    ].join('\n');
+  }
   if (!progress) return null;
   return [
     'Прогресс операции:',
@@ -1384,7 +1417,14 @@ function formatServiceProgress(progress: WatcherServiceActionProgress | undefine
   ].join('\n');
 }
 
-function progressStatusLabel(status: WatcherServiceActionProgress['steps'][number]['status']): string {
+function commandReceiptSummary(receipt: DesktopCommandReceipt): string {
+  if (receipt.diagnostic) return receipt.diagnostic.title;
+  if (receipt.status === 'passed') return 'Команда завершена';
+  if (receipt.status === 'running') return 'Команда выполняется';
+  return `Статус команды: ${receipt.status}`;
+}
+
+function progressStatusLabel(status: 'pending' | 'running' | 'passed' | 'failed' | 'skipped'): string {
   const labels = {
     pending: '[ожидает]',
     running: '[идёт]',
