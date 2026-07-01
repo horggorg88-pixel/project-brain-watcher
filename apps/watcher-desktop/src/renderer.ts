@@ -1250,6 +1250,14 @@ function classifyDesktopAiDiagnostics(text: string, status: WatcherServiceStatus
     impact: 'Windows service starts PowerShell and immediately exits.',
     nextAction: 'Нажми «Починить службу»: пульт переустановит runtime и перепишет launcher.',
   });
+  if (/"?npx\.cmd"?/i.test(text) && /service install|watcher\.install|not recognized|не\s+является|��|�/i.test(text)) diagnostics.push({
+    code: 'WATCHER_NPX_COMMAND_MISSING',
+    severity: 'error' as const,
+    message: 'npx.cmd не найден при установке watcher-службы.',
+    cause: 'Desktop bootstrap attempted to run the watcher installer through npx.cmd before the local service runtime existed.',
+    impact: 'Windows service is not installed, so wrapper/out/err logs may be absent.',
+    nextAction: 'Обнови пульт до версии с node+npx-cli fallback и повтори «Установить службу» или «Починить службу».',
+  });
   if (/launcher_uses_npx_runner|npx(?:\.cmd)?|github:horggorg88-pixel\/project-brain-watcher#v/i.test(text)) diagnostics.push({
     code: 'WATCHER_LEGACY_NPX_LAUNCHER',
     severity: 'warn' as const,

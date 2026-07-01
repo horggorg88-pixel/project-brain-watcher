@@ -432,6 +432,8 @@ describe('watcher desktop contract', () => {
     expect(rendererSource).toContain('formatServicePrimaryCause');
     expect(rendererSource).toContain('formatServiceProgress');
     expect(rendererSource).toContain('watcher-ai-context/v1');
+    expect(rendererSource).toContain('WATCHER_NPX_COMMAND_MISSING');
+    expect(rendererSource).toContain('npx.cmd не найден при установке watcher-службы.');
     expect(rendererSource).toContain('output_profiles');
     expect(rendererSource).toContain('artifact_policy');
     expect(rendererSource).toContain('tail-bounded-redacted');

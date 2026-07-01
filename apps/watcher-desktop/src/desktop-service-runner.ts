@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { delimiter, dirname, join, win32 } from 'node:path';
 import type {
   SavedProjectProfile,
   WatcherCommandStatus,
@@ -38,7 +38,7 @@ import {
 } from './desktop-service-repair.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.116/project-brain-watcher-1.4.116.tgz';
+const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.117/project-brain-watcher-1.4.117.tgz';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 const WATCHER_COMMAND_TIMEOUT_MS = 60_000;
@@ -55,6 +55,19 @@ export interface SpawnWatcherResult {
   readonly exitCode: number;
   readonly output: string;
   readonly commandStatus: WatcherCommandStatus;
+}
+
+export interface WatcherCliInvocation {
+  readonly command: string;
+  readonly args: readonly string[];
+  readonly source: 'env-npx' | 'local-npx' | 'path-npx' | 'node-npx-cli' | 'fallback-npx';
+}
+
+export interface WatcherCliInvocationResolverInput {
+  readonly env?: Readonly<Record<string, string | undefined>>;
+  readonly pathExists?: (path: string) => boolean;
+  readonly platform?: NodeJS.Platform;
+  readonly processExecPath?: string;
 }
 
 export async function runServiceAction(
@@ -102,7 +115,7 @@ export async function runServiceAction(
     }
   }
   const env = token ? { [profile.tokenEnv]: token } : {};
-  const command = defaultNpxExecutable();
+  const watcherCli = resolveWatcherCliInvocation();
   const imagePathRepair = await repairServiceImagePathIfNeeded(profile, status, request.action);
   if (imagePathRepair && imagePathRepair.exitCode !== 0) {
     return finalize({
@@ -114,8 +127,8 @@ export async function runServiceAction(
       commandStatus: imagePathRepair.commandStatus,
     });
   }
-  if (request.action === 'update') return finalize(await runUpdateAction(paths, profile, token, policy, imagePathRepair));
-  const repair = await repairServiceLauncherIfNeeded(profile, status, request.action, command, env);
+  if (request.action === 'update') return finalize(await runUpdateAction(paths, profile, token, policy, imagePathRepair, watcherCli));
+  const repair = await repairServiceLauncherIfNeeded(profile, status, request.action, watcherCli, env);
   if (repair && repair.exitCode !== 0) {
     return finalize({
       executed: true,
@@ -136,7 +149,7 @@ export async function runServiceAction(
       commandStatus: repair.commandStatus,
     });
   }
-  const rawResult = await spawnWatcher(command, buildServiceActionArgs(request.action, profile), profile.root, env, serviceSpawnOptions(request.action));
+  const rawResult = await spawnWatcher(watcherCli.command, [...watcherCli.args, ...buildServiceActionArgs(request.action, profile)], profile.root, env, serviceSpawnOptions(request.action));
   const result = request.action === 'install'
     ? normalizeServiceInstallResult(rawResult.exitCode, rawResult.output)
     : rawResult;
@@ -188,12 +201,12 @@ async function repairServiceLauncherIfNeeded(
   profile: SavedProjectProfile,
   status: WatcherServiceStatus,
   action: WatcherServiceActionRequest['action'],
-  command: string,
+  watcherCli: WatcherCliInvocation,
   env: Readonly<Record<string, string>>,
 ): Promise<SpawnWatcherResult | null> {
   const repairState = readServiceLauncherRepairState(profile);
   if (!shouldRepairServiceLauncherBeforeAction(action, status, repairState)) return null;
-  const install = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env, serviceSpawnOptions('install'));
+  const install = await spawnWatcher(watcherCli.command, [...watcherCli.args, ...buildServiceInstallArgs(profile)], profile.root, env, serviceSpawnOptions('install'));
   const normalized = normalizeServiceInstallResult(install.exitCode, install.output);
   const output = [
     `service repair: launcher устарел (${repairState.reasons.join(', ')})`,
@@ -204,7 +217,7 @@ async function repairServiceLauncherIfNeeded(
     return { exitCode: normalized.exitCode, output: output.filter(Boolean).join('\n'), commandStatus: install.commandStatus };
   }
   if (install.exitCode !== 0) {
-    const refreshRaw = await refreshServiceMetadata(profile, command, env);
+    const refreshRaw = await refreshServiceMetadata(profile, watcherCli, env);
     const refresh = normalizeServiceRefreshResult(refreshRaw.exitCode, refreshRaw.output);
     output.push(refreshRaw.exitCode === 0
       ? 'service repair: refresh выполнен'
@@ -238,10 +251,10 @@ async function repairServiceLauncherIfNeeded(
 
 async function refreshServiceMetadata(
   profile: SavedProjectProfile,
-  command: string,
+  watcherCli: WatcherCliInvocation,
   env: Readonly<Record<string, string>>,
 ): Promise<SpawnWatcherResult> {
-  return spawnWatcher(command, buildServiceRefreshArgs(profile), profile.root, env, {
+  return spawnWatcher(watcherCli.command, [...watcherCli.args, ...buildServiceRefreshArgs(profile)], profile.root, env, {
     timeoutMs: SERVICE_INSTALL_TIMEOUT_MS,
     timeoutLabel: 'service refresh',
   });
@@ -553,23 +566,23 @@ async function runUpdateAction(
   token: string | null,
   policy: WatcherPolicyGate,
   preflightImagePathRepair: SpawnWatcherResult | null,
+  watcherCli: WatcherCliInvocation,
 ): Promise<WatcherServiceActionResult> {
   const versionReport = await updateVersionReport();
   const env = token ? { [profile.tokenEnv]: token } : {};
-  const command = defaultNpxExecutable();
-  const desktop = await spawnWatcher(command, buildDesktopUpdateArgs(), profile.root, env, {
+  const desktop = await spawnWatcher(watcherCli.command, [...watcherCli.args, ...buildDesktopUpdateArgs()], profile.root, env, {
     timeoutMs: DESKTOP_UPDATE_TIMEOUT_MS,
     timeoutLabel: 'desktop update',
   });
   if (desktop.exitCode !== 0) {
     return updateResult(paths, profile.id, policy, desktop.exitCode, versionReport, ['Пульт не обновлён', desktop.output], desktop.commandStatus);
   }
-  const installRaw = await spawnWatcher(command, buildServiceInstallArgs(profile), profile.root, env, serviceSpawnOptions('install'));
+  const installRaw = await spawnWatcher(watcherCli.command, [...watcherCli.args, ...buildServiceInstallArgs(profile)], profile.root, env, serviceSpawnOptions('install'));
   const install = normalizeServiceInstallResult(installRaw.exitCode, installRaw.output);
   if (install.exitCode !== 0) {
     return updateResult(paths, profile.id, policy, install.exitCode, versionReport, ['Пульт обновлён', install.output], installRaw.commandStatus);
   }
-  const refreshRaw = installRaw.exitCode === 0 ? null : await refreshServiceMetadata(profile, command, env);
+  const refreshRaw = installRaw.exitCode === 0 ? null : await refreshServiceMetadata(profile, watcherCli, env);
   const refresh = refreshRaw ? normalizeServiceRefreshResult(refreshRaw.exitCode, refreshRaw.output) : null;
   if (refresh && refresh.exitCode !== 0) {
     return updateResult(paths, profile.id, policy, refresh.exitCode, versionReport, [
@@ -594,7 +607,7 @@ async function runUpdateAction(
       imagePath.output,
     ], imagePathRaw?.commandStatus);
   }
-  const restart = await spawnWatcher(command, buildServiceRestartArgs(profile), profile.root, env);
+  const restart = await spawnWatcher(watcherCli.command, [...watcherCli.args, ...buildServiceRestartArgs(profile)], profile.root, env);
   const status = await waitForServiceActionStatus(paths, 'restart', profile.id);
   const restartSettlement = summarizeServiceActionSettlement('restart', restart.exitCode, restart.output, status);
   const installSummary = installRaw.exitCode === 0
@@ -915,12 +928,90 @@ function spawnInvocation(command: string, args: readonly string[]): { readonly c
   return { command, args };
 }
 
-function defaultNpxExecutable(): string {
-  const override = process.env.PROJECT_BRAIN_WATCHER_NPX?.trim();
-  if (override) return override;
-  if (process.platform !== 'win32') return 'npx';
-  const localNpx = join(dirname(process.execPath), 'npx.cmd');
-  return existsSync(localNpx) ? localNpx : 'npx.cmd';
+export function resolveWatcherCliInvocation(input: WatcherCliInvocationResolverInput = {}): WatcherCliInvocation {
+  const env = input.env ?? process.env;
+  const pathExists = input.pathExists ?? existsSync;
+  const platform = input.platform ?? process.platform;
+  const processExecPath = input.processExecPath ?? process.execPath;
+  const override = env.PROJECT_BRAIN_WATCHER_NPX?.trim();
+  if (override) return { command: override, args: [], source: 'env-npx' };
+  const localNpx = platform === 'win32'
+    ? win32.join(win32.dirname(processExecPath), 'npx.cmd')
+    : join(dirname(processExecPath), 'npx');
+  if (pathExists(localNpx)) return { command: localNpx, args: [], source: 'local-npx' };
+  const pathNpx = findExecutableOnPath(platform === 'win32' ? 'npx.cmd' : 'npx', env, platform, pathExists);
+  if (pathNpx) return { command: pathNpx, args: [], source: 'path-npx' };
+  const nodeExecutable = resolveNodeExecutable(env, platform, processExecPath, pathExists);
+  const npxCliPath = nodeExecutable ? resolveNpxCliPath(nodeExecutable, platform, pathExists) : null;
+  if (nodeExecutable && npxCliPath) {
+    return { command: nodeExecutable, args: [npxCliPath], source: 'node-npx-cli' };
+  }
+  return { command: platform === 'win32' ? 'npx.cmd' : 'npx', args: [], source: 'fallback-npx' };
+}
+
+function resolveNodeExecutable(
+  env: Readonly<Record<string, string | undefined>>,
+  platform: NodeJS.Platform,
+  processExecPath: string,
+  pathExists: (path: string) => boolean,
+): string | null {
+  const override = env.PROJECT_BRAIN_WATCHER_NODE?.trim();
+  const pathNode = findExecutableOnPath(platform === 'win32' ? 'node.exe' : 'node', env, platform, pathExists);
+  const candidates = platform === 'win32'
+    ? [
+        override,
+        win32.join(win32.dirname(processExecPath), 'node.exe'),
+        pathNode,
+        win32.join(env.ProgramFiles ?? 'C:\\Program Files', 'nodejs', 'node.exe'),
+        win32.join(env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)', 'nodejs', 'node.exe'),
+      ]
+    : [
+        override,
+        join(dirname(processExecPath), 'node'),
+        pathNode,
+        '/usr/local/bin/node',
+        '/opt/homebrew/bin/node',
+        '/usr/bin/node',
+      ];
+  return uniqueStrings(candidates).find(candidate => pathExists(candidate)) ?? null;
+}
+
+function resolveNpxCliPath(
+  nodeExecutable: string,
+  platform: NodeJS.Platform,
+  pathExists: (path: string) => boolean,
+): string | null {
+  const baseDir = platform === 'win32' ? win32.dirname(nodeExecutable) : dirname(nodeExecutable);
+  const candidates = platform === 'win32'
+    ? [
+        win32.join(baseDir, 'node_modules', 'npm', 'bin', 'npx-cli.js'),
+      ]
+    : [
+        join(baseDir, '..', 'lib', 'node_modules', 'npm', 'bin', 'npx-cli.js'),
+        join(baseDir, '..', 'lib', 'node_modules', 'corepack', 'dist', 'npx.js'),
+      ];
+  return uniqueStrings(candidates).find(candidate => pathExists(candidate)) ?? null;
+}
+
+function findExecutableOnPath(
+  executable: string,
+  env: Readonly<Record<string, string | undefined>>,
+  platform: NodeJS.Platform,
+  pathExists: (path: string) => boolean,
+): string | null {
+  const pathValue = platform === 'win32'
+    ? env.Path ?? env.PATH ?? env.path ?? ''
+    : env.PATH ?? env.Path ?? env.path ?? '';
+  const separator = platform === 'win32' ? ';' : delimiter;
+  for (const entry of pathValue.split(separator).map(value => value.trim()).filter(Boolean)) {
+    const candidate = platform === 'win32' ? win32.join(entry, executable) : join(entry, executable);
+    if (pathExists(candidate)) return candidate;
+  }
+  return null;
+}
+
+function uniqueStrings(values: readonly (string | null | undefined)[]): string[] {
+  return [...new Set(values.filter((value): value is string => typeof value === 'string' && value.trim().length > 0))];
 }
 
 function actionLabel(action: WatcherServiceActionRequest['action']): string {

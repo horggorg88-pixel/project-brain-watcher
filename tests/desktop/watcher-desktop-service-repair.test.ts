@@ -15,7 +15,7 @@ import {
   shouldRepairServiceImagePathBeforeAction,
   shouldRepairServiceLauncherBeforeAction,
 } from '../../apps/watcher-desktop/src/desktop-service-repair.js';
-import { buildServiceActionProgress, classifyServicePrimaryCause, spawnWatcher } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
+import { buildServiceActionProgress, classifyServicePrimaryCause, resolveWatcherCliInvocation, spawnWatcher } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
 import { readServiceLogTail } from '../../apps/watcher-desktop/src/desktop-service-status.js';
 import { serviceCommandStatusLine } from '../../apps/watcher-desktop/src/renderer-service-command-status.js';
 import { serviceActionProgressLines } from '../../apps/watcher-desktop/src/renderer-service-ui.js';
@@ -146,6 +146,25 @@ describe('watcher desktop service repair', () => {
 
     expect(state.requiresRepair).toBe(true);
     expect(state.reasons).toContain('launcher_uses_npx_runner');
+  });
+
+  it('uses node npx-cli fallback when Windows npx.cmd is not on PATH', () => {
+    const nodePath = 'C:\\Program Files\\nodejs\\node.exe';
+    const npxCliPath = 'C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npx-cli.js';
+    const existing = new Set([nodePath.toLowerCase(), npxCliPath.toLowerCase()]);
+
+    const invocation = resolveWatcherCliInvocation({
+      platform: 'win32',
+      processExecPath: 'C:\\Users\\Den\\AppData\\Local\\Programs\\Project Brain Watcher\\Project Brain Watcher.exe',
+      env: { Path: 'C:\\Program Files\\nodejs' },
+      pathExists: path => existing.has(path.toLowerCase()),
+    });
+
+    expect(invocation).toEqual({
+      command: nodePath,
+      args: [npxCliPath],
+      source: 'node-npx-cli',
+    });
   });
 
   it('requires repair for PowerShell launchers without UTF-8 BOM', () => {
