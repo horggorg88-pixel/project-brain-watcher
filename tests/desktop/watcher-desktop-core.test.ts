@@ -1642,7 +1642,9 @@ describe('watcher desktop core', () => {
         },
       },
     }), 'utf-8');
-    importProjectConfig(paths, source);
+    const imported = importProjectConfig(paths, source);
+    if (!imported.profile) throw new Error('project profile missing');
+    stageDesktopServiceSecret(imported.profile, VALID_TEST_BEARER);
     vi.stubGlobal('fetch', verifiedMcpFetch());
 
     const check = await buildDesktopConnectionCheck(paths, 'runtime-only');
@@ -2710,6 +2712,7 @@ describe('watcher desktop core', () => {
     const imported = importProjectConfig(paths, source);
     expect(imported.profile).not.toBeNull();
     if (!imported.profile) throw new Error('project profile missing');
+    stageDesktopServiceSecret(imported.profile, VALID_TEST_BEARER);
     vi.stubGlobal('fetch', vi.fn(async () => new Response('denied', { status: 401 })));
 
     const result = await runServiceAction(paths, { action: 'start', projectId: imported.profile.id, confirmed: true });
@@ -2739,6 +2742,7 @@ describe('watcher desktop core', () => {
     const imported = importProjectConfig(paths, source);
     expect(imported.profile).not.toBeNull();
     if (!imported.profile) throw new Error('project profile missing');
+    stageDesktopServiceSecret(imported.profile, VALID_TEST_BEARER);
     vi.stubEnv('PROJECT_BRAIN_WATCHER_NPX', installFakeNpx(paths.homePath));
     vi.stubEnv('PROJECT_BRAIN_TEST_RUNTIME_PID', String(process.pid));
     vi.stubGlobal('fetch', vi.fn(async () => {
