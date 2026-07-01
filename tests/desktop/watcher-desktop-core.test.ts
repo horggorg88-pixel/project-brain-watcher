@@ -1590,7 +1590,10 @@ describe('watcher desktop core', () => {
       },
     }), 'utf-8');
     mkdirSync(join(paths.homePath, 'repo'), { recursive: true });
-    importProjectConfig(paths, source);
+    const imported = importProjectConfig(paths, source);
+    expect(imported.profile).not.toBeNull();
+    if (!imported.profile) throw new Error('project profile missing');
+    stageDesktopServiceSecret(imported.profile, VALID_TEST_BEARER);
     vi.stubGlobal('fetch', verifiedMcpFetch());
 
     const check = await buildDesktopConnectionCheck(paths, 'checklist-project');
