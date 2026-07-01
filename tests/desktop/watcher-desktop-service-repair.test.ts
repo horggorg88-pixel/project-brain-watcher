@@ -15,7 +15,7 @@ import {
   shouldRepairServiceImagePathBeforeAction,
   shouldRepairServiceLauncherBeforeAction,
 } from '../../apps/watcher-desktop/src/desktop-service-repair.js';
-import { buildServiceActionProgress, classifyServicePrimaryCause, resolveWatcherCliInvocation, spawnWatcher } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
+import { buildServiceActionProgress, classifyServicePrimaryCause, resolveWatcherCliInvocation, spawnInvocation, spawnWatcher } from '../../apps/watcher-desktop/src/desktop-service-runner.js';
 import { readServiceLogTail } from '../../apps/watcher-desktop/src/desktop-service-status.js';
 import { serviceCommandStatusLine } from '../../apps/watcher-desktop/src/renderer-service-command-status.js';
 import { serviceActionProgressLines } from '../../apps/watcher-desktop/src/renderer-service-ui.js';
@@ -164,6 +164,30 @@ describe('watcher desktop service repair', () => {
       command: nodePath,
       args: [npxCliPath],
       source: 'node-npx-cli',
+    });
+  });
+
+  it('quotes Windows .cmd invocations with spaces for cmd.exe', () => {
+    const invocation = spawnInvocation(
+      'C:\\Program Files\\nodejs\\npx.cmd',
+      [
+        '--yes',
+        'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.120/project-brain-watcher-1.4.120.tgz',
+        'service',
+        'install',
+      ],
+      'win32',
+    );
+
+    expect(invocation).toEqual({
+      command: 'cmd.exe',
+      args: [
+        '/d',
+        '/s',
+        '/c',
+        '""C:\\Program Files\\nodejs\\npx.cmd" "--yes" "https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.120/project-brain-watcher-1.4.120.tgz" "service" "install""',
+      ],
+      windowsVerbatimArguments: true,
     });
   });
 
@@ -434,6 +458,29 @@ describe('watcher desktop service repair', () => {
     expect(result.commandStatus.exitCode).toBe(0);
     expect(result.commandStatus.killed).toBe(false);
     expect(result.commandStatus.label).toBe('desktop health');
+  });
+
+  const itOnWindows = process.platform === 'win32' ? it : it.skip;
+
+  itOnWindows('runs .cmd commands from paths with spaces', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'watcher cmd space '));
+    tempDirs.push(root);
+    const binDir = join(root, 'Program Files', 'nodejs');
+    mkdirSync(binDir, { recursive: true });
+    const commandPath = join(binDir, 'npx.cmd');
+    writeFileSync(commandPath, '@echo ok %*\r\nexit /b 0\r\n', 'utf-8');
+
+    const result = await spawnWatcher(
+      commandPath,
+      ['--yes', 'project-brain-watcher.tgz'],
+      process.cwd(),
+      {},
+      { timeoutMs: 1_000, timeoutLabel: 'cmd path with spaces' },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain('ok');
+    expect(result.output).toContain('project-brain-watcher.tgz');
   });
 
   it('reports spawn errors as machine-readable command status', async () => {

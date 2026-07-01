@@ -38,7 +38,7 @@ import {
 } from './desktop-service-repair.js';
 import { readServiceStatus, resolveServiceProfile } from './desktop-service-status.js';
 
-const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.119/project-brain-watcher-1.4.119.tgz';
+const WATCHER_PACKAGE = 'https://github.com/horggorg88-pixel/project-brain-watcher/releases/download/v1.4.120/project-brain-watcher-1.4.120.tgz';
 const SERVICE_ACTION_SETTLE_TIMEOUT_MS = 30_000;
 const SERVICE_ACTION_SETTLE_POLL_MS = 750;
 const WATCHER_COMMAND_TIMEOUT_MS = 60_000;
@@ -68,6 +68,12 @@ export interface WatcherCliInvocationResolverInput {
   readonly pathExists?: (path: string) => boolean;
   readonly platform?: NodeJS.Platform;
   readonly processExecPath?: string;
+}
+
+export interface WatcherSpawnInvocation {
+  readonly command: string;
+  readonly args: readonly string[];
+  readonly windowsVerbatimArguments?: boolean;
 }
 
 export async function runServiceAction(
@@ -810,7 +816,12 @@ export function spawnWatcher(
       resolve(result);
     };
     try {
-      child = spawn(invocation.command, invocation.args, { cwd, env: { ...process.env, ...env }, windowsHide: true });
+      child = spawn(invocation.command, invocation.args, {
+        cwd,
+        env: { ...process.env, ...env },
+        windowsHide: true,
+        windowsVerbatimArguments: invocation.windowsVerbatimArguments === true,
+      });
     } catch (error) {
       finish(spawnErrorResult(error, invocation.command, label, startedAt, timeoutMs));
       return;
@@ -921,11 +932,27 @@ function delay(ms: number): Promise<void> {
   });
 }
 
-function spawnInvocation(command: string, args: readonly string[]): { readonly command: string; readonly args: readonly string[] } {
-  if (process.platform === 'win32' && command.toLowerCase().endsWith('.cmd')) {
-    return { command: 'cmd.exe', args: ['/d', '/s', '/c', command, ...args] };
+export function spawnInvocation(
+  command: string,
+  args: readonly string[],
+  platform: NodeJS.Platform = process.platform,
+): WatcherSpawnInvocation {
+  if (platform === 'win32' && command.toLowerCase().endsWith('.cmd')) {
+    return {
+      command: 'cmd.exe',
+      args: ['/d', '/s', '/c', quoteCmdCommandLine(command, args)],
+      windowsVerbatimArguments: true,
+    };
   }
   return { command, args };
+}
+
+function quoteCmdCommandLine(command: string, args: readonly string[]): string {
+  return `"${[command, ...args].map(quoteCmdArg).join(' ')}"`;
+}
+
+function quoteCmdArg(value: string): string {
+  return `"${value.replace(/"/g, '\\"')}"`;
 }
 
 export function resolveWatcherCliInvocation(input: WatcherCliInvocationResolverInput = {}): WatcherCliInvocation {
