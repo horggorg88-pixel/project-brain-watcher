@@ -1,10 +1,14 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { callDesktopInfoIndexerTool } from '../../apps/watcher-desktop/src/desktop-infoindexer-bridge.js';
 import { saveProfile, type DesktopCorePaths } from '../../apps/watcher-desktop/src/desktop-profile-store.js';
 import { stageDesktopServiceSecret } from '../../apps/watcher-desktop/src/desktop-service-secret.js';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('watcher desktop InfoIndexer bridge', () => {
   it('calls the stateless tools bridge with project bearer and no-store receipt', async () => {
@@ -72,6 +76,26 @@ describe('watcher desktop InfoIndexer bridge', () => {
       status: 'ok',
       project_id: 'infoindexer',
     });
+  });
+
+  it('rejects renderer tool override attempts before bearer-backed fetch', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await callDesktopInfoIndexerTool(testPaths(), {
+      tool: 'infoindexer.admin_override',
+      projectId: 'infoindexer',
+      query: 'ООО Ромашка',
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: false,
+      isError: true,
+      tool: 'infoindexer.search_companies',
+      projectId: 'infoindexer',
+    });
+    expect(result.content).toContain('неизвестный инструмент');
   });
 });
 

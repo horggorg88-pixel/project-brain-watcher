@@ -58,6 +58,11 @@ describe('watcher desktop contract', () => {
     expect(preloadSource).toContain("ipcRenderer.invoke('service:full-check'");
     expect(preloadSource).toContain("ipcRenderer.invoke('service:log-chunk'");
     expect(preloadSource).toContain("ipcRenderer.invoke('infoindexer:call'");
+    expect(preloadSource).toContain("{ ...request, tool: 'infoindexer.search_companies' }");
+    expect(preloadSource).toContain("{ ...request, tool: 'infoindexer.get_company' }");
+    expect(preloadSource).toContain("{ ...request, tool: 'infoindexer.job_status' }");
+    expect(preloadSource).toContain("{ ...request, tool: 'infoindexer.start_ingest' }");
+    expect(preloadSource).not.toContain("{ tool: 'infoindexer.search_companies', ...request }");
     expect(preloadSource).toContain("ipcRenderer.invoke('ui:load-state'");
     expect(preloadSource).toContain("ipcRenderer.invoke('modes:list'");
     expect(preloadSource).not.toContain('ipcRenderer.on');

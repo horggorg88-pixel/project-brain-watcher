@@ -57,6 +57,7 @@ import {
 } from './desktop-log-redaction.js';
 import { buildDesktopCommandRouteSnapshot } from './desktop-command-route.js';
 import { desktopCheckActionCommandId, descriptorForCommand } from './desktop-command-registry.js';
+import { setupInfoIndexerSection } from './renderer-infoindexer-ui.js';
 
 const POST_SERVICE_ACTION_REFRESH_TIMEOUT_MS = 2_000;
 
@@ -145,6 +146,7 @@ const SERVICE_AI_CONTEXT_TEXT_LIMIT = 120_000;
 const supportEnrollmentRetryMs = 2 * 60 * 1000;
 
 hydrateStaticIcons();
+setupInfoIndexerSection({ getProjectId: currentProjectId, writeLog });
 void renderAppVersion();
 void refresh();
 window.setInterval(() => {

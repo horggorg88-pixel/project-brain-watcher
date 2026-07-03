@@ -217,7 +217,7 @@ function registerIpcHandlers(): void {
     previewMcpDiff(corePaths(), client)
   ));
   ipcMain.handle('modes:list', (_event, projectId?: string) => listDesktopModeSummaries(corePaths(), projectId));
-  ipcMain.handle('infoindexer:call', (_event, request: DesktopInfoIndexerToolCallRequest) => (
+  ipcMain.handle('infoindexer:call', (_event, request: unknown) => (
     callDesktopInfoIndexerTool(corePaths(), request)
   ));
   ipcMain.handle('diagnostics:preview-export', (_event, projectId?: string) => previewDiagnostics(corePaths(), projectId));

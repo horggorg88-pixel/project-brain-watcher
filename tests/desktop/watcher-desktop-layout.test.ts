@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { sectionFrom } from '../../apps/watcher-desktop/src/renderer-view.js';
 
 const layoutCss = readFileSync(new URL('../../apps/watcher-desktop/src/styles/layout.css', import.meta.url), 'utf-8');
 const themesCss = readFileSync(new URL('../../apps/watcher-desktop/src/styles/themes.css', import.meta.url), 'utf-8');
 const indexHtml = readFileSync(new URL('../../apps/watcher-desktop/src/index.html', import.meta.url), 'utf-8');
 const rendererTs = readFileSync(new URL('../../apps/watcher-desktop/src/renderer.ts', import.meta.url), 'utf-8');
+const infoIndexerUiTs = readFileSync(new URL('../../apps/watcher-desktop/src/renderer-infoindexer-ui.ts', import.meta.url), 'utf-8');
 
 describe('watcher desktop layout shell contracts', () => {
   it('keeps the window titlebar, project topbar and log dock as separate sticky layers', () => {
@@ -44,6 +46,21 @@ describe('watcher desktop layout shell contracts', () => {
     expect(rendererTs).toContain('runFullCheckFromUi()');
     expect(rendererTs).toContain('connectionCheckLog(currentConnectionCheck)');
     expect(rendererTs).toContain('Маршрут проверки:');
+  });
+
+  it('adds InfoIndexer as a separate bridge-driven workspace section', () => {
+    expect(indexHtml).toContain('data-nav-section="infoindexer"');
+    expect(indexHtml).toContain('data-section="infoindexer"');
+    expect(indexHtml).toContain('data-infoindexer-search-input');
+    expect(indexHtml).toContain('data-infoindexer-search-submit');
+    expect(indexHtml).toContain('data-infoindexer-search-output');
+    expect(rendererTs).toContain('setupInfoIndexerSection');
+    expect(infoIndexerUiTs).toContain('window.watcherDesktop.infoIndexer.searchCompanies');
+    expect(infoIndexerUiTs).not.toContain('fetch(');
+  });
+
+  it('routes the InfoIndexer nav button through the shared section resolver', () => {
+    expect(sectionFrom('infoindexer')).toBe('infoindexer');
   });
 });
 

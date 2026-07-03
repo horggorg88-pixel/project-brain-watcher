@@ -6,6 +6,11 @@ import type {
   DesktopJsonValue,
   SavedProjectProfile,
 } from './contracts.js';
+import {
+  isDesktopJsonObject,
+  normalizeDesktopInfoIndexerRequest,
+  readDesktopInfoIndexerProjectId,
+} from './desktop-infoindexer-request.js';
 import { buildProjectMcpEndpoint, normalizeMcpServerUrl } from './desktop-mcp-endpoint.js';
 import { discoverMcpConfig } from './desktop-config-discovery.js';
 import { applyMcpConfigToProfile, type DesktopCorePaths } from './desktop-profile-store.js';
@@ -16,8 +21,12 @@ const TOOL_CALL_TIMEOUT_MS = 15_000;
 
 export async function callDesktopInfoIndexerTool(
   paths: DesktopCorePaths,
-  request: DesktopInfoIndexerToolCallRequest,
+  input: unknown,
 ): Promise<DesktopInfoIndexerToolResult> {
+  const request = normalizeDesktopInfoIndexerRequest(input);
+  if (!request) {
+    return localBridgeError('infoindexer.search_companies', readDesktopInfoIndexerProjectId(input), null, 'Запрос InfoIndexer bridge отклонён: неизвестный инструмент.');
+  }
   const profile = resolveInfoIndexerProfile(paths, request.projectId);
   if (!profile) return localBridgeError(request.tool, null, null, 'Профиль проекта InfoIndexer не найден.');
   const endpoint = buildToolsCallEndpoint(profile);
@@ -109,7 +118,7 @@ async function resultFromResponse(
 async function parseJsonResponse(response: Response): Promise<DesktopJsonObject | null> {
   try {
     const parsed = await response.json() as unknown;
-    return isJsonObject(parsed) ? parsed : null;
+    return isDesktopJsonObject(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -174,20 +183,14 @@ function readBoolean(value: DesktopJsonObject | null, key: string): boolean | nu
   return typeof item === 'boolean' ? item : null;
 }
 
+function readNumber(value: DesktopJsonObject | null, key: string): number | undefined {
+  const item = value?.[key];
+  return typeof item === 'number' && Number.isFinite(item) ? item : undefined;
+}
+
 function readJsonObject(value: DesktopJsonObject | null, key: string): DesktopJsonObject | null {
   const item = value?.[key];
-  return isJsonObject(item) ? item : null;
-}
-
-function isJsonObject(value: unknown): value is DesktopJsonObject {
-  return !!value && typeof value === 'object' && !Array.isArray(value) && Object.values(value).every(isJsonValue);
-}
-
-function isJsonValue(value: unknown): value is DesktopJsonValue {
-  if (value === null) return true;
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return true;
-  if (Array.isArray(value)) return value.every(isJsonValue);
-  return isJsonObject(value);
+  return isDesktopJsonObject(item) ? item : null;
 }
 
 function isErrorLike(value: unknown): value is { readonly name?: string; readonly message: string } {

@@ -48,6 +48,8 @@
           <p>Контур MCP</p>
           <button type="button" data-nav-section="prompt">Промт</button>
           <button type="button" data-nav-section="modes">Режимы</button>
+          <p>Данные</p>
+          <button type="button" data-nav-section="infoindexer">InfoIndexer</button>
         </nav>
 
         <section class="account-card" data-profile-card hidden></section>
@@ -151,6 +153,20 @@
             </div>
           </div>
           <div class="mode-stack" data-modes>Загрузка...</div>
+        </section>
+
+        <section class="content-section" data-section="infoindexer" hidden>
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">infoindexer</p>
+              <h2>Поиск организаций</h2>
+            </div>
+          </div>
+          <form class="inline-form" data-infoindexer-search-form>
+            <label>Запрос<input data-infoindexer-search-input name="query" type="search" autocomplete="off" /></label>
+            <button type="submit" data-infoindexer-search-submit>Искать</button>
+          </form>
+          <pre class="code-block" data-infoindexer-search-output>Введите ИНН, ОГРН или название организации.</pre>
         </section>
 
       </section>
