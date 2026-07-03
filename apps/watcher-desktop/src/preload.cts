@@ -6,6 +6,11 @@ import type {
   DesktopCodexGateStatus,
   DesktopConnectionCheck,
   DesktopAccessState,
+  DesktopInfoIndexerCompanyRequest,
+  DesktopInfoIndexerJobStatusRequest,
+  DesktopInfoIndexerSearchRequest,
+  DesktopInfoIndexerStartIngestRequest,
+  DesktopInfoIndexerToolResult,
   DesktopModeSummary,
   DesktopUiState,
   DiagnosticsPreview,
@@ -85,6 +90,20 @@ const api: WatcherDesktopApi = {
   },
   modes: {
     list: (projectId?: string) => ipcRenderer.invoke('modes:list', projectId) as Promise<readonly DesktopModeSummary[]>,
+  },
+  infoIndexer: {
+    searchCompanies: (request: DesktopInfoIndexerSearchRequest) => (
+      ipcRenderer.invoke('infoindexer:call', { tool: 'infoindexer.search_companies', ...request }) as Promise<DesktopInfoIndexerToolResult>
+    ),
+    getCompany: (request: DesktopInfoIndexerCompanyRequest) => (
+      ipcRenderer.invoke('infoindexer:call', { tool: 'infoindexer.get_company', ...request }) as Promise<DesktopInfoIndexerToolResult>
+    ),
+    jobStatus: (request: DesktopInfoIndexerJobStatusRequest) => (
+      ipcRenderer.invoke('infoindexer:call', { tool: 'infoindexer.job_status', ...request }) as Promise<DesktopInfoIndexerToolResult>
+    ),
+    startIngest: (request: DesktopInfoIndexerStartIngestRequest) => (
+      ipcRenderer.invoke('infoindexer:call', { tool: 'infoindexer.start_ingest', ...request }) as Promise<DesktopInfoIndexerToolResult>
+    ),
   },
   diagnostics: {
     previewExport: (projectId?: string) => (

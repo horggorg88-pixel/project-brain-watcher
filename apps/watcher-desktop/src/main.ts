@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type {
   AccessLoginRequest,
   DesktopConfigSaveResult,
+  DesktopInfoIndexerToolCallRequest,
   DesktopUiState,
   McpDiffPreview,
   ProjectDraft,
@@ -17,6 +18,7 @@ import { buildDesktopConfigPackage } from './desktop-config-package.js';
 import { buildDesktopConnectionCheck } from './desktop-connection-check.js';
 import { readDesktopCodexGateEvidence, verifyDesktopCodexGates } from './desktop-codex-gates.js';
 import { importProjectConfig } from './desktop-config-import.js';
+import { callDesktopInfoIndexerTool } from './desktop-infoindexer-bridge.js';
 import { listDesktopModeSummaries } from './desktop-mode-summary.js';
 import { reportDesktopOnboardingProgress } from './desktop-onboarding-events.js';
 import { syncDesktopOnboardingProgress } from './desktop-onboarding-sync.js';
@@ -215,6 +217,9 @@ function registerIpcHandlers(): void {
     previewMcpDiff(corePaths(), client)
   ));
   ipcMain.handle('modes:list', (_event, projectId?: string) => listDesktopModeSummaries(corePaths(), projectId));
+  ipcMain.handle('infoindexer:call', (_event, request: DesktopInfoIndexerToolCallRequest) => (
+    callDesktopInfoIndexerTool(corePaths(), request)
+  ));
   ipcMain.handle('diagnostics:preview-export', (_event, projectId?: string) => previewDiagnostics(corePaths(), projectId));
   ipcMain.handle('support:status', () => readManagedDeviceStatus(corePaths()));
   ipcMain.handle('support:enroll', (_event, projectId?: string) => ensureManagedDeviceEnrolled(corePaths(), projectId));

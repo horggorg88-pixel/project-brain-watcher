@@ -57,6 +57,7 @@ describe('watcher desktop contract', () => {
     expect(preloadSource).toContain("ipcRenderer.invoke('service:run'");
     expect(preloadSource).toContain("ipcRenderer.invoke('service:full-check'");
     expect(preloadSource).toContain("ipcRenderer.invoke('service:log-chunk'");
+    expect(preloadSource).toContain("ipcRenderer.invoke('infoindexer:call'");
     expect(preloadSource).toContain("ipcRenderer.invoke('ui:load-state'");
     expect(preloadSource).toContain("ipcRenderer.invoke('modes:list'");
     expect(preloadSource).not.toContain('ipcRenderer.on');
@@ -69,6 +70,7 @@ describe('watcher desktop contract', () => {
     expect(mainSource).toContain("ipcMain.handle('window:toggle-maximize'");
     expect(mainSource).toContain("ipcMain.handle('window:close'");
     expect(mainSource).toContain("ipcMain.handle('service:log-chunk'");
+    expect(mainSource).toContain("ipcMain.handle('infoindexer:call'");
     expect(contractsSource).not.toContain('readonly serverVerified?: boolean');
     expect(contractsSource).toContain('readonly app:');
     expect(contractsSource).toContain('getVersion(): Promise<string>');
@@ -90,6 +92,11 @@ describe('watcher desktop contract', () => {
     expect(rendererSource).toContain('.brain/mcp.json с bearer');
     expect(contractsSource).toContain('fullCheck(projectId: string)');
     expect(contractsSource).toContain('logChunk(projectId: string, cursorId: string)');
+    expect(contractsSource).toContain('readonly infoIndexer:');
+    expect(contractsSource).toContain('searchCompanies(request: DesktopInfoIndexerSearchRequest)');
+    expect(contractsSource).toContain('getCompany(request: DesktopInfoIndexerCompanyRequest)');
+    expect(contractsSource).toContain('jobStatus(request: DesktopInfoIndexerJobStatusRequest)');
+    expect(contractsSource).toContain('startIngest(request: DesktopInfoIndexerStartIngestRequest)');
     expect(rendererSource).toContain('service.fullCheck');
     expect(rendererSource).toContain('data-check-action');
     expect(rendererSource).toContain('handleCheckAction');

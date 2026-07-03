@@ -405,6 +405,70 @@ export interface DesktopModeSummary {
   readonly rails: readonly DesktopModeRailStage[];
 }
 
+export type DesktopJsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly DesktopJsonValue[]
+  | { readonly [key: string]: DesktopJsonValue };
+
+export type DesktopJsonObject = { readonly [key: string]: DesktopJsonValue };
+
+export type DesktopInfoIndexerToolName =
+  | 'infoindexer.search_companies'
+  | 'infoindexer.get_company'
+  | 'infoindexer.job_status'
+  | 'infoindexer.start_ingest';
+
+export interface DesktopInfoIndexerSearchRequest {
+  readonly projectId: string;
+  readonly query: string;
+  readonly page?: number;
+  readonly limit?: number;
+  readonly projection?: 'compact';
+  readonly filters?: DesktopJsonObject;
+  readonly sort?: DesktopJsonObject;
+}
+
+export interface DesktopInfoIndexerCompanyRequest {
+  readonly projectId: string;
+  readonly companyId?: string;
+  readonly inn?: string;
+  readonly ogrn?: string;
+  readonly sections?: readonly string[];
+}
+
+export interface DesktopInfoIndexerJobStatusRequest {
+  readonly projectId: string;
+  readonly jobId: string;
+}
+
+export interface DesktopInfoIndexerStartIngestRequest {
+  readonly projectId: string;
+  readonly source?: string;
+  readonly mode?: string;
+  readonly idempotencyKey?: string;
+}
+
+export type DesktopInfoIndexerToolCallRequest =
+  | ({ readonly tool: 'infoindexer.search_companies' } & DesktopInfoIndexerSearchRequest)
+  | ({ readonly tool: 'infoindexer.get_company' } & DesktopInfoIndexerCompanyRequest)
+  | ({ readonly tool: 'infoindexer.job_status' } & DesktopInfoIndexerJobStatusRequest)
+  | ({ readonly tool: 'infoindexer.start_ingest' } & DesktopInfoIndexerStartIngestRequest);
+
+export interface DesktopInfoIndexerToolResult {
+  readonly ok: boolean;
+  readonly content: string;
+  readonly structuredContent: DesktopJsonObject | null;
+  readonly isError: boolean;
+  readonly status: number;
+  readonly cacheControl: string | null;
+  readonly endpoint: string | null;
+  readonly projectId: string | null;
+  readonly tool: DesktopInfoIndexerToolName;
+}
+
 export interface WatcherDesktopApi {
   readonly app: {
     getVersion(): Promise<string>;
@@ -442,6 +506,12 @@ export interface WatcherDesktopApi {
   };
   readonly modes: {
     list(projectId?: string): Promise<readonly DesktopModeSummary[]>;
+  };
+  readonly infoIndexer: {
+    searchCompanies(request: DesktopInfoIndexerSearchRequest): Promise<DesktopInfoIndexerToolResult>;
+    getCompany(request: DesktopInfoIndexerCompanyRequest): Promise<DesktopInfoIndexerToolResult>;
+    jobStatus(request: DesktopInfoIndexerJobStatusRequest): Promise<DesktopInfoIndexerToolResult>;
+    startIngest(request: DesktopInfoIndexerStartIngestRequest): Promise<DesktopInfoIndexerToolResult>;
   };
   readonly diagnostics: {
     previewExport(projectId?: string): Promise<DiagnosticsPreview>;
