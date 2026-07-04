@@ -6,6 +6,20 @@ const layoutCss = readFileSync(new URL('../../apps/watcher-desktop/src/styles/la
 const themesCss = readFileSync(new URL('../../apps/watcher-desktop/src/styles/themes.css', import.meta.url), 'utf-8');
 const indexHtml = readFileSync(new URL('../../apps/watcher-desktop/src/index.html', import.meta.url), 'utf-8');
 const rendererTs = readFileSync(new URL('../../apps/watcher-desktop/src/renderer.ts', import.meta.url), 'utf-8');
+const desktopVisualSurfaceFiles = [
+  '../../apps/watcher-desktop/src/index.html',
+  '../../apps/watcher-desktop/src/renderer.ts',
+  '../../apps/watcher-desktop/src/renderer-view.ts',
+  '../../apps/watcher-desktop/src/renderer-service-ui.ts',
+  '../../apps/watcher-desktop/src/renderer-service-command-status.ts',
+  '../../apps/watcher-desktop/src/renderer-icons.ts',
+  '../../apps/watcher-desktop/src/styles.css',
+  '../../apps/watcher-desktop/src/styles/base.css',
+  '../../apps/watcher-desktop/src/styles/components.css',
+  '../../apps/watcher-desktop/src/styles/layout.css',
+  '../../apps/watcher-desktop/src/styles/responsive.css',
+  '../../apps/watcher-desktop/src/styles/themes.css',
+] as const;
 
 describe('watcher desktop layout shell contracts', () => {
   it('keeps the window titlebar, project topbar and log dock as separate sticky layers', () => {
@@ -53,6 +67,10 @@ describe('watcher desktop layout shell contracts', () => {
     expect(indexHtml).not.toContain('data-infoindexer');
     expect(rendererTs).not.toContain('setupInfoIndexerSection');
     expect(rendererTs).not.toContain('renderer-infoindexer-ui');
+    for (const filePath of desktopVisualSurfaceFiles) {
+      const source = readFileSync(new URL(filePath, import.meta.url), 'utf-8');
+      expect(source, filePath).not.toMatch(/InfoIndexer|infoindexer|infoIndexer|watcherDesktop\.infoIndexer/);
+    }
   });
 
   it('does not route InfoIndexer as a desktop section', () => {
