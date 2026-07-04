@@ -6,7 +6,6 @@ const layoutCss = readFileSync(new URL('../../apps/watcher-desktop/src/styles/la
 const themesCss = readFileSync(new URL('../../apps/watcher-desktop/src/styles/themes.css', import.meta.url), 'utf-8');
 const indexHtml = readFileSync(new URL('../../apps/watcher-desktop/src/index.html', import.meta.url), 'utf-8');
 const rendererTs = readFileSync(new URL('../../apps/watcher-desktop/src/renderer.ts', import.meta.url), 'utf-8');
-const infoIndexerUiTs = readFileSync(new URL('../../apps/watcher-desktop/src/renderer-infoindexer-ui.ts', import.meta.url), 'utf-8');
 
 describe('watcher desktop layout shell contracts', () => {
   it('keeps the window titlebar, project topbar and log dock as separate sticky layers', () => {
@@ -48,19 +47,16 @@ describe('watcher desktop layout shell contracts', () => {
     expect(rendererTs).toContain('Маршрут проверки:');
   });
 
-  it('adds InfoIndexer as a separate bridge-driven workspace section', () => {
-    expect(indexHtml).toContain('data-nav-section="infoindexer"');
-    expect(indexHtml).toContain('data-section="infoindexer"');
-    expect(indexHtml).toContain('data-infoindexer-search-input');
-    expect(indexHtml).toContain('data-infoindexer-search-submit');
-    expect(indexHtml).toContain('data-infoindexer-search-output');
-    expect(rendererTs).toContain('setupInfoIndexerSection');
-    expect(infoIndexerUiTs).toContain('window.watcherDesktop.infoIndexer.searchCompanies');
-    expect(infoIndexerUiTs).not.toContain('fetch(');
+  it('keeps InfoIndexer out of the desktop visual surface', () => {
+    expect(indexHtml).not.toContain('data-nav-section="infoindexer"');
+    expect(indexHtml).not.toContain('data-section="infoindexer"');
+    expect(indexHtml).not.toContain('data-infoindexer');
+    expect(rendererTs).not.toContain('setupInfoIndexerSection');
+    expect(rendererTs).not.toContain('renderer-infoindexer-ui');
   });
 
-  it('routes the InfoIndexer nav button through the shared section resolver', () => {
-    expect(sectionFrom('infoindexer')).toBe('infoindexer');
+  it('does not route InfoIndexer as a desktop section', () => {
+    expect(sectionFrom('infoindexer')).toBeNull();
   });
 });
 

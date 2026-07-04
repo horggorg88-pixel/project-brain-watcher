@@ -444,7 +444,7 @@ export function errorMessage(error: unknown): string {
 }
 
 export function sectionFrom(value: string | undefined): DesktopSection | null {
-  const sections: readonly DesktopSection[] = ['start', 'prompt', 'watcher', 'modes', 'infoindexer'];
+  const sections: readonly DesktopSection[] = ['start', 'prompt', 'watcher', 'modes'];
   return typeof value === 'string' && sections.includes(value as DesktopSection) ? value as DesktopSection : null;
 }
 
