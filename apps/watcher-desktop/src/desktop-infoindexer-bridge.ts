@@ -60,6 +60,9 @@ function buildToolsCallEndpoint(profile: SavedProjectProfile): string {
 }
 
 function buildToolArguments(request: DesktopInfoIndexerToolCallRequest): DesktopJsonObject {
+  if (request.tool === 'infoindexer.health') {
+    return { project_id: request.projectId };
+  }
   if (request.tool === 'infoindexer.search_companies') {
     return compactObject({
       project_id: request.projectId,

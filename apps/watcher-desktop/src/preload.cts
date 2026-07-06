@@ -7,6 +7,7 @@ import type {
   DesktopConnectionCheck,
   DesktopAccessState,
   DesktopInfoIndexerCompanyRequest,
+  DesktopInfoIndexerHealthRequest,
   DesktopInfoIndexerJobStatusRequest,
   DesktopInfoIndexerSearchRequest,
   DesktopInfoIndexerStartIngestRequest,
@@ -92,6 +93,9 @@ const api: WatcherDesktopApi = {
     list: (projectId?: string) => ipcRenderer.invoke('modes:list', projectId) as Promise<readonly DesktopModeSummary[]>,
   },
   infoIndexer: {
+    health: (request: DesktopInfoIndexerHealthRequest) => (
+      ipcRenderer.invoke('infoindexer:call', { ...request, tool: 'infoindexer.health' }) as Promise<DesktopInfoIndexerToolResult>
+    ),
     searchCompanies: (request: DesktopInfoIndexerSearchRequest) => (
       ipcRenderer.invoke('infoindexer:call', { ...request, tool: 'infoindexer.search_companies' }) as Promise<DesktopInfoIndexerToolResult>
     ),

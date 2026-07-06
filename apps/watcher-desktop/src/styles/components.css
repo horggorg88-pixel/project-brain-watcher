@@ -694,3 +694,56 @@ h3 {
 .empty-state {
   color: var(--muted);
 }
+
+.infoindexer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.infoindexer-table th,
+.infoindexer-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.infoindexer-table th {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.infoindexer-table tr[data-company-id] {
+  cursor: pointer;
+}
+
+.infoindexer-table tr[data-company-id]:hover,
+.infoindexer-table tr[data-company-id]:focus-visible {
+  background: var(--panel);
+}
+
+.infoindexer-pill {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  border: 1px solid var(--line);
+  padding: 2px 7px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.infoindexer-notice {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  padding: 12px;
+}
+
+.infoindexer-notice[data-severity="warning"] {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}

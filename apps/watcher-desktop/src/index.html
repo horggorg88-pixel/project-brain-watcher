@@ -46,6 +46,7 @@
           <button type="button" data-nav-section="start">Обзор</button>
           <button type="button" data-nav-section="watcher">Watcher</button>
           <p>Контур MCP</p>
+          <button type="button" data-nav-section="infoindexer">Компании</button>
           <button type="button" data-nav-section="prompt">Промт</button>
           <button type="button" data-nav-section="modes">Режимы</button>
         </nav>
@@ -141,6 +142,60 @@
             </div>
           </div>
           <pre class="code-block service-status-output" data-service-status>Проверяем службу...</pre>
+        </section>
+
+        <section class="content-section infoindexer-surface" data-section="infoindexer" data-infoindexer-root hidden>
+          <div class="section-head infoindexer-head">
+            <div>
+              <p class="eyebrow">админка · компании</p>
+              <h2>Индекс компаний</h2>
+              <p class="section-subtitle">Вкладка использует вход в пульт и сервисный bearer выбранного профиля. Отдельный токен здесь не вводится.</p>
+            </div>
+            <div class="infoindexer-toolbar">
+              <span class="overall-badge" data-infoindexer-project>Проект не выбран</span>
+              <button type="button" class="icon-button" data-infoindexer-health aria-label="Проверить индекс компаний" title="Проверить InfoIndexer" data-tooltip="Проверить состояние InfoIndexer через текущий вход пульта">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/><path d="m9 12 2 2 4-4"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="infoindexer-command">
+            <form class="infoindexer-search" data-infoindexer-search-form>
+              <label>
+                Компания
+                <input data-infoindexer-query type="search" placeholder="ИНН, название, домен или ID" autocomplete="off" />
+              </label>
+              <button type="submit">Найти</button>
+            </form>
+            <div class="infoindexer-actions">
+              <button type="button" class="ghost" data-infoindexer-ingest>Переиндексировать</button>
+              <button type="button" class="ghost" data-infoindexer-job>Проверить задачу</button>
+            </div>
+          </div>
+
+          <div class="infoindexer-grid">
+            <div class="infoindexer-results" data-infoindexer-results role="status">
+              <div class="empty-state">
+                <strong>Введите компанию</strong>
+                <p>Результаты появятся здесь. Ошибки источников будут показаны отдельной квитанцией.</p>
+              </div>
+            </div>
+            <div class="infoindexer-detail">
+              <div class="panel-head">
+                <h3>Карточка</h3>
+                <span data-infoindexer-selected>не выбрана</span>
+              </div>
+              <pre class="code-block" data-infoindexer-detail-output>Выберите строку результата.</pre>
+            </div>
+          </div>
+
+          <div class="infoindexer-receipt">
+            <div class="panel-head">
+              <h3>Квитанция</h3>
+              <span data-infoindexer-status>Готово к поиску</span>
+            </div>
+            <pre class="code-block" data-infoindexer-receipt>Вкладка готова. Вход и bearer берутся из пульта.</pre>
+          </div>
         </section>
 
         <section class="content-section mode-surface" data-section="modes" hidden>

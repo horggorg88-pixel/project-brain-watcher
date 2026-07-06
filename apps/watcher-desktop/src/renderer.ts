@@ -57,6 +57,7 @@ import {
 } from './desktop-log-redaction.js';
 import { buildDesktopCommandRouteSnapshot } from './desktop-command-route.js';
 import { desktopCheckActionCommandId, descriptorForCommand } from './desktop-command-registry.js';
+import { setupInfoIndexerSection } from './renderer-infoindexer-ui.js';
 
 const POST_SERVICE_ACTION_REFRESH_TIMEOUT_MS = 2_000;
 
@@ -143,6 +144,11 @@ const SERVICE_AI_LOG_CHUNK_LIMIT = 6;
 const SERVICE_AI_COMMAND_TEXT_LIMIT = 24_000;
 const SERVICE_AI_CONTEXT_TEXT_LIMIT = 120_000;
 const supportEnrollmentRetryMs = 2 * 60 * 1000;
+const infoIndexerUi = setupInfoIndexerSection({
+  api: window.watcherDesktop.infoIndexer,
+  getProjectId: infoIndexerProjectId,
+  writeLog,
+});
 
 hydrateStaticIcons();
 void renderAppVersion();
@@ -600,6 +606,7 @@ async function refreshInternal(): Promise<void> {
   if (!accessState.signedIn) return;
   currentProjects = await safeProjects();
   renderProjectSelect(currentProjects, projectSelect, currentProjectId());
+  renderInfoIndexerBinding();
   await ensureSupportDeviceEnrollment();
   const [check, pack, modes] = await Promise.all([
     safeFullCheck(),
@@ -981,6 +988,20 @@ function currentProjectId(): string {
 function selectedProject(): SavedProjectProfile | undefined {
   const projectId = currentProjectId();
   return projectId ? currentProjects.find(project => project.id === projectId) : undefined;
+}
+
+function infoIndexerProjectId(): string {
+  return currentProjects.find(project => project.id === 'infoindexer')?.id ?? currentProjectId();
+}
+
+function renderInfoIndexerBinding(): void {
+  const projectId = infoIndexerProjectId();
+  const source = !projectId
+    ? 'missing'
+    : projectId === 'infoindexer'
+      ? 'dedicated'
+      : 'selected';
+  infoIndexerUi.renderProject(projectId, source);
 }
 
 function draftFromRoot(root: string): ProjectDraft {

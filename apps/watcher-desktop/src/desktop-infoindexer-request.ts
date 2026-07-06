@@ -6,6 +6,7 @@ import type {
 } from './contracts.js';
 
 const INFOINDEXER_TOOLS: readonly DesktopInfoIndexerToolName[] = [
+  'infoindexer.health',
   'infoindexer.search_companies',
   'infoindexer.get_company',
   'infoindexer.job_status',
@@ -17,6 +18,7 @@ export function normalizeDesktopInfoIndexerRequest(input: unknown): DesktopInfoI
   const tool = readInfoIndexerTool(input);
   const projectId = readString(input, 'projectId') ?? '';
   if (!tool || !projectId) return null;
+  if (tool === 'infoindexer.health') return { tool, projectId };
   if (tool === 'infoindexer.search_companies') return normalizeSearchRequest(input, projectId);
   if (tool === 'infoindexer.get_company') return normalizeCompanyRequest(input, projectId);
   if (tool === 'infoindexer.job_status') {

@@ -20,7 +20,7 @@ export type WatcherPolicyDecision = 'allow' | 'prompt' | 'deny';
 export type WatcherPolicyRisk = 'low' | 'medium' | 'high';
 export type McpConfigSource = 'codex' | 'claude' | 'cursor' | 'generic' | 'none';
 export type DesktopTheme = 'light' | 'dark';
-export type DesktopSection = 'start' | 'prompt' | 'watcher' | 'modes';
+export type DesktopSection = 'start' | 'watcher' | 'infoindexer' | 'prompt' | 'modes';
 export type DesktopOverallStatus = 'ready' | 'action_required' | 'error';
 export type DesktopCheckStatus = 'active' | 'inactive' | 'waiting' | 'error';
 export type DesktopCheckAction =
@@ -416,10 +416,15 @@ export type DesktopJsonValue =
 export type DesktopJsonObject = { readonly [key: string]: DesktopJsonValue };
 
 export type DesktopInfoIndexerToolName =
+  | 'infoindexer.health'
   | 'infoindexer.search_companies'
   | 'infoindexer.get_company'
   | 'infoindexer.job_status'
   | 'infoindexer.start_ingest';
+
+export interface DesktopInfoIndexerHealthRequest {
+  readonly projectId: string;
+}
 
 export interface DesktopInfoIndexerSearchRequest {
   readonly projectId: string;
@@ -452,6 +457,7 @@ export interface DesktopInfoIndexerStartIngestRequest {
 }
 
 export type DesktopInfoIndexerToolCallRequest =
+  | ({ readonly tool: 'infoindexer.health' } & DesktopInfoIndexerHealthRequest)
   | ({ readonly tool: 'infoindexer.search_companies' } & DesktopInfoIndexerSearchRequest)
   | ({ readonly tool: 'infoindexer.get_company' } & DesktopInfoIndexerCompanyRequest)
   | ({ readonly tool: 'infoindexer.job_status' } & DesktopInfoIndexerJobStatusRequest)
@@ -508,6 +514,7 @@ export interface WatcherDesktopApi {
     list(projectId?: string): Promise<readonly DesktopModeSummary[]>;
   };
   readonly infoIndexer: {
+    health(request: DesktopInfoIndexerHealthRequest): Promise<DesktopInfoIndexerToolResult>;
     searchCompanies(request: DesktopInfoIndexerSearchRequest): Promise<DesktopInfoIndexerToolResult>;
     getCompany(request: DesktopInfoIndexerCompanyRequest): Promise<DesktopInfoIndexerToolResult>;
     jobStatus(request: DesktopInfoIndexerJobStatusRequest): Promise<DesktopInfoIndexerToolResult>;

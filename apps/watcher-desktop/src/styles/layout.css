@@ -314,6 +314,79 @@
   border-color: var(--line-strong);
 }
 
+.section-subtitle {
+  max-width: 680px;
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.infoindexer-surface {
+  display: grid;
+  gap: 12px;
+}
+
+.infoindexer-head {
+  align-items: center;
+}
+
+.infoindexer-toolbar,
+.infoindexer-actions,
+.infoindexer-search {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.infoindexer-toolbar {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.infoindexer-command {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.infoindexer-search label {
+  flex: 1 1 360px;
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.infoindexer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 12px;
+}
+
+.infoindexer-results,
+.infoindexer-detail,
+.infoindexer-receipt {
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  padding: 12px;
+}
+
+.infoindexer-results {
+  min-height: 280px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.infoindexer-detail .code-block,
+.infoindexer-receipt .code-block {
+  max-height: 260px;
+  margin-top: 8px;
+}
+
 .split-grid {
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);

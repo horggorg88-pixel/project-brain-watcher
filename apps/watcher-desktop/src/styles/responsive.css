@@ -64,11 +64,14 @@
   .split-grid,
   .form-grid,
   .launch-master-grid,
+  .infoindexer-command,
+  .infoindexer-grid,
   .service-head {
     grid-template-columns: 1fr;
   }
 
-  .service-toolbar {
+  .service-toolbar,
+  .infoindexer-toolbar {
     justify-content: start;
   }
 
@@ -137,6 +140,12 @@
 
   .mode-facts {
     grid-template-columns: 1fr;
+  }
+
+  .infoindexer-actions,
+  .infoindexer-search {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .launch-route {

@@ -97,6 +97,63 @@ describe('watcher desktop InfoIndexer bridge', () => {
     });
     expect(result.content).toContain('неизвестный инструмент');
   });
+
+  it('checks InfoIndexer health through the project bearer bridge', async () => {
+    const paths = testPaths();
+    const profile = saveProfile(paths, {
+      id: 'infoindexer',
+      name: 'InfoIndexer',
+      root: join(paths.userDataPath, 'INFOINDEXER'),
+      indexId: 'idx-infoindexer',
+      serverUrl: 'http://127.0.0.1:14900/mcp/p/infoindexer',
+      tokenEnv: 'MCP_BEARER_TOKEN',
+    }, { stageLocalSecrets: false });
+    stageDesktopServiceSecret(profile, 'pb_desktop_infoindexer_secret_12345');
+
+    const fetchMock = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => new Response(JSON.stringify({
+      ok: true,
+      content: 'health ok',
+      structuredContent: {
+        schemaVersion: 'infoindexer.health/v1',
+        status: 'ok',
+        project_id: 'infoindexer',
+      },
+      isError: false,
+    }), {
+      status: 200,
+      headers: { 'Cache-Control': 'no-store' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await callDesktopInfoIndexerTool(paths, {
+      tool: 'infoindexer.health',
+      projectId: 'infoindexer',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:14900/api/tools/call', expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({
+        authorization: 'Bearer pb_desktop_infoindexer_secret_12345',
+        'content-type': 'application/json',
+      }),
+      body: JSON.stringify({
+        tool: 'infoindexer.health',
+        arguments: {
+          project_id: 'infoindexer',
+        },
+      }),
+    }));
+    expect(result).toMatchObject({
+      ok: true,
+      content: 'health ok',
+      isError: false,
+      status: 200,
+      cacheControl: 'no-store',
+      endpoint: 'http://127.0.0.1:14900/api/tools/call',
+      projectId: 'infoindexer',
+      tool: 'infoindexer.health',
+    });
+  });
 });
 
 function testPaths(): DesktopCorePaths {
