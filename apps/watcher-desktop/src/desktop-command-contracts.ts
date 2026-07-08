@@ -41,7 +41,9 @@ export type DesktopCommandId =
   | 'support.update_watcher'
   | 'support.verify_codex_gates'
   | 'support.refresh_mcp_config'
-  | 'support.mesh_status';
+  | 'support.mesh_status'
+  | 'support.delete_pult'
+  | 'support.delete_project_index';
 
 export type DesktopCommandProgressStepStatus = 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
 

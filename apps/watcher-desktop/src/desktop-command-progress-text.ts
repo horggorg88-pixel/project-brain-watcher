@@ -75,6 +75,8 @@ export const DESKTOP_COMMAND_PROGRESS_TEXT: Readonly<Record<DesktopCommandId, De
   'support.verify_codex_gates': supportText('какой статус Codex gates вернул удалённый job'),
   'support.refresh_mcp_config': supportText('как завершилось удалённое обновление MCP config'),
   'support.mesh_status': supportText('какой mesh-status вернул удалённый job'),
+  'support.delete_pult': supportText('подтвердил ли пульт удаление локальной support-регистрации'),
+  'support.delete_project_index': supportText('какой локальный профиль проекта удалён из пульта'),
 };
 
 function commandText(

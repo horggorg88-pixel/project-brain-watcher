@@ -42,7 +42,9 @@ export type SupportAgentAction =
   | 'update_watcher'
   | 'verify_codex_gates'
   | 'refresh_mcp_config'
-  | 'mesh_status';
+  | 'mesh_status'
+  | 'delete_pult'
+  | 'delete_project_index';
 export type AccessStatus =
   | 'signed_out'
   | 'config_missing'

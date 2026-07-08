@@ -23,6 +23,8 @@ export const SUPPORT_COMMAND_IDS: Record<SupportAgentAction, DesktopCommandId> =
   verify_codex_gates: 'support.verify_codex_gates',
   refresh_mcp_config: 'support.refresh_mcp_config',
   mesh_status: 'support.mesh_status',
+  delete_pult: 'support.delete_pult',
+  delete_project_index: 'support.delete_project_index',
 };
 
 export const DESKTOP_CHECK_ACTION_COMMAND_IDS: Readonly<Partial<Record<DesktopCheckAction, DesktopCommandId>>> = {
@@ -50,6 +52,8 @@ export const DESKTOP_COMMAND_GLOBAL_ACTION_IDS: Readonly<Record<DesktopCommandId
   'support.verify_codex_gates': 'desktop:support.verify_codex_gates',
   'support.refresh_mcp_config': 'desktop:support.refresh_mcp_config',
   'support.mesh_status': 'desktop:support.mesh_status',
+  'support.delete_pult': 'desktop:support.delete_pult',
+  'support.delete_project_index': 'desktop:support.delete_project_index',
 };
 
 const SERVICE_HEALTH_STEPS = ['preflight', 'service_status', 'logs', 'diagnostics'] as const;
@@ -99,6 +103,8 @@ const SUPPORT_DESCRIPTOR_SEEDS: readonly SupportDescriptorSeed[] = [
   ['support.verify_codex_gates', 'Remote: проверить Codex gates', 'medium', false, 180_000, ['support.job', 'codex.gates']],
   ['support.refresh_mcp_config', 'Remote: обновить MCP-конфиг', 'medium', true, 90_000, ['support.job', 'mcp.config', 'server.access']],
   ['support.mesh_status', 'Remote: проверить mesh', 'low', false, 10_000, ['support.job', 'mesh.status']],
+  ['support.delete_pult', 'Remote: удалить пульт из управления', 'high', true, 30_000, ['support.job', 'desktop-support-device.json']],
+  ['support.delete_project_index', 'Remote: забыть индекс проекта', 'high', true, 60_000, ['support.job', 'project-profiles.json']],
 ];
 
 export const DESKTOP_COMMAND_DESCRIPTORS: readonly DesktopCommandDescriptor[] = [

@@ -39,6 +39,8 @@ describe('watcher desktop command receipts', () => {
       'support.verify_codex_gates',
       'support.refresh_mcp_config',
       'support.mesh_status',
+      'support.delete_pult',
+      'support.delete_project_index',
     ]));
     expect(new Set(ids).size).toBe(ids.length);
     expect(descriptorForCommand('watcher.update').timeoutMs).toBe(600_000);
@@ -50,6 +52,8 @@ describe('watcher desktop command receipts', () => {
     expect(watcherServiceCommandId('check_update')).toBe('watcher.check_update');
     expect(watcherServiceCommandId('update')).toBe('watcher.update');
     expect(supportCommandId('refresh_mcp_config')).toBe('support.refresh_mcp_config');
+    expect(supportCommandId('delete_pult')).toBe('support.delete_pult');
+    expect(supportCommandId('delete_project_index')).toBe('support.delete_project_index');
   });
 
   it('turns service progress, cause and log cursors into a machine-readable receipt', () => {

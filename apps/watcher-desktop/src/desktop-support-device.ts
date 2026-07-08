@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { hostname, platform, release, userInfo } from "node:os";
 import { join } from "node:path";
 import type { DesktopCorePaths } from "./desktop-profile-store.js";
@@ -44,6 +44,11 @@ export interface SupportDeviceCredentials {
   readonly meshUrl: string | null;
 }
 
+export interface SupportDeviceRemoval {
+  readonly statePath: string;
+  readonly deleted: boolean;
+}
+
 export function readSupportDeviceCredentials(
   paths: DesktopCorePaths,
 ): SupportDeviceCredentials | null {
@@ -85,6 +90,13 @@ export function readManagedDeviceStatus(
     message: "Support-устройство зарегистрировано и готово к heartbeat/jobs.",
     updatedAt: state.updatedAt,
   };
+}
+
+export function forgetManagedDevice(paths: DesktopCorePaths): SupportDeviceRemoval {
+  const path = statePath(paths);
+  const existed = existsSync(path);
+  rmSync(path, { force: true });
+  return { statePath: path, deleted: existed };
 }
 
 export async function enrollManagedDevice(

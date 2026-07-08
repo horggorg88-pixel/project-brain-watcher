@@ -6,8 +6,17 @@ import { descriptorForCommand, supportCommandId } from './desktop-command-regist
 import type { SupportAgentAction } from './contracts.js';
 import { previewDiagnostics } from './desktop-core.js';
 import { syncDesktopOnboardingProgress } from './desktop-onboarding-sync.js';
-import type { DesktopCorePaths } from './desktop-profile-store.js';
-import { ensureManagedDeviceEnrolled, readSupportDeviceCredentials, type SupportDeviceCredentials } from './desktop-support-device.js';
+import {
+  readProfiles,
+  removeProfile,
+  type DesktopCorePaths,
+} from './desktop-profile-store.js';
+import {
+  ensureManagedDeviceEnrolled,
+  forgetManagedDevice,
+  readSupportDeviceCredentials,
+  type SupportDeviceCredentials,
+} from './desktop-support-device.js';
 import { runServiceAction } from './desktop-service-runner.js';
 import { readDesktopUiState } from './desktop-ui-state.js';
 
@@ -226,7 +235,50 @@ async function executeSupportJob(
     return { connection: sync.check, onboardingReports: sync.reports };
   }
   if (job.action === 'mesh_status') return { meshUrl, ready: Boolean(meshUrl) };
+  if (job.action === 'delete_pult') {
+    const removal = forgetManagedDevice(paths);
+    return {
+      localSupportStateDeleted: removal.deleted,
+      supportStatePath: removal.statePath,
+    };
+  }
+  if (job.action === 'delete_project_index') {
+    const before = readProfiles(paths);
+    const serviceStop = shouldStopWatcherService(job.payload)
+      ? await tryStopWatcherService(paths, projectId)
+      : { attempted: false, skippedReason: 'payload_disabled' };
+    const remaining = removeProfile(paths, projectId, projectRootFromPayload(job.payload));
+    return {
+      projectId,
+      localProfileDeleted: remaining.length < before.length,
+      remainingProfiles: remaining.map(profile => profile.id),
+      serviceStop,
+      projectFolderDeleted: false,
+    };
+  }
   throw new Error(`Неизвестное support-действие: ${job.action}`);
+}
+
+async function tryStopWatcherService(
+  paths: DesktopCorePaths,
+  projectId: string,
+): Promise<Record<string, unknown>> {
+  try {
+    return {
+      attempted: true,
+      result: await runServiceAction(paths, {
+        action: 'stop',
+        projectId,
+        confirmed: true,
+      }),
+    };
+  } catch (error) {
+    return {
+      attempted: true,
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function withSupportJobTimeout<T>(
@@ -255,6 +307,8 @@ function supportJobTimeoutMs(action: SupportJobAction): number {
   const configured = Number(process.env[SUPPORT_JOB_TIMEOUT_ENV] ?? '');
   if (Number.isFinite(configured) && configured >= 10) return Math.trunc(configured);
   if (action === 'mesh_status') return 10_000;
+  if (action === 'delete_pult') return 30_000;
+  if (action === 'delete_project_index') return 60_000;
   if (action === 'collect_diagnostics') return 30_000;
   if (action === 'refresh_mcp_config') return 90_000;
   if (action === 'verify_codex_gates') return 180_000;
@@ -280,6 +334,8 @@ function supportActionProgressMessage(action: SupportJobAction): string {
   if (action === 'update_watcher') return 'Проверяем и устанавливаем обновление watcher.';
   if (action === 'verify_codex_gates') return 'Проверяем Codex gates и evidence.';
   if (action === 'refresh_mcp_config') return 'Проверяем MCP-конфиг и подключение.';
+  if (action === 'delete_pult') return 'Удаляем локальную support-регистрацию пульта.';
+  if (action === 'delete_project_index') return 'Останавливаем watcher и забываем локальный профиль проекта.';
   return 'Проверяем состояние удалённого доступа.';
 }
 
@@ -333,13 +389,24 @@ function isSupportJobAction(value: unknown): value is SupportJobAction {
     value === 'update_watcher' ||
     value === 'verify_codex_gates' ||
     value === 'refresh_mcp_config' ||
-    value === 'mesh_status'
+    value === 'mesh_status' ||
+    value === 'delete_pult' ||
+    value === 'delete_project_index'
   );
 }
 
 function projectIdFromPayload(payload: Record<string, unknown>, fallback: string | undefined): string {
   const projectId = payload['projectId'] ?? payload['project_id'];
   return typeof projectId === 'string' && projectId.trim() ? projectId.trim() : fallback ?? 'default';
+}
+
+function projectRootFromPayload(payload: Record<string, unknown>): string | null {
+  const root = payload['root'] ?? payload['localPath'] ?? payload['local_path'];
+  return typeof root === 'string' && root.trim() ? root.trim() : null;
+}
+
+function shouldStopWatcherService(payload: Record<string, unknown>): boolean {
+  return payload['stopWatcherService'] !== false;
 }
 
 function supportPollIntervalMs(): number {

@@ -16,7 +16,10 @@ import {
 } from "../../apps/watcher-desktop/src/desktop-support-device.js";
 import { runSupportAgentOnce } from "../../apps/watcher-desktop/src/desktop-support-agent.js";
 import type { DesktopAccountAuthorization } from "../../apps/watcher-desktop/src/desktop-account-auth.js";
-import { saveProfile } from "../../apps/watcher-desktop/src/desktop-profile-store.js";
+import {
+  readProfiles,
+  saveProfile,
+} from "../../apps/watcher-desktop/src/desktop-profile-store.js";
 import { stageDesktopServiceSecret } from "../../apps/watcher-desktop/src/desktop-service-secret.js";
 
 const tempDirs: string[] = [];
@@ -170,6 +173,138 @@ describe("watcher desktop support device", () => {
     expect(receipt.ackState).toBe("server_pending");
     expect(receipt.receiptId).toMatch(/^dcr_[a-f0-9]{20}$/);
     expect(receiptLedger.saved).toBe(true);
+  });
+
+  it("removes local support enrollment after a delete pult job completes", async () => {
+    const paths = tempPaths();
+    let completeBody: Record<string, unknown> | null = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        if (urlOf(input).endsWith("/api/support/devices/enroll")) {
+          return jsonResponse({
+            ok: true,
+            device: { deviceId: "dev_delete", meshUrl: null },
+            deviceToken: DEVICE_TOKEN,
+          });
+        }
+        if (urlOf(input).endsWith("/api/support/devices/heartbeat")) {
+          return jsonResponse({ ok: true, device: { deviceId: "dev_delete" } });
+        }
+        if (urlOf(input).endsWith("/api/support/jobs/claim")) {
+          return jsonResponse({
+            ok: true,
+            job: {
+              jobId: "job_delete_pult",
+              action: "delete_pult",
+              payload: { projectId: "mcp-project" },
+            },
+          });
+        }
+        if (urlOf(input).endsWith("/api/support/jobs/job_delete_pult/progress")) {
+          return jsonResponse({
+            ok: true,
+            job: { jobId: "job_delete_pult", status: "running" },
+          });
+        }
+        if (urlOf(input).endsWith("/api/support/jobs/job_delete_pult/complete")) {
+          completeBody = JSON.parse(String(init?.body ?? "{}")) as Record<
+            string,
+            unknown
+          >;
+          return jsonResponse({
+            ok: true,
+            job: { jobId: "job_delete_pult", status: "succeeded" },
+          });
+        }
+        return jsonResponse({ ok: false, error: "unexpected request" }, 404);
+      }),
+    );
+
+    await enrollManagedDevice(paths, account(), "mcp-project");
+    const statePath = join(paths.userDataPath, "desktop-support-device.json");
+    expect(existsSync(statePath)).toBe(true);
+    const result = await runSupportAgentOnce(paths, "mcp-project");
+
+    const completeResult = completeBody?.result as Record<string, unknown>;
+    expect(result.status).toBe("completed");
+    expect(existsSync(statePath)).toBe(false);
+    expect(completeResult.localSupportStateDeleted).toBe(true);
+  });
+
+  it("removes the selected project profile after a delete project index job completes", async () => {
+    const paths = tempPaths();
+    const projectRoot = join(paths.homePath, "infoindexer");
+    mkdirSync(projectRoot, { recursive: true });
+    saveProfile(paths, {
+      id: "infoindexer",
+      name: "InfoIndexer",
+      root: projectRoot,
+      indexId: "idx-infoindexer",
+      serverUrl: "http://149.33.14.250",
+      consoleUrl: "http://console.example.test",
+      tokenEnv: "MCP_BEARER_TOKEN",
+    });
+    let completeBody: Record<string, unknown> | null = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        if (urlOf(input).endsWith("/api/support/devices/enroll")) {
+          return jsonResponse({
+            ok: true,
+            device: { deviceId: "dev_project_delete", meshUrl: null },
+            deviceToken: DEVICE_TOKEN,
+          });
+        }
+        if (urlOf(input).endsWith("/api/support/devices/heartbeat")) {
+          return jsonResponse({
+            ok: true,
+            device: { deviceId: "dev_project_delete" },
+          });
+        }
+        if (urlOf(input).endsWith("/api/support/jobs/claim")) {
+          return jsonResponse({
+            ok: true,
+            job: {
+              jobId: "job_delete_project",
+              action: "delete_project_index",
+              payload: { projectId: "infoindexer", stopWatcherService: false },
+            },
+          });
+        }
+        if (urlOf(input).endsWith("/api/support/jobs/job_delete_project/progress")) {
+          return jsonResponse({
+            ok: true,
+            job: { jobId: "job_delete_project", status: "running" },
+          });
+        }
+        if (urlOf(input).endsWith("/api/support/jobs/job_delete_project/complete")) {
+          completeBody = JSON.parse(String(init?.body ?? "{}")) as Record<
+            string,
+            unknown
+          >;
+          return jsonResponse({
+            ok: true,
+            job: { jobId: "job_delete_project", status: "succeeded" },
+          });
+        }
+        return jsonResponse({ ok: false, error: "unexpected request" }, 404);
+      }),
+    );
+
+    await enrollManagedDevice(paths, account(), "infoindexer");
+    expect(readProfiles(paths).map((profile) => profile.id)).toContain(
+      "infoindexer",
+    );
+    const result = await runSupportAgentOnce(paths, "infoindexer");
+
+    const completeResult = completeBody?.result as Record<string, unknown>;
+    expect(result.status).toBe("completed");
+    expect(readProfiles(paths).map((profile) => profile.id)).not.toContain(
+      "infoindexer",
+    );
+    expect(completeResult.projectId).toBe("infoindexer");
+    expect(completeResult.localProfileDeleted).toBe(true);
   });
 
   it("posts progress events while executing claimed support jobs", async () => {
